@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>DRIFTDREAM — car gallery</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#07040e; font-family:system-ui,-apple-system,sans-serif; color:#e8e4f5; }
+  canvas#gl { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #labels { position:fixed; inset:0; z-index:5; pointer-events:none; font-size:14px; letter-spacing:0.04em;
+    text-shadow:0 1px 4px rgba(0,0,0,0.8); }
+  #labels span { position:absolute; opacity:0.85; transform:translate(-50%, 0); white-space:nowrap; }
+  #hud { position:fixed; top:10px; left:12px; z-index:5; font-size:12px; opacity:0.6; pointer-events:none; line-height:1.4; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="labels">
+  <span data-i="0">Apex Formula</span><span data-i="1">Endurance Prototype</span><span data-i="2">Neon Speeder</span><span data-i="3">Classic Cigar</span>
+</div>
+<div id="hud">DRIFTDREAM gallery — Phase 1 turntable harness (dev tool, not shipped)</div>
+
+<!-- Deliberately NOT the same script set as index.html: trackgen.js/physics.js/audio.js/input.js/
+     game.js are all excluded. This harness is a dedicated display stage, not a slice of the random
+     track generator — no road width/curvature to fight, no bot-sim/terrain-grid cost on load. Only
+     the THREE lib set + core/theme (DD.GARAGE paint/finish) + carspec (the presets) + scene (the
+     renderer) are needed. -->
+<script src="js/lib/three.min.js"></script>
+<script src="js/lib/CopyShader.js"></script>
+<script src="js/lib/LuminosityHighPassShader.js"></script>
+<script src="js/lib/EffectComposer.js"></script>
+<script src="js/lib/ShaderPass.js"></script>
+<script src="js/lib/MaskPass.js"></script>
+<script src="js/lib/RenderPass.js"></script>
+<script src="js/lib/UnrealBloomPass.js"></script>
+<script src="js/lib/FXAAShader.js"></script>
+<script src="js/core.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/carspec.js"></script>
+<script src="js/scene.js"></script>
+
+<script>
+window.addEventListener('DOMContentLoaded', function () {
+  const canvas = document.getElementById('gl');
+  const renderer = DD.createRenderer(canvas, 'high');
+  // this stage has far fewer lights than the real game world (no neon decor/arches), so the shared
+  // 0.78 exposure (tuned for that busier scene) reads dim here — lift it for a clearer QA view.
+  renderer.toneMappingExposure = 1.15;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 6000);
+  const composer = DD.createComposer(renderer, scene, camera, 'high');
+  window.__renderer = renderer; window.__scene = scene; // debug hooks for preview_eval inspection
+
+  let updateLabels = function () {}; // replaced once the cars/label elements exist
+  function renderFrame() {
+    if (composer) composer.render(); else renderer.render(scene, camera);
+    updateLabels();
+  }
+
+  // ---- dusk/neon backdrop, purpose-built (no trackgen dependency) ----
+  (function buildBackdrop() {
+    const c = document.createElement('canvas'); c.width = 2; c.height = 256;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#150a2e');
+    g.addColorStop(0.45, '#4a2d78');
+    g.addColorStop(0.78, '#c15a7a');
+    g.addColorStop(1, '#ffb37b');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    scene.background = tex;
+    scene.fog = new THREE.Fog(0x2a1840, 30, 200);
+
+    const N = 300, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const r = 250, theta = Math.random() * Math.PI * 2, phi = Math.random() * 0.55 * Math.PI;
+      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      pos[i * 3 + 1] = r * Math.cos(phi) * 0.6 + 30;
+      pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    const sgeo = new THREE.BufferGeometry();
+    sgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(sgeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, transparent: true, opacity: 0.85 })));
+  })();
+
+  const hemi = new THREE.HemisphereLight(0x9d8bff, 0x2a1840, 1.8);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffb37b, 2.6);
+  sun.position.set(-7, 14, -10); // front-quartering key light, same general side as the default camera
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -12; sun.shadow.camera.right = 12;
+  sun.shadow.camera.top = 8; sun.shadow.camera.bottom = -8;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 40;
+  scene.add(sun);
+
+  // reuse DD.captureEnvironment for PBR reflections — it only needs a track-shaped stub
+  // (samples[startIdx].p), not a real generated track.
+  DD.captureEnvironment(renderer, scene, { samples: [{ p: [0, 10, 0] }], startIdx: 0 });
+
+  // ---- the display stage: a dedicated flat platform, sized for a 4-car row ----
+  const PLATFORM_W = 18, PLATFORM_D = 8;
+  const platform = new THREE.Mesh(
+    new THREE.BoxGeometry(PLATFORM_W, 0.3, PLATFORM_D),
+    new THREE.MeshStandardMaterial({ color: 0x171220, metalness: 0.35, roughness: 0.55 })
+  );
+  platform.position.set(0, -0.15, 0);
+  platform.receiveShadow = true;
+  scene.add(platform);
+
+  // ---- the 4 locked presets, in a row on the stage ----
+  const ROW_X = [-6, -2, 2, 6];
+  const cars = DD.CAR_PRESETS.map(function (preset, i) {
+    const car = DD.buildCarFromSpec(preset, {
+      ghost: false,
+      envMap: scene.environment,
+      garage: { grad: preset.gallery.grad, finish: preset.gallery.finish, form: i }
+    });
+    scene.add(car);
+    DD.poseCar(car, [ROW_X[i], 0, 0], Math.PI, [0, 1, 0], 0, 0, 0, 0, 0); // yaw=PI: nose toward the default camera
+    return car;
+  });
+  window.__cars = cars; window.__camera = camera; // debug hooks
+
+  // labels track each car's actual projected screen position — a fixed left-to-right DOM order
+  // reads wrong the moment the camera isn't dead-on (an oblique row shot can visually reverse the
+  // world-X order on screen, confirmed while QA'ing the 35° hero shot).
+  const labelEls = Array.prototype.slice.call(document.querySelectorAll('#labels span'));
+  const _labelV = new THREE.Vector3();
+  updateLabels = function () {
+    labelEls.forEach(function (el) {
+      const car = cars[+el.dataset.i]; if (!car) return;
+      _labelV.set(car.position.x, car.position.y + 1.2, car.position.z).project(camera);
+      if (_labelV.z > 1) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.style.left = ((_labelV.x * 0.5 + 0.5) * window.innerWidth) + 'px';
+      el.style.top = ((-_labelV.y * 0.5 + 0.5) * window.innerHeight + 12) + 'px';
+    });
+  };
+
+  // ---- informational rubric numbers (CAR_REBUILD_PLAN.md §4) ----
+  // NOTE: (b)'s axle-flare/waist-pinch formula assumes the generic turnkey silhouette. Tibba's
+  // sculpted Apex/Endurance/Neon hulls deliberately invert that ("wide cockpit bulge" per
+  // CAR_DESIGN_SYSTEM.md §8) — so these are printed as data, not a hard pass/fail, except (c)
+  // canopy ratio which is a universal proportion check regardless of silhouette philosophy.
+  console.table(DD.CAR_PRESETS.map(function (p) {
+    const st = p.chassis.hull.station; // [z=1 .. z=-1], 9 entries
+    const s3 = st[2][1], s4 = st[3][1], s7 = st[6][1]; // front axle / waist / rear axle halfWidth
+    // hull station z_pct spans -1..+1 (2 units), each unit = one wheelbase (buildHull: wz =
+    // z_pct*wheelbase+midZ) — so the hull's actual nose-to-tail length is 2x the wheelbase, not the
+    // wheelbase itself. (Caught via a manual bounding-box check — using plain wheelbase here would
+    // double every ratio and falsely fail 3 of the 4 presets.)
+    const totalLen = 2 * (p.chassis.hardpoints.frontZ - p.chassis.hardpoints.rearZ) * p.chassis.L;
+    // buildCanopy scales the canopy sphere's Z by canopy.scale[2]*L (see scene.js buildCanopy) — the
+    // L factor must match on both sides of the ratio or it doesn't cancel and skews smaller-L presets.
+    const canopyRatio = (p.canopy.scale[2] * 2 * p.chassis.L) / totalLen;
+    return {
+      preset: p.name,
+      'axleF/waist': (s3 / s4).toFixed(2),
+      'axleR/waist': (s7 / s4).toFixed(2),
+      'canopyRatio': canopyRatio.toFixed(2),
+      'canopyPass(<=0.25)': canopyRatio <= 0.25
+    };
+  }));
+
+  // ---- camera framing helpers (call via preview_eval / browser console) ----
+  function orbit(center, angleDeg, radius, height) {
+    const rad = (angleDeg || 0) * Math.PI / 180;
+    return [center[0] + Math.sin(rad) * radius, center[1] + height, center[2] - Math.cos(rad) * radius];
+  }
+  window.frameRow = function (angleDeg) {
+    const p = orbit([0, 0, 0], angleDeg == null ? 35 : angleDeg, 15, 4.2);
+    camera.position.set(p[0], p[1], p[2]);
+    camera.lookAt(0, 0.5, 0);
+    renderFrame();
+  };
+  window.frameCar = function (index, angleDeg) {
+    const car = cars[index]; if (!car) return;
+    const c = car.position;
+    if (angleDeg === 'top') {
+      camera.position.set(c.x, c.y + 8, c.z + 0.01);
+      camera.lookAt(c.x, c.y, c.z);
+    } else {
+      const p = orbit([c.x, c.y, c.z], angleDeg == null ? 35 : angleDeg, 4.2, 1.6);
+      camera.position.set(p[0], p[1], p[2]);
+      camera.lookAt(c.x, c.y + 0.4, c.z);
+    }
+    renderFrame();
+  };
+  window.bumpWheelSpin = function (index, radians) {
+    const car = cars[index]; if (!car) return;
+    const p = car.position;
+    DD.poseCar(car, [p.x, p.y, p.z], Math.PI, [0, 1, 0], 0, 0, radians == null ? 0.6 : radians, 0, 0);
+    renderFrame();
+  };
+  // orbit the sun around Y for the specular-continuity rubric check (f)
+  window.orbitSun = function (angleDeg) {
+    const p = orbit([0, 0, 0], angleDeg == null ? 0 : angleDeg, 14, 10);
+    sun.position.set(p[0], p[1], p[2]);
+    renderFrame();
+  };
+  window.__fit = function () {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (composer) {
+      composer.setSize(window.innerWidth, window.innerHeight);
+      if (composer._fxaa) {
+        const dpr = renderer.getPixelRatio();
+        composer._fxaa.material.uniforms['resolution'].value.set(1 / (window.innerWidth * dpr), 1 / (window.innerHeight * dpr));
+      }
+    }
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderFrame();
+  };
+
+  window.addEventListener('resize', window.__fit);
+  window.__fit();
+  window.frameRow(35);
+});
+</script>
+</body>
+</html>

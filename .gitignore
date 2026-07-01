@@ -1,0 +1,20 @@
+# Dependencies (reinstall via npm install)
+node_modules/
+apk-build/node_modules/
+
+# Capacitor: synced duplicate of the root game, regenerated via apk-build/sync.bat|sh
+apk-build/www/
+
+# Android/Gradle build output (apk-build/android already has its own .gitignore for the rest)
+apk-build/android/capacitor-cordova-android-plugins/
+
+# Test run output — regenerated per run; tests/screenshots/golden/ is the committed baseline
+tests/screenshots/actual/
+tests/screenshots/diff/
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db

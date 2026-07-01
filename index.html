@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>DRIFTDREAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Azeret+Mono:ital,wght@0,100..900;1,100..900&family=Outfit:wght@200;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #9d7bff;
+    --accent-rgb: 157, 123, 255;
+    --accent2: #ff7bd5;
+    --accent2-rgb: 255, 123, 213;
+    --warm: #ffb37b;
+    --warm-rgb: 255, 179, 123;
+    --bg-primary: #07040e;
+    --bg-panel: rgba(10, 7, 22, 0.72);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+  html,body { width:100%; height:100%; overflow:hidden; background:var(--bg-primary); font-family:'Outfit',system-ui,-apple-system,sans-serif; color:#e8e4f5; }
+  canvas#gl { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; z-index:1; }
+
+  /* cinematic post: vignette + grain + subtle scanline. Pure CSS overlay, no GPU cost on the scene. */
+  #post { position:fixed; inset:0; pointer-events:none; z-index:3; }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:3;
+    background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(5,2,12,0.35) 80%, rgba(3,1,8,0.65) 100%); }
+  #grain { position:fixed; inset:-50%; pointer-events:none; z-index:4; opacity:0.045;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain 0.6s steps(2) infinite; }
+  @keyframes grain { 0%{transform:translate(0,0)} 50%{transform:translate(-6%,4%)} 100%{transform:translate(4%,-3%)} }
+
+  /* Screens & Menus */
+  .screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10;
+    background:radial-gradient(120% 120% at 50% 110%, rgba(var(--accent-rgb), 0.15) 0%, rgba(5, 3, 10, 0.95) 55%, #05030a 100%);
+    animation: screen-boot 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both, boot-flicker 0.3s linear both; }
+  
+  @keyframes screen-boot {
+    0% { transform: scaleY(0.005) scaleX(0); }
+    30% { transform: scaleY(0.005) scaleX(1); }
+    100% { transform: scaleY(1) scaleX(1); }
+  }
+
+  @keyframes boot-flicker {
+    0% { opacity: 0; }
+    20% { opacity: 0; }
+    21% { opacity: 0.8; }
+    23% { opacity: 0.2; }
+    25% { opacity: 1; }
+    27% { opacity: 0.4; }
+    29% { opacity: 0.9; }
+    31% { opacity: 0.5; }
+    33% { opacity: 1; }
+  }
+  
+  /* Glassmorphism theme for secondary panels/overlays */
+  .screen.glass { background:rgba(7,4,15,0.55); backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px); }
+  .screen.overlay { background:rgba(5,2,10,0.8); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+
+  h1.logo { font-family:'Chakra Petch',sans-serif; font-size:min(11vw,64px); font-weight:700; letter-spacing:0.25em; margin-bottom:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2),var(--warm)); -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 30px rgba(var(--accent-rgb),0.25)); }
+  .tag { font-family:'Chakra Petch',sans-serif; opacity:0.5; letter-spacing:0.4em; font-size:10px; margin-bottom:42px; text-transform:uppercase; font-weight:600; }
+
+  /* Buttons & Inputs */
+  .mbtn { display:block; width:min(78vw,340px); margin:8px 0; padding:15px 22px; border:1px solid rgba(var(--accent-rgb),0.22); border-radius:0;
+    background:rgba(10,7,22,0.6); color:#e8e4f5; font-size:16px; letter-spacing:0.12em; font-weight:500;
+    cursor:pointer; text-align:center; transition:all 0.25s cubic-bezier(0.25,1,0.5,1); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    clip-path:polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .mbtn:hover { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.5); box-shadow:0 0 20px rgba(var(--accent-rgb),0.25); transform:translateY(-2px); }
+  .mbtn:active { transform:scale(0.97) translateY(0); background:rgba(var(--accent-rgb),0.22); }
+  .mbtn small { display:block; font-size:11px; opacity:0.55; letter-spacing:0.06em; margin-top:3px; }
+  .mbtn.primary { border-color:rgba(var(--warm-rgb),0.45); }
+  .mbtn.primary:hover { border-color:rgba(var(--warm-rgb),0.75); box-shadow:0 0 22px rgba(var(--warm-rgb),0.25); }
+
+  .seedRow { display:flex; gap:8px; width:min(78vw,340px); margin:8px 0; }
+  .seedRow input { flex:1; padding:13px 16px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.2); background:rgba(5,3,10,0.55);
+    color:#e8e4f5; font-size:14px; letter-spacing:0.1em; outline:none; text-transform:uppercase; font-family:'Azeret Mono',monospace; transition:border-color .2s;
+    clip-path:polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+  .seedRow input:focus { border-color:rgba(var(--accent-rgb),0.5); }
+  .seedRow button { padding:13px 20px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.25); background:rgba(var(--accent-rgb),0.12); color:#e8e4f5; cursor:pointer; font-weight:600; transition:all .2s;
+    clip-path:polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+  .seedRow button:hover { background:rgba(var(--accent-rgb),0.25); }
+  select { padding:10px 14px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.2); background:rgba(15,10,32,0.95); color:#e8e4f5; font-size:14px; outline:none; font-family:inherit; cursor:pointer;
+    clip-path:polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+
+  /* Garage Sidebar & Showcase Layout */
+  .garage-sidebar {
+    width: min(100%, 370px);
+    height: 100%;
+    background: rgba(10, 7, 22, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(var(--accent-rgb), 0.16);
+    padding: min(8vh, 45px) min(6vw, 32px) 30px min(6vw, 32px);
+    display: flex;
+    flex-direction: column;
+    z-index: 11;
+    position: absolute;
+    left: 0;
+    top: 0;
+    box-shadow: 10px 0 40px rgba(0,0,0,0.5);
+  }
+  .garage-title { font-family:'Chakra Petch',sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.25em; color: var(--warm); text-shadow: 0 0 15px rgba(var(--warm-rgb), 0.25); margin-bottom: 4px; }
+  .garage-subtitle { font-size: 10px; opacity: 0.55; letter-spacing: 0.08em; margin-bottom: 24px; text-transform: uppercase; font-weight: 600; }
+  .garage-tabs { display: flex; background: rgba(0, 0, 0, 0.3); border-radius: 0; padding: 4px; margin-bottom: 22px; border: 1px solid rgba(var(--accent-rgb), 0.1);
+    clip-path:polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+  .tab-btn { flex: 1; background: transparent; border: none; color: #e8e4f5; opacity: 0.6; padding: 10px 0; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; cursor: pointer; border-radius: 0; transition: all 0.2s; font-family: inherit; }
+  .tab-btn.active { background: rgba(var(--accent-rgb), 0.16); opacity: 1; color: #fff; text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4); }
+  .tab-content { flex: 1; overflow-y: auto; padding-right: 6px; }
+  .section-title { font-family:'Chakra Petch',sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; opacity: 0.4; margin-bottom: 12px; }
+  .garage-back { margin-top: 24px; width: 100%; }
+  .garage-instruction { position: absolute; right: 40px; bottom: 40px; display: flex; align-items: center; gap: 10px; color: #e8e4f5; font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.4; pointer-events: none; z-index: 10; }
+  .drag-icon { width: 18px; height: 18px; fill: currentColor; animation: drag-bounce 2s ease-in-out infinite; }
+  @keyframes drag-bounce { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px); } }
+
+  /* Campaign Split Layout */
+  .campaign-left {
+    width: min(100%, 380px);
+    height: 100%;
+    background: rgba(10, 7, 22, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(var(--accent-rgb), 0.16);
+    padding: min(6vh, 35px) min(5vw, 28px) 30px min(5vw, 28px);
+    display: flex;
+    flex-direction: column;
+    z-index: 11;
+    position: absolute;
+    left: 0;
+    top: 0;
+    box-shadow: 10px 0 40px rgba(0,0,0,0.5);
+  }
+  .campaign-title { font-family:'Chakra Petch',sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.25em; color: var(--warm); text-shadow: 0 0 15px rgba(var(--warm-rgb), 0.25); margin-bottom: 4px; }
+  .campaign-subtitle { font-size: 10px; opacity: 0.55; letter-spacing: 0.08em; margin-bottom: 24px; text-transform: uppercase; font-weight: 600; }
+  #campList { flex: 1; overflow-y: auto; padding-right: 6px; }
+  .campaign-back { margin-top: 24px; width: 100%; }
+
+  .campaign-right {
+    position: absolute;
+    left: 380px;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .campaign-right > * { pointer-events: auto; }
+
+  .details-placeholder {
+    font-family:'Chakra Petch',sans-serif;
+    color: #e8e4f5;
+    font-size: 14px;
+    letter-spacing: 0.25em;
+    opacity: 0.35;
+    font-weight: 700;
+  }
+
+  .details-content {
+    background: rgba(10, 7, 22, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(var(--accent-rgb), 0.16);
+    border-radius: 0;
+    padding: min(4vh, 28px) 30px;
+    width: min(100%, 390px);
+    height: min(100%, 570px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    clip-path: polygon(0 16px, 16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  }
+
+  .track-preview-name { font-family:'Chakra Petch',sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 0.15em; color: var(--accent2); text-shadow: 0 0 10px rgba(var(--accent2-rgb), 0.3); margin-bottom: 4px; }
+  .track-preview-meta { font-family:'Chakra Petch',sans-serif; font-size: 11px; opacity: 0.6; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .track-preview-theme { font-family:'Chakra Petch',sans-serif; font-size: 10px; opacity: 0.4; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+  
+  #campMapCanvas {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
+    border-radius: 0;
+    margin-bottom: 18px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
+
+  .medal-targets {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 18px;
+    border-top: 1px solid rgba(var(--accent-rgb), 0.1);
+    border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
+    padding: 12px 0;
+  }
+  .targets-title { font-family:'Chakra Petch',sans-serif; font-size: 9px; font-weight: 800; letter-spacing: 0.25em; opacity: 0.35; margin-bottom: 4px; text-transform: uppercase; text-align: center; }
+  .target-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; opacity: 0.85; }
+  .target-row span:nth-child(2) { flex: 1; margin-left: 8px; font-weight: 400; opacity: 0.7; }
+  .target-val { font-family:'Azeret Mono',monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12px; }
+
+  .track-pb-box {
+    width: 100%;
+    background: rgba(var(--warm-rgb), 0.08);
+    border: 1px solid rgba(var(--warm-rgb), 0.22);
+    border-radius: 0;
+    padding: 10px;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--warm);
+    margin-bottom: 18px;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
+  .track-pb-box .pb-val { font-family:'Azeret Mono',monospace; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .trackBtn.sel {
+    border-color: var(--accent2) !important;
+    background: rgba(var(--accent2-rgb), 0.18) !important;
+    box-shadow: 0 0 15px rgba(var(--accent2-rgb), 0.3) !important;
+  }
+
+  @media (max-width: 768px) {
+    #campaign { flex-direction: column !important; }
+    .campaign-left { width: 100% !important; height: 50% !important; border-right: none !important; border-bottom: 1px solid rgba(var(--accent-rgb), 0.16); position: relative !important; }
+    .campaign-right { width: 100% !important; height: 50% !important; left: 0 !important; top: 50% !important; position: absolute !important; padding: 15px !important; }
+    .details-content { height: 100% !important; width: 100% !important; justify-content: center !important; }
+  }
+
+  /* HUD */
+  #gameHud { display:none; position:fixed; inset:0; pointer-events:none; z-index:5; }
+  /* frameless "type-on-scene" HUD: no panels. Readability comes from a layered drop-shadow
+     (tight dark outline + soft dark halo); colour is used only as signal (delta, shift), never decoration. */
+  #hudLeftBox {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top));
+    left: max(16px, env(safe-area-inset-left));
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 150px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 9px rgba(0,0,0,0.6));
+  }
+  .hud-time-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  #hudTime {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+  }
+  #hudDelta {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.45);
+  }
+  #hudDelta.neg { color:#7bffb3; }
+  #hudDelta.pos { color:#ff8d7b; }
+  .hud-info-row {
+    display: flex;
+    align-items: center;
+    margin-top: 2px;
+    gap: 14px;
+  }
+  #hudPB {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.62);
+    font-variant-numeric: tabular-nums;
+  }
+  #hudLap {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  #hudWarn {
+    position: absolute;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.25em;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 16px rgba(var(--accent2-rgb), 0.7);
+    opacity: 0;
+    transition: opacity .4s;
+    text-transform: uppercase;
+  }
+  #hudMedals {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+    min-width: 118px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 9px rgba(0,0,0,0.6));
+  }
+  .tower-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+    opacity: 0.4;
+    transition: opacity 0.25s, transform 0.25s;
+    font-family: 'Azeret Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tower-row.active {
+    opacity: 1;
+    transform: scale(1.05);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+  .tower-row.active .marker {
+    width: 4px;
+    height: 4px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #fff;
+  }
+  .tower-row.missed {
+    opacity: 0.15;
+    text-decoration: line-through;
+  }
+  .tower-row .marker {
+    width: 4px;
+    height: 4px;
+    background: transparent;
+    transition: all 0.2s;
+  }
+
+  #hudSpeedBox {
+    position: absolute;
+    right: max(20px, env(safe-area-inset-right));
+    bottom: max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 9px rgba(0,0,0,0.6));
+  }
+  /* On touch layouts the GAS pad owns the bottom-right corner, so move the speed HUD to
+     bottom-center (the only free zone — top corners hold the medal stack + game buttons,
+     and the steering/brake pads flank the bottom edges). body.touch-controls-on is toggled
+     by game.js only while the touch pads are actually shown. */
+  body.touch-controls-on #hudSpeedBox {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  /* hudArch is decorative bottom-center text — hide it so it doesn't collide with the relocated HUD. */
+  body.touch-controls-on #hudArch { display: none; }
+ 
+  /* Minimal RPM tach: a thin open arc around the gear number, sweeping 0..240deg with revs. */
+  #hudGearWrap {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* SVG ring (no CSS mask — mask hangs the compositor capture and is a perf risk). The gauge spans
+     240deg; circumference of r=44 is ~276.46 → arc length 184.3, gap 92.2 at the bottom. game.js
+     sets the fill circle's stroke-dasharray from RPM. */
+  #hudRpmArc {
+    position: absolute;
+    inset: 0;
+    transform: rotate(126deg);
+    overflow: visible;
+  }
+  #hudRpmArc circle {
+    fill: none;
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-dasharray: 184.3 276.46;
+  }
+  #hudRpmArc .rpm-track { stroke: rgba(255, 255, 255, 0.14); }
+  #hudRpmArc .rpm-fill {
+    stroke: var(--accent);
+    stroke-dasharray: 0 276.46;
+    transition: stroke-dasharray 0.08s linear;
+  }
+  #hudSpeedBox.redline .rpm-fill { stroke: #ff4b4b; animation: rpm-flash-bright 0.1s steps(2) infinite; }
+  @keyframes rpm-flash-bright {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
+  #hudGear {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 34px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+    text-align: center;
+    transition: transform 0.08s ease-out, color 0.08s;
+  }
+  #hudGear.shift-cut, #hudSpeedBox.redline #hudGear { color: #ff6a6a; }
+  #hudGear.shift-cut { transform: scale(1.15); }
+  .hud-speed-stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #hudSpeed {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  #hudSpeedBox .unit {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+  #hudArch {
+    position: absolute;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 10px;
+    opacity: 0.4;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .md.author { color:#c7b3ff; } .md.gold { color:#ffd27b; } .md.silver { color:#cfd6e4; } .md.bronze { color:#e09b6f; } .md.none { color:#6a637d; }
+
+  /* countdown */
+  #countdown { position:absolute; inset:0; display:none; align-items:center; justify-content:center; }
+  #countNum { font-family: 'Azeret Mono', monospace; font-size:120px; font-weight:800; letter-spacing:-0.05em; text-shadow:0 0 50px rgba(var(--accent-rgb),0.85); }
+  .pulse-tick {
+    animation: pulse-tick 1s ease-out infinite;
+  }
+  @keyframes pulse-tick {
+    0% { transform: scale(1.6); opacity: 0; }
+    15% { transform: scale(1.0); opacity: 1; }
+    85% { transform: scale(1.0); opacity: 1; }
+    100% { transform: scale(0.7); opacity: 0; }
+  }
+
+  /* in-game buttons */
+  /* Sits BELOW #hudLeftBox (the top-left timer card, ~94px tall): both share the top-left anchor,
+     and the z-index:6 buttons were painting directly over the live timer digits. Offsetting them
+     down by the card height keeps the timer fully readable while leaving the buttons in the
+     conventional top-left utility cluster. */
+  #gameButtons { display:none; position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 104px); left:max(16px,env(safe-area-inset-left)); gap:8px; z-index:6; flex-direction:row; }
+  /* no backdrop-filter in-race — blurring the live WebGL framebuffer recomposites it every frame (mobile perf). Higher bg alpha keeps it legible. */
+  .gbtn { pointer-events:auto; width:44px; height:44px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.22); background:rgba(10,7,22,0.85);
+    color:#e8e4f5; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .gbtn:hover { background:rgba(var(--accent-rgb),0.15); border-color:rgba(var(--accent-rgb),0.45); }
+  .gbtn:active { transform:scale(0.92); }
+  .gbtn svg { width:20px; height:20px; fill:currentColor; }
+
+  /* touch controls */
+  #touchControls { display:none; position:fixed; inset:0; pointer-events:none; z-index:6; }
+  /* no backdrop-filter — the pads sit over the live canvas during play; blurring it forces a per-frame framebuffer recomposite on mobile. Opaque-ish bg keeps them readable. */
+  .pad { position:absolute; pointer-events:auto; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.32);
+    background:radial-gradient(circle at 35% 30%, rgba(var(--accent-rgb),0.24), rgba(15,10,32,0.72));
+    display:flex; align-items:center; justify-content:center; font-size:12px; letter-spacing:0.18em; font-weight:700; color:rgba(232,228,245,0.9); box-shadow:0 6px 20px rgba(0,0,0,0.3);
+    clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+  .pad:active { background:radial-gradient(circle at 35% 30%, rgba(var(--accent2-rgb),0.35), rgba(15,10,32,0.6)); transform:scale(0.96); }
+  /* Split layout: steering on the LEFT thumb, gas/brake/drift on the RIGHT thumb,
+     so you can brake-tap or drift mid-corner while still steering. */
+  #padGas { right:max(24px,env(safe-area-inset-right)); bottom:max(24px,env(safe-area-inset-bottom)); width:104px; height:104px; }
+  #padBrake { right:max(140px,calc(env(safe-area-inset-right) + 140px)); bottom:max(24px,env(safe-area-inset-bottom)); width:84px; height:84px; }
+  #padDrift { right:max(44px,calc(env(safe-area-inset-right) + 44px)); bottom:max(150px,calc(env(safe-area-inset-bottom) + 150px)); width:78px; height:78px;
+    border-color:rgba(var(--warm-rgb),0.4); background:radial-gradient(circle at 35% 30%, rgba(var(--warm-rgb),0.22), rgba(15,10,32,0.65)); color:rgba(255,224,196,0.9); }
+  #padDrift:active { background:radial-gradient(circle at 35% 30%, rgba(var(--warm-rgb),0.5), rgba(20,10,32,0.65)); }
+  #padL { left:max(24px,env(safe-area-inset-left)); bottom:max(28px,env(safe-area-inset-bottom)); width:84px; height:84px; display:none; }
+  #padR { left:max(120px,calc(env(safe-area-inset-left) + 120px)); bottom:max(28px,env(safe-area-inset-bottom)); width:84px; height:84px; display:none; }
+
+  /* finish */
+  #finish .card { background:rgba(10,7,22,0.85); border:1px solid rgba(var(--accent-rgb),0.25); border-radius:0; padding:32px 48px; text-align:center; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 20px 50px rgba(0,0,0,0.5);
+    clip-path: polygon(0 24px, 24px 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%); }
+  #finTime { font-family:'Azeret Mono',monospace; font-size:56px; font-weight:700; letter-spacing:-0.02em; text-shadow:0 0 24px rgba(var(--accent-rgb),0.7); font-variant-numeric:tabular-nums; }
+  #finMedal { font-family:'Chakra Petch',sans-serif; font-size:22px; letter-spacing:0.25em; margin:8px 0 2px; font-weight:700; }
+  #finPB { font-family:'Azeret Mono',monospace; font-size:13px; opacity:0.65; margin-bottom:4px; font-weight:500; }
+  #finSeed { font-family:'Azeret Mono',monospace; font-size:11px; opacity:0.4; letter-spacing:0.15em; margin-bottom:20px; text-transform:uppercase; }
+  .finRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .finRow button { padding:12px 24px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.3); background:rgba(var(--accent-rgb),0.1); color:#e8e4f5; font-size:14px; letter-spacing:0.1em; cursor:pointer; font-weight:600; transition:all .2s;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .finRow button:hover { background:rgba(var(--accent-rgb),0.22); border-color:rgba(var(--accent-rgb),0.45); }
+  .finRow button:active { transform:scale(0.96); }
+
+  /* campaign */
+  #campList { max-height:68vh; overflow-y:auto; width:min(92vw,560px); padding:4px; }
+  .tierHead { font-family:'Chakra Petch',sans-serif; font-size:13px; letter-spacing:0.25em; opacity:0.85; margin:18px 0 10px; font-weight:700; text-transform:uppercase; color:var(--accent); }
+  .tierHead.locked { opacity:0.45; }
+  .tierRow { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .trackBtn { padding:10px 4px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.2); background:rgba(var(--accent-rgb),0.06);
+    color:inherit; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; transition:all .2s; font-family:inherit;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .trackBtn .num { font-family:'Azeret Mono',monospace; font-size:16px; font-weight:700; }
+  .trackBtn .ico { font-size:11px; }
+  .trackBtn .pb { font-family:'Azeret Mono',monospace; font-size:9px; opacity:0.65; font-variant-numeric:tabular-nums; font-weight:500; }
+  .trackBtn:hover { background:rgba(var(--accent-rgb),0.15); border-color:rgba(var(--accent-rgb),0.45); }
+  .trackBtn:active { transform:scale(0.95); }
+
+  /* settings & garage */
+  .panel { width:min(88vw,420px); max-height:72vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+  .setRow { display:flex; align-items:center; justify-content:space-between; gap:14px; font-size:14px; letter-spacing:0.06em; font-weight:500; }
+  .setRow input[type=range] { flex:1; max-width:170px; accent-color:var(--accent); cursor:pointer; }
+  .setRow input[type=checkbox] { width:20px; height:20px; accent-color:var(--accent); cursor:pointer; }
+  h2.ph { font-family:'Chakra Petch',sans-serif; font-size:14px; letter-spacing:0.25em; font-weight:700; opacity:0.85; margin-bottom:6px; text-transform:uppercase; color:var(--accent); }
+  .gGroup { display:flex; flex-direction:column; gap:8px; width:100%; }
+  .gItem { width:100%; padding:12px 16px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.16); background:rgba(var(--accent-rgb),0.05);
+    color:#e8e4f5; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:all 0.2s; font-family:inherit; text-align:left; font-weight:500;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .gItem:hover { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); }
+  .gItem.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); box-shadow:0 0 15px rgba(var(--warm-rgb),0.15); }
+  .gItem .sw { width:20px; height:20px; border-radius:6px; display:inline-block; border:1px solid rgba(255,255,255,0.15); }
+  .editModeBar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .editModeBtn { flex:1 1 auto; padding:8px 10px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.16);
+    background:rgba(var(--accent-rgb),0.05); color:#e8e4f5; font-size:12px; cursor:pointer; font-family:inherit;
+    font-weight:500; transition:all 0.2s; text-align:center; }
+  .editModeBtn:hover:not(:disabled) { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); }
+  .editModeBtn.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); box-shadow:0 0 15px rgba(var(--warm-rgb),0.15); }
+  .editModeBtn:disabled { opacity:0.35; cursor:not-allowed; }
+  .backBtn { margin-top:24px; padding:12px 34px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.3); background:transparent; color:#e8e4f5; letter-spacing:0.2em; cursor:pointer; font-size:13px; font-weight:600; transition:all .2s; font-family:inherit;
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .backBtn:hover { background:rgba(var(--accent-rgb),0.1); border-color:rgba(var(--accent-rgb),0.55); }
+  .backBtn:active { transform:scale(0.96); }
+
+  /* loading */
+  #loadPlate {
+    background: rgba(10, 7, 22, 0.85);
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
+    padding: 32px 48px;
+    width: min(90vw, 420px);
+    text-align: center;
+    clip-path: polygon(0 20px, 20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+    box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  #loadBiomeHeader {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--accent2);
+    text-shadow: 0 0 8px rgba(var(--accent2-rgb), 0.5);
+    text-transform: uppercase;
+  }
+  #loadSeed {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #e8e4f5;
+  }
+  .load-bar-container {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
+  }
+  #loadBar {
+    position: absolute;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    animation: load-scan 1.5s infinite linear;
+  }
+  @keyframes load-scan {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+  .load-footer {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    opacity: 0.35;
+    text-transform: uppercase;
+  }
+  .hint { position:absolute; bottom:max(16px,env(safe-area-inset-bottom)); font-family:'Chakra Petch',sans-serif; font-size:11px; opacity:0.45; letter-spacing:0.18em; text-align:center; width:100%; text-transform:uppercase; font-weight:500; }
+
+  /* Task 4: Racing Motion Animations */
+  @keyframes streak-in-left {
+    0% { transform: translateX(-150px) skewX(-15deg); opacity: 0; }
+    100% { transform: translateX(0) skewX(0); opacity: 1; }
+  }
+  @keyframes streak-in-right {
+    0% { transform: translateX(150px) skewX(15deg); opacity: 0; }
+    100% { transform: translateX(0) skewX(0); opacity: 1; }
+  }
+  @keyframes streak-in-bottom-center {
+    0% { transform: translate(-50%, 150px) skewY(5deg); opacity: 0; }
+    100% { transform: translate(-50%, 0) skewY(0); opacity: 1; }
+  }
+  #hudLeftBox.streak-in {
+    animation: streak-in-left 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  #hudMedals.streak-in {
+    animation: streak-in-right 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  #hudSpeedBox.streak-in {
+    animation: streak-in-right 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  body.touch-controls-on #hudSpeedBox.streak-in {
+    animation: streak-in-bottom-center 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes digit-roll {
+    0% { transform: translateY(-3px); filter: blur(0.5px); }
+    50% { transform: translateY(1px); filter: blur(0.2px); }
+    100% { transform: translateY(0); filter: none; }
+  }
+  .digit-change {
+    animation: digit-roll 0.08s ease-out;
+  }
+
+  /* checkpoint-ahead feedback: a brief accent glow pulse around the (frameless) timer cluster */
+  @keyframes purple-flash-anim {
+    0%   { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 18px rgba(var(--accent2-rgb), 0.95)); }
+    100% { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 9px rgba(0,0,0,0.6)); }
+  }
+  .purple-flash {
+    animation: purple-flash-anim 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  @keyframes pb-flash-overlay {
+    0% { background: rgba(255, 255, 255, 0.95); }
+    15% { background: rgba(var(--accent2-rgb), 0.75); }
+    100% { background: radial-gradient(120% 120% at 50% 110%, rgba(var(--accent-rgb), 0.15) 0%, rgba(5, 3, 10, 0.95) 55%, #05030a 100%); }
+  }
+  #finish.pb-celebration {
+    animation: pb-flash-overlay 1.2s cubic-bezier(0.1, 0.8, 0.1, 1) both;
+  }
+
+  @keyframes gold-glow-flicker {
+    0% {
+      border-color: var(--accent2);
+      box-shadow: 0 0 20px rgba(var(--accent2-rgb), 0.4), inset 0 0 10px rgba(var(--accent2-rgb), 0.2);
+    }
+    50% {
+      border-color: var(--warm);
+      box-shadow: 0 0 35px rgba(var(--warm-rgb), 0.7), inset 0 0 15px rgba(var(--warm-rgb), 0.35);
+    }
+    100% {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4), inset 0 0 10px rgba(var(--accent-rgb), 0.2);
+    }
+  }
+  #finish.pb-celebration .card {
+    border: 2px solid var(--accent2);
+    animation: gold-glow-flicker 3s infinite linear;
+  }
+
+  @keyframes final-sector-glow {
+    0% { transform: translateX(-50%) scale(1.3); color: var(--accent2); text-shadow: 0 0 25px rgba(var(--accent2-rgb), 1); }
+    50% { transform: translateX(-50%) scale(1.0); color: var(--warm); text-shadow: 0 0 15px rgba(var(--warm-rgb), 0.8); }
+    100% { transform: translateX(-50%) scale(1.0); color: var(--warm); text-shadow: 0 0 10px rgba(var(--warm-rgb), 0.5); }
+  }
+  .final-sector-pulse {
+    animation: final-sector-glow 1.2s cubic-bezier(0.1, 0.8, 0.1, 1) both;
+  }
+
+  /* Short landscape (phones held sideways, e.g. 812x375): the centered main menu has too many
+     rows to fit 375px tall — the logo clipped off the top and garage/settings off the bottom.
+     Compact the spacing, anchor to the top, and allow scroll so every option is reachable. */
+  @media (max-height: 470px) {
+    #menu { justify-content: flex-start; overflow-y: auto; padding: 10px 0 16px; }
+    #menu h1.logo { font-size: min(9vw, 30px); margin-bottom: 1px; }
+    #menu .tag { margin-bottom: 10px; }
+    #menu .mbtn { margin: 4px 0; padding: 10px 20px; }
+    #menu .mbtn small { margin-top: 1px; }
+    #menu .seedRow { margin: 4px 0; }
+    #menu .hint { position: static; margin-top: 8px; width: auto; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vignette"></div>
+<div id="grain"></div>
+
+<!-- MAIN MENU -->
+<div class="screen glass" id="menu">
+  <h1 class="logo">DRIFTDREAM</h1>
+  <div class="tag">procedural dream racing</div>
+  <button class="mbtn primary" id="btnDaily">today's dream<small id="dailyLabel"></small></button>
+  <button class="mbtn" id="btnRandom">random track</button>
+  <div class="seedRow">
+    <input id="seedInput" placeholder="enter seed…" maxlength="24">
+    <select id="randTier"><option value="1">T1</option><option value="2">T2</option><option value="3" selected>T3</option><option value="4">T4</option><option value="5">T5</option></select>
+    <button id="btnSeed">go</button>
+  </div>
+  <button class="mbtn" id="btnCampaign">campaign</button>
+  <button class="mbtn" id="btnGarage">garage</button>
+  <button class="mbtn" id="btnSettings">settings</button>
+  <div class="hint">desktop: WASD / arrows · space = drift · R = restart · E = respawn</div>
+</div>
+
+<!-- LOADING -->
+<div class="screen overlay" id="loading">
+  <div id="loadPlate">
+    <div id="loadBiomeHeader">ACQUIRING SECTOR...</div>
+    <div id="loadSeed">---</div>
+    <div class="load-bar-container"><div id="loadBar"></div></div>
+    <div class="load-footer">DREAM TELEMETRY ENGINE V1.0</div>
+  </div>
+  <div class="hint">desktop: WASD / arrows · space = drift · R = restart · E = respawn</div>
+</div>
+
+<!-- CAMPAIGN -->
+<div class="screen" id="campaign" style="flex-direction: row; justify-content: flex-start; align-items: stretch; padding: 0; background: transparent;">
+  <div class="campaign-left">
+    <h2 class="campaign-title">CAMPAIGN</h2>
+    <p class="campaign-subtitle">race through the tiers to unlock new challenges</p>
+    <div id="campList"></div>
+    <button class="backBtn campaign-back">back</button>
+  </div>
+  <div class="campaign-right">
+    <div id="campDetailsPlaceholder" class="details-placeholder">
+      SELECT A TRACK TO PREVIEW
+    </div>
+    <div id="campDetailsContent" class="details-content" style="display:none;">
+      <h3 id="campTrackName" class="track-preview-name">TRACK 01</h3>
+      <div id="campTrackInfo" class="track-preview-meta">ARCHETYPE · 1420m</div>
+      <div id="campTrackTheme" class="track-preview-theme">NEON · RAIN</div>
+      
+      <canvas id="campMapCanvas" width="240" height="240"></canvas>
+      
+      <div class="medal-targets">
+        <h4 class="targets-title">MEDAL TARGETS</h4>
+        <div class="target-row"><span class="md author">◆</span> <span>Author Time</span> <span id="campTimeAuthor" class="target-val">--:--</span></div>
+        <div class="target-row"><span class="md gold">●</span> <span>Gold Time</span> <span id="campTimeGold" class="target-val">--:--</span></div>
+        <div class="target-row"><span class="md silver">●</span> <span>Silver Time</span> <span id="campTimeSilver" class="target-val">--:--</span></div>
+        <div class="target-row"><span class="md bronze">●</span> <span>Bronze Time</span> <span id="campTimeBronze" class="target-val">--:--</span></div>
+      </div>
+      
+      <div id="campTrackPB" class="track-pb-box"></div>
+      
+      <button class="mbtn primary" id="btnPlayCampTrack" style="margin-top: auto; width: 100%;">DRIVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="screen glass" id="settings">
+  <h2 class="ph">Settings</h2>
+  <div class="panel">
+    <div class="setRow"><span>tilt steering</span><input type="checkbox" id="setTilt"></div>
+    <div class="setRow"><span>tilt sensitivity</span><input type="range" id="setSens" min="0.5" max="2.2" step="0.1"></div>
+    <div class="setRow"><span>invert tilt</span><input type="checkbox" id="setInvert"></div>
+    <div class="setRow"><span>engine volume</span><input type="range" id="setEngine" min="0" max="1" step="0.05"></div>
+    <div class="setRow"><span>sfx volume</span><input type="range" id="setSfx" min="0" max="1" step="0.05"></div>
+    <div class="setRow"><span>ambient volume</span><input type="range" id="setMusic" min="0" max="1" step="0.05"></div>
+    <div class="setRow"><span>quality</span><select id="setQuality"><option value="low">low</option><option value="med">medium</option><option value="high">high</option></select></div>
+  </div>
+  <button class="backBtn">back</button>
+</div>
+
+<!-- GARAGE -->
+<div class="screen" id="garage" style="flex-direction: row; justify-content: flex-start; align-items: stretch; padding: 0; background: transparent;">
+  <div class="garage-sidebar">
+    <h2 class="garage-title">GARAGE</h2>
+    <p class="garage-subtitle">select and customise your dream machine</p>
+    
+    <div class="garage-tabs">
+      <button class="tab-btn active" id="tabBtnPaint">paint</button>
+      <button class="tab-btn" id="tabBtnFinish">finish</button>
+      <button class="tab-btn" id="tabBtnForm">chassis</button>
+    </div>
+
+    <div class="garage-tabs">
+      <button class="tab-btn" id="btnCustomize">customize</button>
+      <button class="tab-btn" id="btnEditReset" style="display:none;">reset to preset</button>
+    </div>
+    <div class="editModeBar" id="editModeBar" style="display:none;">
+      <button class="editModeBtn" id="editMode_orbit">orbit</button>
+      <button class="editModeBtn" id="editMode_length">length</button>
+      <button class="editModeBtn" id="editMode_cross" disabled title="coming soon">cross-section</button>
+      <button class="editModeBtn" id="editMode_addrm" disabled title="coming soon">add/remove</button>
+    </div>
+
+    <div class="tab-content" id="tabPaint">
+      <h3 class="section-title">gradient paint</h3>
+      <div class="gGroup" id="gGrads"></div>
+    </div>
+    <div class="tab-content" id="tabFinish" style="display:none;">
+      <h3 class="section-title">material finish</h3>
+      <div class="gGroup" id="gFinish"></div>
+    </div>
+    <div class="tab-content" id="tabForm" style="display:none;">
+      <h3 class="section-title">body design</h3>
+      <div class="gGroup" id="gForms"></div>
+    </div>
+    
+    <button class="backBtn garage-back">back</button>
+  </div>
+  <div class="garage-instruction">
+    <svg class="drag-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 2a8 8 0 0 1 8 8a8 8 0 0 1-8 8a8 8 0 0 1-8-8a8 8 0 0 1 8-8m-3 4l-4 4l4 4v-3h6v3l4-4l-4-4v3H9V8Z"/></svg>
+    drag to rotate
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="gameHud">
+  <div id="hudLeftBox">
+    <div class="hud-time-row">
+      <div id="hudTime">0.000</div>
+      <div id="hudDelta"></div>
+    </div>
+    <div class="hud-info-row">
+      <div id="hudPB"></div>
+      <div id="hudLap">LAP 1/1</div>
+    </div>
+  </div>
+  <div id="hudWarn"></div>
+  <div id="hudMedals">
+    <div class="tower-row" id="towerAuthor">
+      <span class="marker"></span>
+      <span class="md author">◆</span>
+      <span class="time" id="valAuthor">--:--</span>
+    </div>
+    <div class="tower-row" id="towerGold">
+      <span class="marker"></span>
+      <span class="md gold">●</span>
+      <span class="time" id="valGold">--:--</span>
+    </div>
+    <div class="tower-row" id="towerSilver">
+      <span class="marker"></span>
+      <span class="md silver">●</span>
+      <span class="time" id="valSilver">--:--</span>
+    </div>
+    <div class="tower-row" id="towerBronze">
+      <span class="marker"></span>
+      <span class="md bronze">●</span>
+      <span class="time" id="valBronze">--:--</span>
+    </div>
+  </div>
+  <div id="hudSpeedBox">
+    <div id="hudGearWrap">
+      <svg id="hudRpmArc" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="rpm-track" cx="50" cy="50" r="44"></circle>
+        <circle class="rpm-fill" cx="50" cy="50" r="44"></circle>
+      </svg>
+      <div id="hudGear">·</div>
+    </div>
+    <div class="hud-speed-stacked">
+      <div id="hudSpeed">0</div>
+      <div class="unit">km/h</div>
+    </div>
+  </div>
+  <div id="hudArch"></div>
+  <div id="countdown"><div id="countNum" class="pulse-tick">3</div></div>
+</div>
+
+<!-- in-game buttons -->
+<div id="gameButtons">
+  <button class="gbtn" id="btnRestart" title="restart">
+    <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6c0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6c0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4l-4-4v3Z"/></svg>
+  </button>
+  <button class="gbtn" id="btnRespawn" title="respawn">
+    <svg viewBox="0 0 24 24"><path d="M12.4 5H18v10h-5.4l-.4-2H5V5h5.6l.4 2h.8V5m0-2H5c-1.1 0-2 .9-2 2v17h2v-7h6.4l.4 2H20V3h-7.2l-.4-2Z"/></svg>
+  </button>
+  <button class="gbtn" id="btnExit" title="exit">
+    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z"/></svg>
+  </button>
+</div>
+
+<!-- touch controls -->
+<div id="touchControls">
+  <div class="pad" id="padBrake">BRAKE</div>
+  <div class="pad" id="padGas">GAS</div>
+  <div class="pad" id="padDrift">DRIFT</div>
+  <div class="pad" id="padL">◀</div>
+  <div class="pad" id="padR">▶</div>
+</div>
+
+<!-- FINISH -->
+<div class="screen overlay" id="finish">
+  <div class="card">
+    <div id="finTime">0.000</div>
+    <div id="finMedal"></div>
+    <div id="finPB"></div>
+    <div id="finSeed"></div>
+    <div class="finRow">
+      <button id="finRetry">retry</button>
+      <button id="finNext">next</button>
+      <button id="finShare">share</button>
+      <button id="finMenu">menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/lib/three.min.js?v=15"></script>
+<script src="js/lib/CopyShader.js?v=15"></script>
+<script src="js/lib/LuminosityHighPassShader.js?v=15"></script>
+<script src="js/lib/EffectComposer.js?v=15"></script>
+<script src="js/lib/ShaderPass.js?v=15"></script>
+<script src="js/lib/MaskPass.js?v=15"></script>
+<script src="js/lib/RenderPass.js?v=15"></script>
+<script src="js/lib/UnrealBloomPass.js?v=15"></script>
+<script src="js/lib/FXAAShader.js?v=16"></script>
+<script src="js/core.js?v=15"></script>
+<script src="js/theme.js?v=19"></script>
+<script src="js/trackgen.js?v=18"></script>
+<script src="js/physics.js?v=17"></script>
+<script src="js/audio.js?v=15"></script>
+<script src="js/input.js?v=16"></script>
+<script src="js/carspec.js?v=1"></script>
+<script src="js/scene.js?v=47"></script>
+<script src="js/game.js?v=38"></script>
+</body>
+</html>

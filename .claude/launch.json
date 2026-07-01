@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "driftdream",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "C:/Users/tibba/Documents/Claude/Projects/trackmaniamobile"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}
