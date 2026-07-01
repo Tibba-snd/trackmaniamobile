@@ -257,11 +257,14 @@ Sculpted hull station tables `[z_pct, halfWidth, height, yOffset]` (× WIDTH/HEI
   the spec — ONE orbitable real car, no separate 2D "views." The player switches **edit mode**, not
   screen, and the camera assists:
   - **Orbit** — spin/zoom; raycast-pick a ring or control point.
-  - **Length (rings): ✅ slice A done (session 15).** `DD.buildEditHandles` (one handle sphere per
-    station) + raycast pick + drag → mutates `station[].{w,h}` live, `DD.CAR_SCHEMA`-clamped, layers
-    correctly under garage paint/finish. A "customize" button forks the locked preset into a session-
-    only `G.workingSpec`; "reset to preset" clears it. **Not yet done:** fore-aft (`z`)/raise-lower
-    (`y`) — same pattern, quick follow-up. See STATUS.md session 15.
+  - **Length (rings): ✅ slice A done + fixed up (sessions 15-16).** `DD.buildEditHandles` (one handle
+    sphere per station) + raycast pick + drag → mutates `station[].{w,h}` live, `DD.CAR_SCHEMA`-clamped,
+    layers correctly under garage paint/finish. A "customize" button forks the locked preset into a
+    session-only `G.workingSpec`; "reset to preset" clears it. Live-drag is cheap (`DD.updateHullGeometry`
+    swaps just the hull's geometry — nothing else depends on `station[]`) and the ambient camera spin
+    freezes while customizing so dragging isn't a moving target (session 16). The garage itself now sits
+    on a dedicated `DD.buildGarageStage()` platform, not the raceway (session 16). **Not yet done:**
+    fore-aft (`z`)/raise-lower (`y`) — same pattern, quick follow-up. See STATUS.md sessions 15-16.
   - **Cross-section** — on grabbing a ring, camera tweens **end-on** (down the spine) so the ring reads as
     a flat outline; the §1.5 profile editor now operates as the 3D viewport at that angle (drag/split/
     curve points, mirror). Exit → it's a 3D bulge on the car.

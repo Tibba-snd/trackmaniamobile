@@ -2384,7 +2384,9 @@
     const hp = spec.chassis.hardpoints, L = spec.chassis.L;
 
     const hullMat = mats.bodyMat(mats.gradMix(0.5), 0);
-    group.add(buildHull(spec.chassis.hull, hp, L, hullMat));
+    const hullMesh = buildHull(spec.chassis.hull, hp, L, hullMat);
+    group.add(hullMesh);
+    group.userData.hullMesh = hullMesh; // editor hook: DD.updateHullGeometry swaps just this mesh's geometry
 
     if (spec.chassis.floor) {
       const f = spec.chassis.floor;
@@ -2430,26 +2432,75 @@
   /* garage editor — Length-rings mode (P2 slice A): one grabbable handle per hull station, at its
      rightmost ring point. Mirrors buildHull's math exactly so a handle always sits on the surface it
      controls. Editor-only — never built for the race car, never touches the physics/contract. */
-  DD.buildEditHandles = function (spec) {
-    spec = DD.normalizeSpec(spec);
-    const hp = spec.chassis.hardpoints, L = spec.chassis.L, hull = spec.chassis.hull;
+  function hullStationLocalPos(hull, hp, L, stationIndex) {
+    const st = hull.station[stationIndex]; if (!st) return null;
     const frontZ = hp.frontZ * L, rearZ = hp.rearZ * L;
     const wheelbase = frontZ - rearZ, midZ = (frontZ + rearZ) / 2;
     const WIDTH = 1.18, HEIGHT = 0.92, YB = 0.05;
-    const maxHw = hull.fenderClamp;
+    const hw = Math.min(st[1], hull.fenderClamp) * WIDTH;
+    const yc = YB + st[3] * HEIGHT;
+    const wz = st[0] * wheelbase + midZ;
+    return [hw, yc, wz];
+  }
+
+  DD.buildEditHandles = function (spec) {
+    spec = DD.normalizeSpec(spec);
+    const hp = spec.chassis.hardpoints, L = spec.chassis.L, hull = spec.chassis.hull;
     const mat = new THREE.MeshBasicMaterial({ color: 0xffe66d, depthTest: false });
     const group = new THREE.Group();
     hull.station.forEach(function (st, i) {
-      const hw = Math.min(st[1], maxHw) * WIDTH;
-      const yc = YB + st[3] * HEIGHT;
-      const wz = st[0] * wheelbase + midZ;
+      const p = hullStationLocalPos(hull, hp, L, i);
       const handle = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), mat);
-      handle.position.set(hw, yc, wz);
+      handle.position.set(p[0], p[1], p[2]);
       handle.userData = { stationIndex: i };
       handle.renderOrder = 999;
       group.add(handle);
     });
     return group;
+  };
+
+  // Reposition existing handle spheres in place (no dispose/rebuild) — used every drag frame.
+  DD.updateEditHandlePositions = function (handleGroup, spec) {
+    spec = DD.normalizeSpec(spec);
+    const hp = spec.chassis.hardpoints, L = spec.chassis.L, hull = spec.chassis.hull;
+    handleGroup.children.forEach(function (h) {
+      const p = hullStationLocalPos(hull, hp, L, h.userData.stationIndex);
+      if (p) h.position.set(p[0], p[1], p[2]);
+    });
+  };
+
+  // Swap just the hull mesh's geometry — cheap live preview while dragging a ring. Nothing else in
+  // the car (wheels/canopy/wings/parts) ever depends on hull station data, so this is fully authoritative
+  // for a width/height edit; no full DD.buildCarFromSpec rebuild is needed mid-drag.
+  DD.updateHullGeometry = function (carMesh, spec) {
+    const hullMesh = carMesh.userData.hullMesh; if (!hullMesh) return;
+    spec = DD.normalizeSpec(spec);
+    const hp = spec.chassis.hardpoints, L = spec.chassis.L;
+    const fresh = buildHull(spec.chassis.hull, hp, L, hullMesh.material);
+    hullMesh.geometry.dispose();
+    hullMesh.geometry = fresh.geometry;
+  };
+
+  /* Garage stage — a dedicated platform for the showcase car so it doesn't look parked in the middle
+     of the actual raceway (the gate arches get hidden alongside this in the garage loop branch).
+     Sky/mountains/stars/decor are untouched — only the immediate ground + start-gate props swap out,
+     which is what keeps the surrounding world/theme intact while giving the car its own stage. */
+  DD.buildGarageStage = function (envMap, theme) {
+    const W = 7, D = 10, H = 0.3;
+    const carbonTex = getCarbonTexture();
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, map: carbonTex, metalness: 0.35, roughness: 0.5,
+      bumpMap: carbonTex, bumpScale: 0.05, clearcoat: 1.0, clearcoatRoughness: 0.08,
+      envMapIntensity: 0.8, envMap: envMap || null
+    });
+    const stage = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat);
+    stage.receiveShadow = true;
+    const rimColor = (theme && theme.accent) ? col(theme.accent) : [0.62, 0.48, 1.0];
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.06, 0.03, D + 0.06),
+      new THREE.MeshBasicMaterial({ color: col(rimColor), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    rim.position.y = -H / 2;
+    stage.add(rim);
+    return stage;
   };
 
   /* trail */

@@ -329,9 +329,11 @@
 
     if (G.state === 'menu' || G.state === 'garage') {
       const orbitSpeed = G.state === 'garage' ? 0.00018 : 0.00008;
-      const baseAngle = t * orbitSpeed;
+      // Freeze the ambient auto-spin while customizing — a moving target makes precision ring-dragging
+      // unusable. Manual drag-to-orbit (garageDragYaw) still works in every mode.
+      const autoSpin = (G.state === 'garage' && G.workingSpec) ? 0 : t * orbitSpeed;
       const dragAngle = G.garageDragYaw || 0;
-      const angle = baseAngle + dragAngle;
+      const angle = autoSpin + dragAngle;
       const radius = G.state === 'garage' ? 7.5 : 12.0;
       const height = G.state === 'garage' ? 2.4 : 3.8;
       
@@ -342,7 +344,21 @@
         carPos[2] - Math.cos(angle) * radius
       );
       G.camera.lookAt(carPos[0], carPos[1] + 0.4, carPos[2]);
-      
+
+      // Garage stage: a dedicated platform for the showcase car (see DD.buildGarageStage) so it
+      // doesn't look parked in the middle of the actual raceway; hides the start/checkpoint gate
+      // arches while here. Sky/mountains/stars/decor are untouched — only the immediate ground +
+      // gate props swap out, keeping the surrounding world/theme intact.
+      if (!G.garageStage) {
+        G.garageStage = DD.buildGarageStage(G.scene.environment, G.track && G.track.theme);
+        G.scene.add(G.garageStage);
+      }
+      G.garageStage.position.set(carPos[0], carPos[1], carPos[2]);
+      G.garageStage.visible = G.state === 'garage';
+      if (G.track && G.track.gateMeshes) {
+        G.track.gateMeshes.forEach((m) => { m.visible = G.state !== 'garage'; });
+      }
+
       const s0 = G.track ? G.track.samples[G.track.startIdx] : null;
       if (G.car && G.carMesh && s0) {
         DD.poseCar(G.carMesh, G.car.pos, G.car.yaw, s0.u, 0, 0, 0, 0, 0);
@@ -1170,7 +1186,11 @@
         const st = G.workingSpec.chassis.hull.station[handleDrag.stationIndex];
         st[1] = DD.clamp(handleDrag.startW + (e.clientX - handleDrag.startX) * HANDLE_SENS, R_STW[0], R_STW[1]);
         st[2] = DD.clamp(handleDrag.startH - (e.clientY - handleDrag.startY) * HANDLE_SENS, R_STH[0], R_STH[1]);
-        updateShowcaseCar();
+        // cheap live preview: only the hull's geometry + handle positions need updating for a
+        // width/height edit (wheels/canopy/wings/parts don't depend on station data) — a full
+        // updateShowcaseCar() rebuild here was the source of the unbearable per-pixel drag lag.
+        DD.updateHullGeometry(G.carMesh, G.workingSpec);
+        DD.updateEditHandlePositions(G.editHandles, G.workingSpec);
       } else if (isDragging) {
         const dx = e.clientX - prevX;
         G.garageDragYaw = (G.garageDragYaw || 0) + dx * 0.007;

@@ -209,6 +209,42 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — Garage editor fixes: frozen camera, fast drag, dedicated stage (2026-07-01, session 16)
+
+Session 15's ring-drag editor had three real problems the user hit immediately on trying it — all
+three now fixed and re-verified in the actual garage (not a synthetic harness):
+
+1. **Camera no longer drifts while customizing.** The garage's ambient auto-rotate
+   (`js/game.js` `loop()`, `baseAngle = t*orbitSpeed`) kept advancing regardless of edit mode, so the
+   view crept out from under the player mid-drag even after manually orienting it. Now the auto-spin
+   term is zeroed whenever `G.workingSpec` is set (`autoSpin = (state==='garage' && workingSpec) ? 0 :
+   t*orbitSpeed`) — manual drag-to-orbit (`garageDragYaw`) still works untouched; only idle browsing
+   (no working spec) keeps the ambient spin.
+2. **Dragging a ring handle is no longer laggy.** The old handler called a full
+   `updateShowcaseCar()` (dispose + rebuild hull/canopy/wheels/every mount/all materials) on **every
+   `pointermove`** — far too heavy for mouse-move frequency. Verified that nothing but the hull mesh
+   itself depends on `station[]` data (wheels/canopy/parts all key off `hp`/`L`), so added
+   `DD.updateHullGeometry(carMesh, spec)` (swaps just the hull's `BufferGeometry`, same material
+   instance) + `DD.updateEditHandlePositions(handleGroup, spec)` (repositions existing handle spheres
+   in place) for the live-drag path; `DD.buildCarFromSpec`'s hull mesh is now kept at
+   `group.userData.hullMesh` to make this possible. Confirmed via object-identity check
+   (`carMesh`/`hullMesh` are the *same instance* before/after a drag) that no rebuild happens mid-drag.
+3. **The garage is a dedicated stage now, not the raceway.** New `DD.buildGarageStage()` — a carbon-
+   textured platform (matching the car's own carbon material, not a foreign-looking asset) with a thin
+   neon rim in the track's accent colour — replaces the actual road as the ground under the showcase
+   car; `track.gateMeshes` (checkpoint/start arches) hide while `G.state==='garage'` and reappear for
+   play. Sky/mountains/stars/decor and even the road visible in the distance are untouched — decor
+   generation (`buildDecor`) scatters along the real track spline, so a fully track-free garage
+   backdrop would have *lost* the "keeps the game's theme" ask, not satisfied it; this only swaps what's
+   immediately under/around the car.
+
+**Note for whoever continues:** this session's preview tab ran backgrounded (`document.hidden===true`),
+so `requestAnimationFrame` never fired and the loop-driven camera/stage code couldn't be observed via
+normal navigation + screenshot alone. Verified instead by manually replicating one frame's worth of the
+loop's garage-branch logic via eval (position camera, lazily build/position the stage, toggle gate
+visibility, pose the car, render) — same "drive the sim synchronously" workaround documented in
+`CAR_REBUILD_PLAN.md` §6 for this exact class of harness limitation.
+
 ## Resolved this pass — Garage live editor, slice A: ring-drag Length mode (2026-07-01, session 15)
 
 First slice of P2 (`CAR_DESIGN_SYSTEM.md` §9's live 3D editor) — proves the raycast→drag→mutate→
