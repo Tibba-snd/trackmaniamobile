@@ -109,7 +109,7 @@
       if (raw) return JSON.parse(raw);
     } catch (e) { /* corrupted */ }
     // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
-    return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now() } };
+    return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now() } };
   };
   DD.persistSave = function (save) {
     if (DD.testMode) return;

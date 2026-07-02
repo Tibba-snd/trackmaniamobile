@@ -277,5 +277,41 @@ console.log('[14] air control');
   check('air brake stops rotation', Math.abs(car.yawRate) < 0.25, 'yawRate ' + car.yawRate.toFixed(2));
 }
 
+/* 15 — hairpin: drift line beats grip line (Wave 2) */
+console.log('[15] hairpin: drift vs grip');
+{
+  // 15a: Grip cornering (full steer, no drift, stays in grip regime)
+  const carG = spawn(35);
+  let reachedG = false;
+  let stepsG = 0;
+  for (let t = 0; t < 60 * 5; t++) {
+    DD.stepCar(carG, { steer: 1.0, throttle: 1, brake: 0 }, FT);
+    stepsG++;
+    if (carG.yaw <= -Math.PI / 2) { reachedG = true; break; }
+  }
+  const zG = carG.pos[2];
+
+  // 15b: Drift cornering (brake tap to break traction, then hold drift + full steer)
+  const carD = spawn(35);
+  let reachedD = false;
+  let stepsD = 0;
+  for (let t = 0; t < 60 * 5; t++) {
+    const brake = (t < 8) ? 1 : 0;
+    const steer = 1.0;
+    const throttle = brake ? 0 : 1;
+    const drift = (t >= 8);
+    DD.stepCar(carD, { steer, throttle, brake, drift }, FT);
+    stepsD++;
+    if (carD.yaw <= -Math.PI / 2) { reachedD = true; break; }
+  }
+  const zD = carD.pos[2];
+
+  check('grip line completed 90 deg turn', reachedG, 'z=' + zG.toFixed(1) + 'm in ' + (stepsG/60).toFixed(2) + 's');
+  check('drift line completed 90 deg turn', reachedD, 'z=' + zD.toFixed(1) + 'm in ' + (stepsD/60).toFixed(2) + 's');
+  check('drift line turns tighter than grip line', zD < zG - 25, 'drift z: ' + zD.toFixed(1) + 'm vs grip z: ' + zG.toFixed(1) + 'm');
+  check('drift line completed turn faster', stepsD < stepsG - 50, 'drift: ' + (stepsD/60).toFixed(2) + 's vs grip: ' + (stepsG/60).toFixed(2) + 's');
+  check('drift did not spin out', Math.abs(carD.slipR) < 1.0, 'final slipR ' + (carD.slipR * 57.3).toFixed(1) + ' deg');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

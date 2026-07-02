@@ -199,7 +199,14 @@
       // ghost
       if (G.ghostMesh) { DD.disposeGroup(G.scene, G.ghostMesh); G.ghostMesh = null; }
       const rec = G.save.tracks[seedKey(seed, tier)];
-      G.ghostData = rec && rec.ghost ? decodeGhost(rec.ghost) : null;
+      const ghostOpt = G.save.settings.ghost || 'pb';
+      let ghostToPlay = null;
+      if (ghostOpt === 'pb') {
+        ghostToPlay = (rec && rec.ghost) ? decodeGhost(rec.ghost) : (track.authorGhost || null);
+      } else if (ghostOpt === 'author') {
+        ghostToPlay = track.authorGhost || null;
+      }
+      G.ghostData = ghostToPlay;
       G.ghostTimes = precomputeGhostTimes(track, G.ghostData);
       if (G.ghostData) {
         G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
@@ -301,11 +308,14 @@
         const fr = G.recFrames[i];
         flat[i * 4] = fr[0]; flat[i * 4 + 1] = fr[1]; flat[i * 4 + 2] = fr[2]; flat[i * 4 + 3] = fr[3];
       }
-      G.ghostData = flat;
-      G.ghostTimes = precomputeGhostTimes(track, flat);
-      if (!G.ghostMesh) {
-        G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
-        G.scene.add(G.ghostMesh);
+      const ghostOpt = G.save.settings.ghost || 'pb';
+      if (ghostOpt === 'pb') {
+        G.ghostData = flat;
+        G.ghostTimes = precomputeGhostTimes(track, flat);
+        if (!G.ghostMesh) {
+          G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
+          G.scene.add(G.ghostMesh);
+        }
       }
       $('hudPB').textContent = 'PB ' + DD.formatTime(ms);
     }
@@ -476,8 +486,15 @@
             console.log('[TEST] CHECKPOINT: index=' + i + ', time=' + G.car.splits[i] + 'ms');
           }
           const rec = G.save.tracks[seedKey(G.track.seed, G.track.tier)];
-          if (rec && rec.splits && rec.splits[i] != null) {
-            const d = G.car.splits[i] - rec.splits[i];
+          const ghostOpt = G.save.settings.ghost || 'pb';
+          let targetSplits = null;
+          if (ghostOpt === 'pb') {
+            targetSplits = (rec && rec.ghost) ? rec.splits : (G.track.authorSplits || null);
+          } else if (ghostOpt === 'author') {
+            targetSplits = G.track.authorSplits || null;
+          }
+          if (targetSplits && targetSplits[i] != null) {
+            const d = G.car.splits[i] - targetSplits[i];
             // (the live delta number is driven continuously below; here we only fire the ahead-of-PB flash)
             if (d <= 0) {
               const leftBox = $('hudLeftBox');
@@ -1064,6 +1081,7 @@
     $('setQuality').value = s.quality;
     $('setGlow').value = s.glow || 'standard';
     $('setCamera').value = s.camera || 'close';
+    $('setGhost').value = s.ghost || 'pb';
   }
 
   /* ---------------- boot ---------------- */
@@ -1177,6 +1195,7 @@
     $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); };
     $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
     $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
+    $('setGhost').onchange = (e) => { G.save.settings.ghost = e.target.value; saveSet(); };
     function saveSet() { DD.persistSave(G.save); }
 
     // touch controls

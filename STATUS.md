@@ -209,6 +209,47 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — Wave 2 landed (Antigravity impl, Claude review): drift rework, author ghost, expert bot v2 (2026-07-02, session 18)
+
+First run of the two-agent workflow now formalized in `IMPROVEMENT_PLAN.md` §"Division of labor":
+**Antigravity** implemented Wave 2 in the main checkout (uncommitted); **Claude** reviewed the raw
+diff, corrected two integration defects, verified, and committed.
+
+**What Antigravity shipped (all verified working):**
+1. **Drift rework** (`js/physics.js`): `driftYawAuthority: 5.5` steer-proportional yaw +
+   `driftCoupling: 2.2` velocity-to-heading rotation while `input.drift` is held; slide yaw damping
+   suspended for held drifts. New drivability test 15 proves the intended skill crossover: 90° at
+   126 km/h in 0.65 s / 24 m drifted vs 2.20 s / 61 m gripped, no spin-out (final rear slip 43.5°,
+   self-caught by the `prevSlip < 0.5` rear-grip return). Drift is now a genuine cornering tool.
+2. **Author ghost** (`js/physics.js` + `js/game.js` + `index.html`): `DD.runBot` records frames
+   @30 Hz during track validation → `track.authorGhost`/`track.authorSplits` (zero storage,
+   deterministic regeneration); new `settings.ghost` = **pb** (falls back to author when no PB) /
+   **author** / **off**; checkpoint delta + flash target the selected ghost's splits. Session 17's
+   ghost-on-retry refresh preserved (only replaces the live ghost in `pb` mode).
+3. **Expert bot v2** (`js/physics.js` `buildExpertData`, cached on `track.expert`): 100-iteration
+   relaxation racing line clamped to `w*0.35`, flattened to centerline approaching ice (12
+   samples)/kickers (8)/gaps (8); centerline-curvature two-pass speed solver (backward corner
+   limits + forward accel limits); proactive ice slowdown (≤18 m/s near ice); slide-recovery
+   countersteer (steers toward velocity when sliding). Bot **deliberately never drifts** (grip +
+   line-cutting judged faster/stabler) — author ghosts therefore don't showcase drift lines.
+   Campaign author medal factor **0.82 → 0.97** of bot time.
+
+**Claude review findings (both fixed in this commit):**
+- ⚠️ The drop **silently removed the slope-gravity term** (`longAcc -= sin(pitch)·gravity·slopeFactor`)
+  from `stepGrounded` — an undocumented gameplay change (hills stopped costing speed, drops stopped
+  giving it) with `P.slopeFactor` left as dead config. **Restored**; all 32 drivability assertions +
+  determinism/colors/m2/camera suites pass WITH it restored (incl. test 15, byte-identical numbers —
+  the removal was never needed). Workflow rule added to the plan: every gameplay-affecting line must
+  appear in the drop's walkthrough.
+- ⚠️ **No cache busters were bumped** → browsers would run stale physics with new game.js. Bumped:
+  `core v17, physics v18, game v41`.
+
+**Open balance flag (Claude-owned C4):** author = bot×0.97 on a much faster bot makes every medal
+tier dramatically harder in absolute time — and since the bot doesn't drift while humans now can,
+hairpin-heavy tracks may invert (author beatable by drifting) while flowing tracks become brutal.
+Calibrate only after Tibba playtests. E2E goldens still need a host re-baseline (physics + Wave 1
+visuals both moved); `apk-build/sync.bat` after merge as usual.
+
 ## Resolved this pass — Wave 1 "see the game clearly": ghost-on-retry, glow budget, sky/sign/particle/garage fixes, car presence, close camera (2026-07-02, session 17)
 
 Executed Wave 1 of [`IMPROVEMENT_PLAN.md`](IMPROVEMENT_PLAN.md) (new doc — the two-phase improvement

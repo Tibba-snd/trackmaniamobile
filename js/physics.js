@@ -57,6 +57,8 @@
     driveRearGripMul: 0.45, // throttle cuts rear grip — but only at low speed (donuts), fades by powerOversteerV
     powerOversteerV: 45,    // m/s above which throttle no longer destabilises the rear
     driftBtnRearMul: 0.42,
+    driftYawAuthority: 5.5, // yaw acceleration factor when steering in drift (arcade authority)
+    driftCoupling: 2.2,     // velocity-to-heading coupling rate when drift is held
     slideRearMul: 0.92,     // once sliding, rear stays a touch loose (drifts hold, weak feedback loop)
     slideYawDamp: 1.6,      // extra yaw damping while sliding — drifts recover, don't spin
     slideEnter: 0.15, slideExit: 0.07, // rad rear slip hysteresis
@@ -350,13 +352,29 @@
       vLat = DD.dampTo(vLat, vLatTarget, 12, dt);
     } else {
       r += ((P.cgF * FyF - P.cgR * FyR) / P.yawInertia) * dt;
+      if (input.drift) {
+        // steer-proportional yaw authority when drift is held (arcade authority)
+        r += -car.steerPos * P.driftYawAuthority * dt;
+      }
       if (!wantSlide) { // catching an unwanted breakaway: continuous auto-countersteer
         const ramp = DD.smoothstep(DD.clamp((Math.abs(alphaR) - 0.04) / 0.10, 0, 1));
         r += DD.clamp(alphaR * dir * P.counterAssist * ramp, -2.6, 2.6) * dt;
       }
-      const yawDamp = DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1));
+      // drop slideYawDamp for player-held drifts
+      const yawDamp = input.drift ? 0 : DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1));
       r *= Math.exp(-dt * yawDamp);
       vLat += (FyF + FyR - r * vLong) * dt;
+
+      // velocity-follows-heading coupling while drift is held (arcade tightening)
+      if (input.drift) {
+        const velSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
+        if (velSpeed > 1) {
+          let theta = Math.atan2(vLat, vLong);
+          theta -= theta * P.driftCoupling * dt;
+          vLong = velSpeed * Math.cos(theta);
+          vLat = velSpeed * Math.sin(theta);
+        }
+      }
     }
     r = DD.clamp(r, -3.4, 3.4);
 
@@ -382,7 +400,7 @@
     if (vLong < -0.5) longAcc += Math.min(-vLong, 6) * 1.2; // reverse self-slows; throttle always recovers
     longAcc -= P.dragK * vLong * Math.abs(vLong) + P.rollDrag * Math.sign(vLong);
     if (dirt) longAcc -= P.dirtDragK * vLong * Math.abs(vLong);
-    longAcc -= Math.sin(gf.pitch) * P.gravity * P.slopeFactor;
+    longAcc -= Math.sin(gf.pitch) * P.gravity * P.slopeFactor; // climbs cost speed, drops give it back
     vLong += longAcc * dt;
     if (boost) { vLong += P.boostAccel * dt; car.boostGlow = 1; }
 
@@ -461,62 +479,147 @@
     }
   };
 
-  DD.getBotInput = function (car, track) {
-    const idx = car.idx;
-    const speed = V.len(car.vel);
+  function buildExpertData(track) {
     const ss = track.samples;
+    const N = ss.length;
 
-    // braking-distance-aware target speed (aggressive F1 style)
-    const brakeDist = (speed * speed) / (2 * P.brakeDec) + 5;
-    const look = Math.min(ss.length - 1, idx + Math.ceil(brakeDist / track.ds));
-    let vT = P.vmax;
-    for (let i = idx + 2; i <= look; i += 3) {
-      const a = ss[Math.max(0, i - 3)], b = ss[i];
-      const curv = Math.abs(DD.angleDiff(a.yaw, b.yaw)) / (3 * track.ds);
-      const gmul = b.surf === DD.SURF.GLASS ? P.glassGripMul : 1;
+    // 1. Precompute Racing Line
+    const offsets = new Float32Array(N);
+    const iterations = 100;
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let i = track.startIdx + 1; i < track.finishIdx; i++) {
+        const prev = V.addS(V.clone(ss[i-1].p), ss[i-1].r, offsets[i-1]);
+        const next = V.addS(V.clone(ss[i+1].p), ss[i+1].r, offsets[i+1]);
+        const target = V.scale(V.add(prev, next), 0.5);
+        const toTarget = V.sub(target, ss[i].p);
+        const w = V.dot(toTarget, ss[i].r);
+
+        // Lookahead buffer checks for ice, kickers, and gaps
+        let isIce = false;
+        let isKicker = false;
+        let isGap = false;
+
+        const iceBuffer = 12;
+        const kickerBuffer = 8;
+        const gapBuffer = 8;
+
+        for (let j = i; j < Math.min(N, i + 15); j++) {
+          if (j - i < iceBuffer && ss[j].surf === DD.SURF.GLASS) isIce = true;
+          if (j - i < kickerBuffer && ss[j].pieceName === 'kicker') isKicker = true;
+          if (j - i < gapBuffer && ss[j].gap) isGap = true;
+        }
+
+        let limit = ss[i].w * 0.35;
+        if (isIce || isKicker || isGap) {
+          limit = 0; // force centerline on/before dangerous features
+        }
+
+        offsets[i] = DD.clamp(w, -limit, limit);
+      }
+    }
+
+    const positions = [];
+    const BLEND = 0.70;
+    for (let i = 0; i < N; i++) {
+      positions.push(V.addS(V.clone(ss[i].p), ss[i].r, offsets[i] * BLEND));
+    }
+
+    // Use Centerline Curvature for the Speed Solver (for safety)
+    const curvatures = new Float32Array(N);
+    for (let i = 1; i < N - 1; i++) {
+      curvatures[i] = Math.abs(DD.angleDiff(ss[i-1].yaw, ss[i].yaw)) / track.ds;
+    }
+
+    // 2. Precompute Target Speeds
+    const botSpeeds = new Float32Array(N);
+    botSpeeds[N-1] = P.vmax;
+
+    // Backward pass
+    for (let i = N - 2; i >= 0; i--) {
+      const curv = curvatures[i];
+      const isGlass = ss[i].surf === DD.SURF.GLASS;
+      const isDirt = ss[i].surf === DD.SURF.DIRT;
+      const gmul = isGlass ? P.glassGripMul : (isDirt ? P.dirtGripMul : 1.0);
+
+      let vCorner = isGlass ? 46 : P.vmax;
       if (curv > 1e-4) {
-        const rad = (1 / curv) * (1 + Math.abs(b.bank) * 0.9);
-        const bankBonus = 1 + Math.abs(b.bank) * 0.9;
+        const rad = (1 / curv) * (1 + Math.abs(ss[i].bank) * 0.9);
+        const bankBonus = 1 + Math.abs(ss[i].bank) * 0.9;
         const gripMech = (P.gripF + P.gripR) * 0.5;
         const vEst = Math.sqrt(gripMech * bankBonus * gmul * rad);
         const df = Math.max(0, vEst - P.downforceV) * P.downforceK;
         const gripCombined = gripMech + df;
-        const vc = Math.sqrt(gripCombined * bankBonus * gmul * 1.02 * rad);
-        vT = Math.min(vT, Math.sqrt(vc * vc + 2 * P.brakeDec * Math.max((i - idx) * track.ds - 8, 0)));
-      } else if (gmul < 1) {
-        const d = (i - idx) * track.ds;
-        vT = Math.min(vT, Math.sqrt(48 * 48 + 2 * P.brakeDec * Math.max(d - 8, 0)));
+        vCorner = Math.min(vCorner, Math.sqrt(gripCombined * bankBonus * gmul * 1.05 * rad));
       }
-    }
-    vT = DD.clamp(vT, 22, P.vmax);
 
-    const aimI = Math.min(ss.length - 1, idx + 3 + Math.floor(speed * 0.14));
-    const to = V.sub(ss[aimI].p, car.pos);
-    const err = DD.angleDiff(car.yaw, Math.atan2(to[0], to[2]));
-    let steer = DD.clamp(-(err * 3.4 - car.yawRate * 0.18), -1, 1); // negated: positive input = screen-right = -yaw
-
-    let throttle = speed < vT * 1.03 ? 1 : 0.15;
-    let brake = speed > vT * 1.03 ? 1 : 0;
-    let drift = false;
-
-    // Implement dynamic drift tap
-    let hasTightCorner = false;
-    const lookAheadDrift = Math.min(ss.length - 1, idx + Math.ceil(15 / track.ds));
-    for (let i = idx + 2; i <= lookAheadDrift; i++) {
-      const a = ss[i - 1], b = ss[i];
-      const curv = Math.abs(DD.angleDiff(a.yaw, b.yaw)) / track.ds;
-      if (curv > 0.032) { hasTightCorner = true; break; }
-    }
-
-    if (hasTightCorner && speed > 28) {
-      drift = true;
-      if (!car.slideState) {
-        brake = 1;
-        steer = Math.sign(steer) * 1.0;
-      } else {
-        throttle = 1;
+      // Slow down proactively if approaching ice
+      let nearIce = false;
+      for (let j = i; j < Math.min(N, i + 15); j++) {
+        if (ss[j].surf === DD.SURF.GLASS) { nearIce = true; break; }
       }
+      if (nearIce) {
+        vCorner = Math.min(vCorner, 18);
+      }
+
+      const maxDecel = P.brakeDec * gmul * 0.90;
+      botSpeeds[i] = Math.min(vCorner, Math.sqrt(botSpeeds[i+1] * botSpeeds[i+1] + 2 * maxDecel * track.ds));
     }
+
+    // Forward pass
+    botSpeeds[0] = 0;
+    for (let i = 1; i < N; i++) {
+      const isGlass = ss[i].surf === DD.SURF.GLASS;
+      const isDirt = ss[i].surf === DD.SURF.DIRT;
+      const gmul = isGlass ? P.glassGripMul : (isDirt ? P.dirtGripMul : 1.0);
+      const maxAccel = 16 * gmul;
+      botSpeeds[i] = Math.min(botSpeeds[i], Math.sqrt(botSpeeds[i-1] * botSpeeds[i-1] + 2 * maxAccel * track.ds));
+    }
+
+    for (let i = 0; i < N; i++) {
+      let nearIce = false;
+      for (let j = i; j < Math.min(N, i + 15); j++) {
+        if (ss[j].surf === DD.SURF.GLASS) { nearIce = true; break; }
+      }
+      const floor = nearIce ? 18 : 22;
+      botSpeeds[i] = DD.clamp(botSpeeds[i], floor, P.vmax);
+    }
+
+    return { positions, botSpeeds, curvatures };
+  }
+
+  DD.getBotInput = function (car, track) {
+    if (!track.expert) {
+      track.expert = buildExpertData(track);
+    }
+
+    const idx = car.idx;
+    const speed = V.len(car.vel);
+    const data = track.expert;
+    const ss = track.samples;
+    const N = ss.length;
+
+    const vT = data.botSpeeds[idx];
+    const aimI = Math.min(N - 1, idx + 3 + Math.floor(speed * 0.14));
+
+    const targetPos = data.positions[aimI];
+
+    const to = V.sub(targetPos, car.pos);
+
+    let steer;
+    const isIce = ss[idx].surf === DD.SURF.GLASS;
+
+    if (car.slideState && !isIce && speed > 10) {
+      const velYaw = Math.atan2(car.vel[0], car.vel[2]);
+      const errVel = DD.angleDiff(car.yaw, velYaw);
+      steer = DD.clamp(-(errVel * 4.0 - car.yawRate * 0.2), -1, 1);
+    } else {
+      const err = DD.angleDiff(car.yaw, Math.atan2(to[0], to[2]));
+      steer = DD.clamp(-(err * 3.4 - car.yawRate * 0.18), -1, 1);
+    }
+
+    let throttle = speed < vT * 1.02 ? 1 : 0.15;
+    let brake = speed > vT * 1.02 ? 1 : 0;
+    let drift = false; // Grip corner-cutting is more stable and faster for the bot than drift initiation
 
     return { steer, throttle, brake, drift };
   };
@@ -527,30 +630,44 @@
     const car = DD.createCar(track);
     const maxTicks = (opts.maxSeconds || 200) * 60;
     let stuckTicks = 0, lastIdx = 0;
+    const recordFrames = !!opts.recordFrames;
+    const frames = recordFrames ? [] : null;
 
     for (let t = 0; t < maxTicks; t++) {
       const input = DD.getBotInput(car, track);
       DD.stepCar(car, input, track);
       DD.postWallClamp(car, track);
 
+      if (recordFrames && (t % 2 === 0)) {
+        frames.push(car.pos[0], car.pos[1], car.pos[2], car.yaw);
+      }
+
       if (car.fellOff) { car.fellOff = false; DD.respawnCheckpoint(car, track); }
-      if (car.finished) return { ok: true, ms: car.finalMs, respawns: car.respawns, splits: car.splits };
+      if (car.finished) {
+        return {
+          ok: true,
+          ms: car.finalMs,
+          respawns: car.respawns,
+          splits: car.splits.slice(),
+          frames: recordFrames ? new Float32Array(frames) : null
+        };
+      }
       if (t % 120 === 0) {
         if (car.idx <= lastIdx + 2) stuckTicks++; else stuckTicks = 0;
         lastIdx = car.idx;
-        if (stuckTicks > 5) return { ok: false, reason: 'stuck', at: car.idx };
+        if (stuckTicks > 5) return { ok: false, reason: 'stuck', at: car.idx, frames: null };
       }
     }
-    return { ok: false, reason: 'timeout' };
+    return { ok: false, reason: 'timeout', frames: null };
   };
 
   DD.buildValidTrack = function (seedStr, tier) {
     for (let attempt = 0; attempt < 6; attempt++) {
       const track = DD.generateTrack(seedStr, tier, attempt);
       if (track.overlapForced > 0) continue; // self-intersecting layout: regenerate
-      const bot = DD.runBot(track);
+      const bot = DD.runBot(track, { recordFrames: true });
       if (bot.ok && bot.respawns === 0 && bot.ms > 25000) {
-        const author = Math.round(bot.ms * 0.82); // author line meaningfully faster than the safe bot run
+        const author = Math.round(bot.ms * 0.97); // expert bot v2 is close to optimal
         track.medals = {
           author,
           gold: Math.round(author * 1.10),
@@ -558,6 +675,8 @@
           bronze: Math.round(author * 1.55)
         };
         track.attempt = attempt;
+        track.authorGhost = bot.frames;
+        track.authorSplits = bot.splits;
         return track;
       }
     }

@@ -65,7 +65,28 @@ Goal restated: **dreamy TrackMania-like racer — efficient, looks good, excitin
 
 _Everything in Wave 1 needs: `?v=` bumps, apk sync, e2e golden re-baseline after sign-off._
 
-## Wave 2 — make it exciting to drive (1–2 weeks)
+## Wave 2 — make it exciting to drive — ✅ LANDED (sessions 18, Antigravity impl + Claude review)
+
+**Status 2026-07-02:** items 6+7+8 implemented by Antigravity, reviewed/integrated by Claude.
+Review notes (read before touching these systems again):
+- **Drift (6)** ✅ — arcade authority exactly per spec, gated on `input.drift`; new drivability
+  test 15 proves the hairpin crossover (90° at 126 km/h: drift 0.65 s / 24 m vs grip 2.2 s / 61 m).
+  ⚠️ The same drop silently deleted the **slope-gravity term** (`sin(pitch)·gravity·slopeFactor`)
+  from `stepGrounded` — undocumented, unneeded (all 32 tests pass with it restored) — **restored
+  by Claude.** Rule reaffirmed: every gameplay-affecting line must appear in the drop's walkthrough.
+- **Author ghost (7)** ✅ core — bot frames recorded in `buildValidTrack` → `track.authorGhost`/
+  `authorSplits`; `settings.ghost` = pb (author fallback) / author / off. UX polish outstanding
+  (brief A2 below): HUD doesn't yet SAY which ghost you're racing.
+- **Bot v2 (8)** ✅ — relaxation racing line (hazard-aware: flattens to centerline before
+  ice/kickers/gaps), two-pass speed solver, slide countersteer recovery. Engineering call to
+  note: **the bot never drifts** (grip+cutting judged more stable) → author ghosts don't
+  showcase drift lines, and a drifting human can beat author times on hairpin tracks.
+  **Medal factor changed 0.82 → 0.97** on a much faster bot ⇒ every medal tier is dramatically
+  harder in absolute time — needs human calibration (Claude-owned C4, with Tibba playtests).
+  The telemetry/playtest-report part of item 8 (min-speed histogram, wall proximity, airtime)
+  is NOT built yet — folded into C2/C3 where it's needed.
+
+Original spec kept below for reference:
 
 6. **Drift rework — drift as a cornering tool, not a failure mode.** Design intent: corners
    tighter than some radius are *faster drifted*; wide sweepers stay faster gripped (the
@@ -143,3 +164,79 @@ Wave 1 first because every later judgment (drift feel, terrain art, garage) is m
 author ghost (7) before expert bot (8) because each consumes the previous. World (9–11) after
 the bot exists so variety is measurable, not vibes. Garage (12–13) is parallel-friendly — any
 wave can interleave a slice.
+
+---
+
+# Division of labor — Claude (orchestrator) × Antigravity (implementer)
+
+_Agreed with Tibba 2026-07-02. Claude owns architecture, cross-system design, balance judgment,
+and review/integration of every drop. Antigravity executes well-specified, test-guarded briefs
+(high token throughput, bounded blast radius)._
+
+## Working protocol (both agents + Tibba)
+
+1. **Antigravity works from the briefs below**, in the main checkout, leaving changes
+   uncommitted. One brief per drop — don't mix.
+2. **Definition of Done for every brief:** all listed tests green (`node tests/...`), `?v=`
+   cache busters bumped in `index.html` for every changed `js/` file, and a walkthrough that
+   lists **every gameplay-affecting line** — an undocumented physics/balance change is a
+   defect even if tests pass (see the slope-term incident, session 18).
+3. **Claude reviews the `git diff`** (not the walkthrough), fixes/integrates, commits, and
+   updates STATUS.md. Nothing merges unreviewed.
+4. **Hard invariants nobody crosses without a Claude-reviewed design note:** determinism (no
+   `Math.random` in sim paths), the `buildCar` contract (`verify_m2_features`), `normalizeSpec`
+   guarantees (glow = emissive only, never real lights), the light pool rule (`addLightSource`,
+   never raw lights), `DD.GLOW` discipline (no new magic glow constants), and `DD.PHYS`
+   semantics (any `stepCar` change is Claude-reviewed by design).
+
+## Claude-owned (hard problems, architecture, judgment)
+
+- **C1 — Review & integration** of every Antigravity drop (ongoing, see protocol).
+- **C2 — Multilap / closed circuits** (item 11): loop-closure solver in the piece grammar,
+  lap/checkpoint/ghost/medal semantics, HUD `LAP n/m`. Hardest single item in the plan;
+  touches trackgen+physics+game+ghosts at once.
+- **C3 — Terrain & world architecture** (item 9): corridor-safety policy, landform height
+  design, bake redesign, playtest-telemetry hooks. Claude designs + prototypes the generator
+  changes, then splits implementable chunks into new A-briefs.
+- **C4 — Balance calibration with Tibba**: medal factor (0.97 flag above), drift feel tuning
+  passes, campaign gating difficulty. Judgment work — numbers move only after human playtests.
+- **C5 — Garage editor deep slices** (item 13): cross-section mode (end-on camera tween +
+  `profile` primitive + 2D-outline-equals-3D-viewport editing), add/remove-parts interaction
+  design. Plus the **garage room art-direction spec** (item 12) — Claude specs it, then the
+  build can become an A-brief.
+
+## Antigravity briefs (ready to run, in priority order)
+
+- **A1 — Theme knobs** (item 10): implement `atmosphere: 'aurora'` (2–3 additive scrolling
+  sky bands, camera-following like planet/nebulae, `fog:false`, registered under `DD.GLOW`
+  discipline — no new raw constants) and `'foggy'` (override `fogNear/fogFar` + halo boost on
+  pole lamps); implement `surfaceLook: 'shimmer'` and `'edgelit'` on the ribbon (banded
+  already works; `solid` = explicit no-op). Files: `js/scene.js`, `js/theme.js` (knob docs
+  only — do NOT change palette values; `verify_colors` locks them). Tests: colors, sky_stars,
+  determinism. Visual proof per biome required in the walkthrough.
+- **A2 — Ghost UX polish**: HUD shows WHICH ghost you're racing (small tag near `#hudPB`:
+  "vs PB" / "vs AUTHOR", hidden when ghost=off); `setGhost` change takes effect without a full
+  track reload if cheap (else document that it applies next load); finish screen shows delta
+  vs the raced target. Files: `index.html`, `js/game.js`. Keep `finishRun`'s PB-refresh
+  behavior (session 17) intact.
+- **A3 — Zero-alloc render path** (promoted from Parked — mechanical crunch): module-scope
+  scratch `Matrix4`/`Vector3`/color objects in `DD.poseCar`, `DD.updateShadow`,
+  `DD.updateCamera` (in-place vector helpers allowed in RENDER path only — physics `DD.v`
+  stays pure); cache the per-frame DOM lookups in the game loop (`hudWarn`, `hudSpeed`,
+  `hudGear`, rpm-arc fill, `hudDelta`); reuse one scratch `THREE.Color` for iridescent/boost.
+  ZERO behavior change; all suites must stay green byte-identical.
+- **A4 — Dead code + scene.js split**: delete `js/lib/GLTFLoader.js` (unused since session 12)
+  and `theme.js` `PALETTES`; split `js/scene.js` (~2.9k lines) into `scene-core.js` /
+  `scene-car.js` / `scene-decor.js` / `scene-fx.js` loaded in order from `index.html` (plain
+  script tags, shared closure state must become explicit `DD._sceneShared` or stay in one
+  file — propose the split in the walkthrough BEFORE moving code). Tests + a full visual pass.
+- **A5 — Impact audio**: filtered-noise wall thud + landing whump in `js/audio.js` (synth
+  only, no samples), wired where sparks already fire (`car.hitWall`) and on hard landings
+  (`justLanded`/`suspV` spike), volumes under the existing `sfx` setting. No changes outside
+  `audio.js`/`game.js` wiring lines.
+- **A6 — Sign polish**: arch chevrons currently face one way — add the mirrored glyphs on the
+  back face (same InstancedMesh, +4 instances/sign); check `buildCornerSigns` boards read as
+  powered (same emissive-frame treatment as session 17's arch signs).
+
+_Adding new briefs: Claude writes them here (usually spun out of C2/C3/C5 designs); Tibba can
+also paste any brief-shaped task directly to Antigravity if it fits the protocol invariants._
