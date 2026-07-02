@@ -108,7 +108,8 @@
       const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(SAVE_KEY) : null;
       if (raw) return JSON.parse(raw);
     } catch (e) { /* corrupted */ }
-    return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt' }, garage: { grad: 6, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now() } };
+    // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
+    return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now() } };
   };
   DD.persistSave = function (save) {
     if (DD.testMode) return;

@@ -37,7 +37,7 @@
   // Known part + wheel-style names (unknown ones are dropped by normalize → forward-compat).
   const PARTS = ['frontWing', 'rearWingBiplane', 'rearSpoilerLow', 'hoverFins', 'splitter',
     'splitterGlow', 'halo', 'sharkFin', 'diffuser', 'exhausts', 'exposedEngine', 'hoverChannels',
-    'glowCore', 'ducktail', 'chromeTrim'];
+    'glowCore', 'ducktail', 'chromeTrim', 'lightBar'];
   const WHEEL_STYLES = ['multiSpoke', 'turbofan', 'glowDisc', 'classicSpoke'];
   DD.CAR_PART_NAMES = PARTS;
   DD.CAR_WHEEL_STYLES = WHEEL_STYLES;
@@ -134,7 +134,8 @@
       },
       wheelStyle: 'multiSpoke',
       canopy: { kind: 'open', scale: [0.20, 0.12, 0.45], z: 0.25, y: 0.46, halo: true },
-      mounts: ['frontWing', 'rearWingBiplane', 'halo', 'splitter', 'diffuser'],
+      mounts: ['frontWing', 'rearWingBiplane', 'halo', 'splitter', 'diffuser',
+        { part: 'lightBar', knobs: { x: 0.82, y: 0.27, z: -0.28, len: 0.9 } }],
       palette: { glowI: 0.95, metalBias: 0.05 },
       gallery: { grad: 2, finish: 1 }
     },
@@ -153,7 +154,8 @@
       },
       wheelStyle: 'turbofan',
       canopy: { kind: 'bubble', scale: [0.26, 0.14, 0.65], z: 0.2, y: 0.5, halo: false },
-      mounts: ['splitter', 'rearSpoilerLow', 'sharkFin', 'diffuser'],
+      mounts: ['splitter', 'rearSpoilerLow', 'sharkFin', 'diffuser',
+        { part: 'lightBar', knobs: { x: 0.84, y: 0.31, z: -0.6, len: 1.3 } }],
       palette: { glowI: 0.7, metalBias: 0.1 },
       gallery: { grad: 6, finish: 1 }
     },
@@ -172,7 +174,8 @@
       },
       wheelStyle: 'glowDisc',
       canopy: { kind: 'recessed', scale: [0.24, 0.11, 0.50], z: 0.2, y: 0.5, halo: false },
-      mounts: ['splitterGlow', 'hoverFins', 'hoverChannels', 'glowCore'],
+      mounts: ['splitterGlow', 'hoverFins', 'hoverChannels', 'glowCore',
+        { part: 'lightBar', knobs: { x: 0.86, y: 0.28, z: -0.62, len: 1.4 } }],
       palette: { glowI: 1.4, metalBias: -0.05 },
       gallery: { grad: 0, finish: 4 }
     },

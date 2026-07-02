@@ -180,12 +180,10 @@
       composer.setPixelRatio(renderer.getPixelRatio());
       composer.setSize(window.innerWidth, window.innerHeight);
       composer.addPass(new THREE.RenderPass(scene, camera));
-      const strength = 1.25;
-      const radius = 0.65;
-      const threshold = 0.85;
+      // tuned centrally in DD.GLOW (theme.js) — strength is recomposed per-frame in game.js
       const bloom = new THREE.UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        strength, radius, threshold);   // strength, radius, threshold (low threshold → lights & neon bloom hard against the night)
+        DD.GLOW.bloom.base, DD.GLOW.bloom.radius, DD.GLOW.bloom.threshold);
       composer.addPass(bloom);
       composer._bloom = bloom;
       // AA: FXAA as the final pass. The composer renders into an offscreen target, so the
@@ -611,7 +609,7 @@
     const pos = new Float32Array(N * 3);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const m = new THREE.PointsMaterial({ color: col(V.lerp(theme.accent, [1, 1, 1], 0.55)), size: 0.75, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.PointsMaterial({ color: col(V.lerp(theme.accent, [1, 1, 1], 0.55)), size: 0.75, map: getDotTexture(), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
     const pts = new THREE.Points(g, m);
     pts.frustumCulled = false;
     pts.userData = { N, head: 0, life: new Float32Array(N), vel: new Float32Array(N * 3) };
@@ -668,6 +666,7 @@
     const m = new THREE.PointsMaterial({
       color: 0xffaa33,
       size: 0.35,
+      map: getDotTexture(),
       transparent: true,
       opacity: 0.9,
       blending: THREE.AdditiveBlending,
@@ -783,6 +782,7 @@
     const m = new THREE.PointsMaterial({
       color,
       size,
+      map: getDotTexture(),
       transparent: true,
       opacity: weather === 'rain' ? 0.45 : 0.65,
       blending: THREE.AdditiveBlending,
@@ -853,7 +853,7 @@
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const m = new THREE.PointsMaterial({ color: col(theme.accent2), size: 0.55, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.PointsMaterial({ color: col(theme.accent2), size: 0.55, map: getDotTexture(), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
     const pts = new THREE.Points(g, m);
     pts.frustumCulled = false;
     pts.userData = { basePos, phase, n };
@@ -1578,13 +1578,14 @@
     
     // Center sign display panel
     const signGeo = new THREE.BoxGeometry(1.8, 1.0, 0.12);
-    const signMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.9, roughness: 0.1 });
+    // faint emissive tint so the panel reads as a powered board even when nothing lights it
+    const signMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.9, roughness: 0.1, emissive: col(theme.accent2), emissiveIntensity: 0.06 });
     const signGlowMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
     const chevronGeo = new THREE.BoxGeometry(0.45, 0.12, 0.14);
 
     // Glowing pool on road surface under the arches
     const poolGeo = new THREE.CircleGeometry(1, 16);
-    const poolMat = new THREE.MeshBasicMaterial({ color: col(theme.accent), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const poolMat = new THREE.MeshBasicMaterial({ color: col(theme.accent), transparent: true, opacity: DD.GLOW.archPool, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     
     // PERF: each arch used to be a Group of ~16 separate meshes — with ~28 arches that's ~450 draw
     // calls, which was the single biggest CPU/draw-call cost in the scene. Instance every component
@@ -1643,12 +1644,16 @@
       neons.setMatrixAt(i, place(0, 8.24, 0, null, halfW * 1.8, 1, 1));
       // center sign panel (signGroup sat at y=7.3)
       signs.setMatrixAt(i, place(0, 7.3, 0, null, 1, 1, 1));
-      // chevrons on the sign
-      for (const sx of [-0.35, 0, 0.35]) {
+      // sign glyphs: two LARGE chevrons + top/bottom frame bars (6 instances/sign, same count
+      // as before). Big glyphs are the point — the old six mini-chevrons were sub-pixel at
+      // distance, so the panel read as a floating black box hanging over the road.
+      for (const sx of [-0.42, 0.30]) {
         for (const sy of [-1, 1]) {
-          chevrons.setMatrixAt(ci++, place(sx, 7.3 + sy * 0.16, 0.07, ez.set(0, 0, sy * 0.7), 1, 1, 1));
+          chevrons.setMatrixAt(ci++, place(sx, 7.3 + sy * 0.19, 0.07, ez.set(0, 0, sy * 0.62), 1.6, 1.4, 1));
         }
       }
+      chevrons.setMatrixAt(ci++, place(0, 7.82, 0.05, null, 4.2, 0.35, 0.5));
+      chevrons.setMatrixAt(ci++, place(0, 6.78, 0.05, null, 4.2, 0.35, 0.5));
       // flat neon pool on the road surface
       pools.setMatrixAt(i, place(0, 0.02, 0, ez.set(-Math.PI / 2, 0, 0), s.w * 0.7, 3.5, 1.0));
 
@@ -1747,9 +1752,10 @@
       opacity: 0.14,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      fog: false // sky element: beyond fogFar, world fog would swallow it entirely
     });
-    
+
     const geo = new THREE.PlaneGeometry(1600, 1600);
     for (let i = 0; i < numClouds; i++) {
       const m = new THREE.Mesh(geo, mat);
@@ -1762,31 +1768,41 @@
 
   function buildSciFiPlanet(theme, rng) {
     const group = new THREE.Group();
+    // A luminous dream-moon. `fog: false` is load-bearing: the planet sits beyond fogFar, so
+    // with fog applied the sphere rendered as a solid fog-colored disc — a "black hole" punched
+    // into the sky gradient (and the ring floated as a giant ghost circle).
+    const bodyCol = [
+      DD.lerp(theme.skyBand[0], theme.accent2[0], 0.4),
+      DD.lerp(theme.skyBand[1], theme.accent2[1], 0.4),
+      DD.lerp(theme.skyBand[2], theme.accent2[2], 0.4)
+    ];
     const planetGeo = new THREE.SphereGeometry(120, 24, 24);
-    const planetMat = new THREE.MeshStandardMaterial({
-      color: col([theme.skyTop[0]*0.12, theme.skyTop[1]*0.12, theme.skyTop[2]*0.18]),
-      roughness: 0.9,
-      metalness: 0.1,
-      emissive: col(theme.accent2),
-      emissiveIntensity: 0.08
-    });
+    const planetMat = new THREE.MeshBasicMaterial({ color: col(bodyCol), fog: false });
     const planet = new THREE.Mesh(planetGeo, planetMat);
     planet.position.set(1000, 420, -1800);
     group.add(planet);
-    
-    const ringGeo = new THREE.RingGeometry(160, 240, 30);
+
+    // soft additive shell so the edge reads hazy instead of a hard paper cutout
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(134, 24, 24),
+      new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.10, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    halo.position.copy(planet.position);
+    group.add(halo);
+
+    const ringGeo = new THREE.RingGeometry(160, 230, 30);
     const ringMat = new THREE.MeshBasicMaterial({
       color: col(theme.accent),
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.10,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
-      depthWrite: false
+      depthWrite: false,
+      fog: false
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.set(Math.PI / 3, Math.PI / 6, 0);
     planet.add(ring);
-    
+
     return group;
   }
 
@@ -1890,13 +1906,22 @@
       track.emissiveDecorMesh = emissiveDecor;
     }
 
-    root.add(buildLightPoles(track, theme, rng, quality));
-    root.add(buildNeonProps(track, theme, rng, quality));
+    const poles = buildLightPoles(track, theme, rng, quality);
+    root.add(poles);
+    const props = buildNeonProps(track, theme, rng, quality);
+    root.add(props);
 
     // Support pillars under elevated sections
     root.add(buildSupportPillars(track, theme));
     // Glowing neon arches with downward light pools
-    root.add(buildNeonArches(track, theme, quality));
+    const arches = buildNeonArches(track, theme, quality);
+    root.add(arches);
+
+    // Tall glowing verticals photobomb the garage: a lamp/pylon right behind the stage reads
+    // as a giant bloom beam through the showcase car. game.js hides these while in the garage
+    // (same pattern as track.gateMeshes); everything low/horizontal stays as backdrop.
+    track.garageHide = [poles, props, arches];
+    if (emissiveDecor) track.garageHide.push(emissiveDecor);
     
     // Distant background elements (skipped on low quality for mobile performance)
     if (quality !== 'low') {
@@ -2068,6 +2093,24 @@
   }
 
   let _carbonTexCache = null;
+  /* shared round-dot sprite for the particle PointsMaterials — raw points render as hard
+     squares (clearly visible on snow); stars have their own shader, everything else uses this */
+  let _dotTexCache = null;
+  function getDotTexture() {
+    if (_dotTexCache) return _dotTexCache;
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.8)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 32, 32);
+    _dotTexCache = new THREE.CanvasTexture(c);
+    return _dotTexCache;
+  }
+
   function getCarbonTexture() {
     if (_carbonTexCache) return _carbonTexCache;
     const canvas = document.createElement('canvas');
@@ -2237,6 +2280,9 @@
       }
       const blade = _mesh(_box(0.04, r * 1.3, 0.03), M.glowMat(M.grad.a, 0.95));
       blade.position.set(side * 0.12, r * 0.18, 0); spin.add(blade);
+      // glowing rim ring (concept sheet: "Rims: glowing / emissive accent color")
+      const rim = _mesh(_tor(r * 0.72, 0.018, 6, 24), M.glowMat(M.grad.b, 0.8));
+      rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.10, 0, 0); spin.add(rim);
     },
     turbofan(spin, r, side, M) {
       const ring = _mesh(_tor(r * 0.5, 0.02, 6, 24), M.glowMat(M.grad.b, 0.9));
@@ -2257,6 +2303,9 @@
       }
       const cap = _mesh(_cyl(r * 0.18, r * 0.18, 0.1, 12), M.glowMat(M.grad.a, 0.85));
       cap.rotation.z = Math.PI / 2; cap.position.set(side * 0.1, 0, 0); spin.add(cap);
+      // subtler vintage rim glow — keeps the chrome identity but reads at dusk
+      const rim = _mesh(_tor(r * 0.66, 0.014, 6, 24), M.glowMat(M.grad.b, 0.55));
+      rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.08, 0, 0); spin.add(rim);
     }
   };
 
@@ -2370,6 +2419,20 @@
     chromeTrim(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
       for (const sx of [-1, 1]) { const tr = _mesh(_box(0.02, 0.03, 2.4 * L), M.chrome); tr.position.set(sx * 0.36, 0.30, 0); g.add(tr); }
+    },
+    lightBar(ctx) {
+      // concept sheet: "thin emissive light bar on the car" — one glow seam per flank, the car's
+      // neon identity at dusk. Knobs place it half-embedded in the widest hull band (a seam that
+      // touches always reads right; a floating bar reads like a bug): x/y = seam position,
+      // z (in L units) = centre, len (in L units) = length.
+      const g = ctx.group, L = ctx.L, M = ctx.mats, k = ctx.knobs || {};
+      const x = k.x != null ? k.x : 0.70, y = k.y != null ? k.y : 0.28;
+      const len = (k.len != null ? k.len : 1.3) * L, z = (k.z != null ? k.z : -0.4) * L;
+      for (const sx of [-1, 1]) {
+        const bar = _mesh(_box(0.025, 0.035, len), M.glowMat(M.grad.a, k.i != null ? k.i : 0.9));
+        bar.position.set(sx * x, y, z);
+        g.add(bar);
+      }
     }
   };
 
@@ -2488,10 +2551,12 @@
   DD.buildGarageStage = function (envMap, theme) {
     const W = 7, D = 10, H = 0.3;
     const carbonTex = getCarbonTexture();
+    // calm sheen: the original glossy clearcoat threw two huge white specular blobs that
+    // washed out the car it's supposed to present
     const mat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, map: carbonTex, metalness: 0.35, roughness: 0.5,
-      bumpMap: carbonTex, bumpScale: 0.05, clearcoat: 1.0, clearcoatRoughness: 0.08,
-      envMapIntensity: 0.8, envMap: envMap || null
+      color: 0xffffff, map: carbonTex, metalness: 0.2, roughness: 0.62,
+      bumpMap: carbonTex, bumpScale: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.3,
+      envMapIntensity: 0.45, envMap: envMap || null
     });
     const stage = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat);
     stage.receiveShadow = true;
@@ -2533,9 +2598,9 @@
     const cols = trail.geometry.attributes.color.array;
     const c = ud.color;
     
-    // Blazing "light trail" on drift, very faint speed tail otherwise
+    // Blazing "light trail" on drift, very faint speed tail otherwise (levels in DD.GLOW)
     const isDrifting = car.sliding && car.slideState;
-    const intensity = isDrifting ? 1.8 : 0.2 * speedNorm;
+    const intensity = isDrifting ? DD.GLOW.skid.drift : DD.GLOW.skid.straight * speedNorm;
     
     for (let i = 0; i < ud.N; i++) {
       const p = ud.pts[Math.min(i, ud.pts.length - 1)] || { l: back, r: back };
@@ -2679,6 +2744,14 @@
   };
 
   /* chase camera */
+  // Framing profiles. `close` = the concept sheet's "camera just behind and slightly above the
+  // car" (hero presence); `classic` = the original farther/higher frame. game.js sets
+  // DD.cameraProfile from settings; the module default keeps headless tests on the old numbers.
+  DD.CAM_PROFILES = {
+    classic: { dist0: 7.4, distV: 2.0, h0: 2.45, hV: 0.45, look: 11, fov0: 63, fovV: 34 },
+    close:   { dist0: 6.0, distV: 1.6, h0: 1.90, hV: 0.40, look: 10, fov0: 64, fovV: 32 }
+  };
+  DD.cameraProfile = 'classic';
   DD.makeCamState = () => ({ pos: [0, 5, -10], look: [0, 0, 0], fov: 68, shake: [0, 0, 0], prevGrounded: true, prevVelY: 0 });
   DD.updateCamera = function (camera, camState, car, track, dt, speed) {
     const s = track.samples[Math.min(car.idx, track.samples.length - 1)];
@@ -2704,9 +2777,10 @@
       }
     }
 
-    const dist = 7.4 + sv * 2.0;
-    const targetPos = V.addS(V.addS(car.pos, follow, -dist), up, 2.45 + sv * 0.45);
-    const targetLook = V.addS(V.addS(car.pos, follow, 11), up, 1.0);
+    const CP = DD.CAM_PROFILES[DD.cameraProfile] || DD.CAM_PROFILES.classic;
+    const dist = CP.dist0 + sv * CP.distV;
+    const targetPos = V.addS(V.addS(car.pos, follow, -dist), up, CP.h0 + sv * CP.hV);
+    const targetLook = V.addS(V.addS(car.pos, follow, CP.look), up, 1.0);
     const kp = 1 - Math.exp(-10 * dt), kl = 1 - Math.exp(-16 * dt);
     camState.pos = V.lerp(camState.pos, targetPos, kp);
     camState.look = V.lerp(camState.look, targetLook, kl);
@@ -2733,7 +2807,7 @@
     camera.up.set(DD.lerp(0, up[0], 0.55), 1, DD.lerp(0, up[2], 0.55));
     camera.lookAt(camState.look[0], camState.look[1], camState.look[2]);
     // FOV widens with speed (with a subtle non-linear speed-creep above 75% speed), a touch more while sliding, plus a punch on boost pads (speed rush).
-    const targetFov = 63 + sv * 34 + (sv > 0.75 ? Math.pow(sv - 0.75, 1.5) * 20 : 0) + (car.sliding ? 3 : 0) + (car.boostGlow || 0) * 7;
+    const targetFov = CP.fov0 + sv * CP.fovV + (sv > 0.75 ? Math.pow(sv - 0.75, 1.5) * 20 : 0) + (car.sliding ? 3 : 0) + (car.boostGlow || 0) * 7;
     camState.fov = DD.dampTo(camState.fov, targetFov, 6, dt);
     camera.fov = camState.fov;
     camera.updateProjectionMatrix();
@@ -2741,6 +2815,11 @@
     if (track) {
       if (track.skyMesh) track.skyMesh.position.copy(camera.position);
       if (track.starsMesh) track.starsMesh.position.copy(camera.position);
+      // planet + nebulae are sky furniture too: follow the camera so they stay celestial
+      // backdrop instead of world objects you can drive toward (their child offsets keep the
+      // apparent direction; group rotation in the loop = slow drift across the sky)
+      if (track.planetMesh) track.planetMesh.position.copy(camera.position);
+      if (track.nebulaeMesh) track.nebulaeMesh.position.copy(camera.position);
 
       const theme = track.theme;
       if (theme && DD.game && DD.game.scene) {
@@ -2779,7 +2858,7 @@
     const pos = new Float32Array(n * 3);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const m = new THREE.PointsMaterial({ color: col(theme.accent), size: 0.3, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.PointsMaterial({ color: col(theme.accent), size: 0.3, map: getDotTexture(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     const pts = new THREE.Points(g, m);
     pts.frustumCulled = false;
     pts.userData = { seeded: false };

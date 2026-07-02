@@ -209,6 +209,58 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — Wave 1 "see the game clearly": ghost-on-retry, glow budget, sky/sign/particle/garage fixes, car presence, close camera (2026-07-02, session 17)
+
+Executed Wave 1 of [`IMPROVEMENT_PLAN.md`](IMPROVEMENT_PLAN.md) (new doc — the two-phase improvement
+roadmap agreed with Tibba; read it before planning further work). All changes verified live in the
+browser preview (neon + frozen runs, garage) and the full headless suite is green (drivability 27/27,
+determinism, colors 4500, m2 18/18, camera 21/21).
+
+1. **Ghost appears on retry** (`js/game.js` `finishRun`): on a PB, `G.ghostData`/`G.ghostTimes`/
+   `G.ghostMesh` are now refreshed in place from `G.recFrames` (and `#hudPB` updates), so the very
+   next retry races the new ghost. Previously ghosts loaded only in `loadTrack` — the retry loop
+   never saw them (the "I never see any ghosts" root cause). Verified end-to-end: finish → retry →
+   ghost visible and replaying. Note: `DD.game` IS the live game state (`game.js:9`) — full
+   introspection for tests/debug; a redundant `DD._G` alias is set under `testMode`.
+2. **Glow budget** (`DD.GLOW` + `DD.glowMul` in `js/theme.js` — ALL bloom/pulse constants live
+   there now; consumers: `js/scene.js` composer/trail/arch-pools, `js/game.js` per-frame bloom):
+   bloom composition is `(base + speedCreep + driftFlash) × master × biomeTrim`, hard-capped at 1.8;
+   the drift-release fullscreen surge dropped +1.5 → +0.45 with faster decay; gates/decor/boost all
+   pulse on ONE shared breath LFO (0.10 Hz, small amplitude) instead of three competing sines; drift
+   light-trail 1.8 → 1.15; arch road-pools 0.35 → 0.22; frozen gets a 0.82 biome trim (its near-field
+   white-out is gone — road reads as dark asphalt + crisp neon edges per `visual_concept.jpg`).
+   **User-facing: settings → "glow" (subtle/standard/vivid)**, live, saved as `settings.glow`.
+3. **Sky fixed** (`js/scene.js` `buildSciFiPlanet`/`buildNebulae`): the planet was a near-black
+   sphere PLUS it sat beyond `fogFar`, so fog rendered it as a solid dark disc — the "black hole in
+   the sky" (and its ring floated as a giant ghost circle). Now: `fog:false` on all sky-furniture
+   materials (load-bearing), luminous pastel body (skyBand↔accent2 mix) + soft additive halo shell,
+   dimmer/smaller ring, and planet+nebulae follow the camera like `skyMesh`/`starsMesh` (celestial
+   backdrop, not world objects you can drive toward).
+4. **Arch signs readable** (`buildNeonArches`): two LARGE glowing chevrons + top/bottom frame bars
+   per board (same 6 instances/sign as before) and a faint emissive tint on the panel — boards now
+   read as powered chevron signage (concept-sheet style) instead of floating black rectangles.
+5. **Round particles**: shared radial-dot `CanvasTexture` (`getDotTexture`) mapped onto the smoke /
+   sparks / weather / fireflies / speed-lines `PointsMaterial`s — no more square snow.
+6. **Garage presentable (interim)**: new `track.garageHide = [poles, props, arches, emissiveDecor]`
+   registry, hidden while `state==='garage'` (same pattern as `gateMeshes`) — kills the giant bloom
+   beam through the showcase car; the stage platform sheen calmed (metalness 0.2, roughness 0.62,
+   clearcoat 0.45, envMapIntensity 0.45) so the white specular blobs are gone. The real dedicated
+   garage room is Wave 4 in the plan.
+7. **Car presence** (`js/core.js`, `js/carspec.js`, `js/scene.js`): default paint Noir → **Dream**
+   (new saves only — existing saves keep their choice); new `lightBar` part (thin emissive flank
+   seams, knob-positioned per preset to half-embed in the widest hull band) added to Apex/Endurance/
+   Neon presets + registered in `CAR_PART_NAMES`; glowing rim rings added to `multiSpoke` and (subtler)
+   `classicSpoke` wheels — per the concept sheet's "thin emissive light bar" + "glowing rims".
+   Classic Cigar keeps its chrome/vintage identity (no light bar).
+8. **Close chase camera** (`DD.CAM_PROFILES` in `js/scene.js`, `settings.camera`): `close`
+   (dist 6.0+sv·1.6, height 1.9+sv·0.4 — the concept's "just behind and slightly above", default for
+   new saves) vs `classic` (the old 7.4/2.45 frame). Module default stays `classic` so headless tests
+   are unaffected; the game sets the profile from settings at boot.
+
+**Cache-busters:** `core v16, theme v20, carspec v2, scene v49, game v40`. **Not done here:** e2e
+golden re-baseline (`node tests/e2e_runner.js -u` on the host — bloom/camera/car all intentionally
+changed) and `apk-build/sync.bat` (run after merging).
+
 ## Resolved this pass — Garage editor fixes: frozen camera, fast drag, dedicated stage (2026-07-01, session 16)
 
 Session 15's ring-drag editor had three real problems the user hit immediately on trying it — all
@@ -467,7 +519,10 @@ is 0, the scene renders with full materials. Pre-existing, not a regression.
 
 ## Gotchas for whoever continues
 
-- **Not a git repo.** There is no undo for file operations here. Be deliberate.
+- **This IS a git repo (since 2026-07-01).** Use `git status`/`git diff`/`git log` to inspect
+  unexpected changes (multiple AI tools edit this folder). Note the branch layout: session work may
+  live on feature branches (e.g. `garage-editor-fixes-session16`) ahead of `master` — check
+  `git branch -av` before assuming `master` is current.
 - **Determinism is load-bearing.** `core`/`theme`/`trackgen`/`physics` must stay Three-free and
   must not introduce `Math.random` in any path that affects race outcome or golden screenshots
   (particles use a deterministic trig-hash for exactly this reason).

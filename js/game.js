@@ -291,6 +291,25 @@
     pruneGhosts();
     DD.persistSave(G.save);
 
+    // Live-refresh the ghost to the new PB line so the very next retry races it. Ghosts used to
+    // load only in loadTrack, so the retry loop — the way a time-attack game is actually played —
+    // never saw the PB set moments earlier; you only met your ghost after exiting to the menu and
+    // re-entering the same seed.
+    if (isPB) {
+      const flat = new Float32Array(G.recFrames.length * 4);
+      for (let i = 0; i < G.recFrames.length; i++) {
+        const fr = G.recFrames[i];
+        flat[i * 4] = fr[0]; flat[i * 4 + 1] = fr[1]; flat[i * 4 + 2] = fr[2]; flat[i * 4 + 3] = fr[3];
+      }
+      G.ghostData = flat;
+      G.ghostTimes = precomputeGhostTimes(track, flat);
+      if (!G.ghostMesh) {
+        G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
+        G.scene.add(G.ghostMesh);
+      }
+      $('hudPB').textContent = 'PB ' + DD.formatTime(ms);
+    }
+
     DD.engineQuiet();
     DD.sfxFinish(medal);
 
@@ -358,6 +377,11 @@
       if (G.track && G.track.gateMeshes) {
         G.track.gateMeshes.forEach((m) => { m.visible = G.state !== 'garage'; });
       }
+      // tall glowing verticals (poles/props/arches/pylons) — hidden in garage so a lamp behind
+      // the stage can't bloom into a beam through the showcase car
+      if (G.track && G.track.garageHide) {
+        for (const m of G.track.garageHide) m.visible = G.state !== 'garage';
+      }
 
       const s0 = G.track ? G.track.samples[G.track.startIdx] : null;
       if (G.car && G.carMesh && s0) {
@@ -369,17 +393,17 @@
       if (G.ghostMesh) G.ghostMesh.visible = false;
 
       if (G.track) {
-        if (G.track.nebulaeMesh) G.track.nebulaeMesh.rotation.y = t * 0.000015;
-        if (G.track.planetMesh) G.track.planetMesh.rotation.y = -t * 0.00003;
+        if (G.track.nebulaeMesh) { G.track.nebulaeMesh.rotation.y = t * 0.000015; G.track.nebulaeMesh.position.copy(G.camera.position); }
+        if (G.track.planetMesh) { G.track.planetMesh.rotation.y = -t * 0.00003; G.track.planetMesh.position.copy(G.camera.position); }
         if (G.track.starsMesh) { G.track.starsMesh.rotation.y = t * 0.000007; const _sm = G.track.starsMesh.material; if (_sm.uniforms && _sm.uniforms.time) _sm.uniforms.time.value = t * 0.001; }
+        // one shared breath LFO (DD.GLOW.breathHz) — world glow pulses together, gently
+        const breath = Math.sin(t * 0.001 * Math.PI * 2 * DD.GLOW.breathHz);
         if (G.track.gateMeshes) {
-          G.track.gateMeshes.forEach((m, i) => {
-            m.material.opacity = 0.55 + 0.3 * Math.sin(t * 0.006 + i);
-          });
+          for (const m of G.track.gateMeshes) m.material.opacity = DD.GLOW.gate.base + DD.GLOW.gate.amp * breath;
         }
         if (G.track.emissiveDecorMesh) {
           const mat = G.track.emissiveDecorMesh.userData.mat;
-          if (mat) mat.emissiveIntensity = 1.9 + 0.5 * Math.sin(t * 0.007);
+          if (mat) mat.emissiveIntensity = (DD.GLOW.decor.base + DD.GLOW.decor.amp * breath) * DD.glowMul(G.save.settings, G.track.theme);
         }
       }
       if (G.carMesh && G.carMesh.userData.iridescent) {
@@ -392,7 +416,8 @@
       }
 
       if (G.composer && G.composer._bloom) {
-        G.composer._bloom.strength = 1.25;
+        G.composer._bloom.strength = Math.min(
+          DD.GLOW.bloom.base * DD.glowMul(G.save.settings, G.track && G.track.theme), DD.GLOW.bloom.cap);
       }
       if (G.track && DD.updateLightPool) DD.updateLightPool(G.track, G.camera.position.x, G.camera.position.y, G.camera.position.z);
       if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
@@ -543,7 +568,7 @@
     G.prevSlideState = isCurrentlyDrifting;
 
     if (G.driftFlash > 0) {
-      G.driftFlash = Math.max(0, G.driftFlash - dtReal * 5.0); // decays over 0.2s
+      G.driftFlash = Math.max(0, G.driftFlash - dtReal * DD.GLOW.bloom.flashDecay);
     }
 
     if (G.sparks && DD.updateSparks) {
@@ -579,19 +604,19 @@
         m.emissiveIntensity = ud.baseEmisI;
       }
     }
-    // boost pulse
-    if (G.track.boostMesh) G.track.boostMesh.material.opacity = 0.4 + 0.25 * Math.sin(t * 0.012);
-    // gentle flicker of emissive environmental elements
+    // world glow: one shared breath LFO (DD.GLOW.breathHz) — boost pads, decor and gates
+    // pulse together, gently, instead of three sines at competing frequencies
+    const breath = Math.sin(t * 0.001 * Math.PI * 2 * DD.GLOW.breathHz);
+    if (G.track.boostMesh) G.track.boostMesh.material.opacity = DD.GLOW.boost.base + DD.GLOW.boost.amp * breath;
     if (G.track && G.track.emissiveDecorMesh) {
       const mat = G.track.emissiveDecorMesh.userData.mat;
-      if (mat) mat.emissiveIntensity = 1.9 + 0.5 * Math.sin(t * 0.007);
+      if (mat) mat.emissiveIntensity = (DD.GLOW.decor.base + DD.GLOW.decor.amp * breath) * DD.glowMul(G.save.settings, G.track.theme);
     }
-    // gates pulse
     if (G.track.gateMeshes) {
-      G.track.gateMeshes.forEach((m, i) => {
+      for (let i = 0; i < G.track.gateMeshes.length; i++) {
         const passed = i < G.car.nextCkpt;
-        m.material.opacity = passed ? 0.18 : 0.55 + 0.3 * Math.sin(t * 0.006 + i);
-      });
+        G.track.gateMeshes[i].material.opacity = passed ? DD.GLOW.gate.passed : DD.GLOW.gate.base + DD.GLOW.gate.amp * breath;
+      }
     }
 
     // ghost playback
@@ -702,11 +727,13 @@
 
     if (G.composer && G.composer._bloom) {
       const speedNorm = speed / DD.PHYS.vmax;
-      // bloom strength creep at high speed
-      const bloomSpeedCreep = Math.max(0, speedNorm - 0.6) * 0.8;
-      // flash adds a temporary surge of up to +1.5 bloom strength
-      const flash = (G.driftFlash || 0) * 1.5;
-      G.composer._bloom.strength = 1.25 + bloomSpeedCreep + flash;
+      const bloomSpeedCreep = Math.max(0, speedNorm - 0.6) * DD.GLOW.bloom.speedCreep;
+      const flash = (G.driftFlash || 0) * DD.GLOW.bloom.driftFlash;
+      // composed strength scales with the user/biome glow multiplier and is hard-capped —
+      // event surges can accent the scene but never white it out
+      G.composer._bloom.strength = Math.min(
+        (DD.GLOW.bloom.base + bloomSpeedCreep + flash) * DD.glowMul(G.save.settings, G.track.theme),
+        DD.GLOW.bloom.cap);
     }
 
     if (G.track && DD.updateLightPool) DD.updateLightPool(G.track, G.camera.position.x, G.camera.position.y, G.camera.position.z);
@@ -1035,6 +1062,8 @@
     $('setSfx').value = s.sfx;
     $('setMusic').value = s.music;
     $('setQuality').value = s.quality;
+    $('setGlow').value = s.glow || 'standard';
+    $('setCamera').value = s.camera || 'close';
   }
 
   /* ---------------- boot ---------------- */
@@ -1051,7 +1080,9 @@
     if (DD.testMode) {
       G.save.settings.controlMode = 'keys';
       G.save.settings.quality = 'low';
+      DD._G = G; // test-only introspection hook (e2e / preview verification); never set outside testMode
     }
+    DD.cameraProfile = G.save.settings.camera || 'close'; // saved framing profile (see DD.CAM_PROFILES)
     const canvas = $('gl');
     G.renderer = DD.createRenderer(canvas, G.save.settings.quality);
     G.scene = new THREE.Scene();
@@ -1144,6 +1175,8 @@
     $('setSfx').oninput = (e) => { G.save.settings.sfx = parseFloat(e.target.value); DD.audio.volumes.sfx = G.save.settings.sfx; saveSet(); };
     $('setMusic').oninput = (e) => { G.save.settings.music = parseFloat(e.target.value); DD.audio.volumes.music = G.save.settings.music; if (DD.audio.nodes.padMaster) DD.audio.nodes.padMaster.gain.value = 0.1 * G.save.settings.music; saveSet(); };
     $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); };
+    $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
+    $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
     function saveSet() { DD.persistSave(G.save); }
 
     // touch controls
