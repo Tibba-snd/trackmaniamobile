@@ -28,7 +28,9 @@
   ];
 
   const MOTIFS = ['slabs', 'pillars', 'spheres', 'islands', 'shards', 'mountains'];
+  // Atmospheres: clear, foggy (thick haze + streetlight halos), starfield (default star density), aurora (additive scrolling sky bands)
   const ATMOS = ['clear', 'foggy', 'starfield', 'aurora'];
+  // Surface looks on road: solid (default), edgelit (neon boundaries), banded (expansion joints), shimmer (high-frequency metallic reflection)
   const SURFACE_LOOKS = ['solid', 'edgelit', 'banded', 'shimmer'];
 
   const BIOMES = ['dune', 'neon', 'canyon', 'frozen'];
@@ -157,7 +159,7 @@
       groundDetailWidth = 0.25;
     }
 
-    return {
+    const theme = {
       name: biome + '_' + weather,
       seed: seedStr,
       biome,
@@ -191,6 +193,18 @@
       groundDetailSpacing,
       groundDetailWidth
     };
+
+    // Dev/QA hook: force the two purely-visual knobs from the URL (?forceAtmos=aurora&forceLook=
+    // edgelit). Visual-only — no physics/medal/ghost impact; e2e goldens never pass these params.
+    // NOTE: no forceBiome — biome drives accents/ground/track colors computed above, so a post-hoc
+    // biome swap would produce a half-mutated theme (wrong colors under the new label).
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('forceAtmos')) theme.atmosphere = params.get('forceAtmos');
+      if (params.has('forceLook')) theme.surfaceLook = params.get('forceLook');
+    }
+
+    return theme;
   };
 
   /* Global glow budget — every bloom/pulse constant lives here so "too much glow" is a
@@ -201,6 +215,7 @@
     master: { subtle: 0.7, standard: 1.0, vivid: 1.3 },   // user-facing slider
     biome: { dune: 1.0, neon: 1.0, canyon: 1.0, frozen: 0.82 }, // bright palettes get less headroom
     bloom: { base: 1.15, speedCreep: 0.6, driftFlash: 0.45, flashDecay: 7.0, cap: 1.8, radius: 0.65, threshold: 0.85 },
+    aurora: { bands: 3, glow: 1.2, scrollSpeed: [0.03, -0.05, 0.02] },
     // one shared "breath" LFO (Hz): world elements pulse together, gently — replaces three
     // independent sines at competing frequencies that made the whole scene flicker
     breathHz: 0.10,

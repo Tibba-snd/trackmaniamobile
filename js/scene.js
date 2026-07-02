@@ -875,35 +875,86 @@
   /* ---------------- TRACK ---------------- */
   function buildRibbon(track, theme) {
     const ss = track.samples, n = ss.length;
-    const pos = new Float32Array(n * 2 * 3);
-    const colors = new Float32Array(n * 2 * 3);
-    const uvs = new Float32Array(n * 2 * 2);
+    const edgelit = theme.surfaceLook === 'edgelit';
+    const numVerts = edgelit ? 4 : 2;
+    const pos = new Float32Array(n * numVerts * 3);
+    const colors = new Float32Array(n * numVerts * 3);
+    const uvs = new Float32Array(n * numVerts * 2);
     const idx = [];
-    const cLow = theme.trackLow, cHigh = theme.trackHigh;
     const banded = theme.surfaceLook === 'banded';
+    const shimmer = theme.surfaceLook === 'shimmer';
 
     for (let i = 0; i < n; i++) {
       const s = ss[i];
-      const L = V.addS(s.p, s.r, -s.w / 2);
-      const R = V.addS(s.p, s.r, s.w / 2);
-      pos.set(L, i * 6); pos.set(R, i * 6 + 3);
-      
-      // UV mapping: u goes 0->1 across track width, v goes along length of track
-      uvs[i * 4] = 0.0;
-      uvs[i * 4 + 1] = i * 0.4;
-      uvs[i * 4 + 2] = 1.0;
-      uvs[i * 4 + 3] = i * 0.4;
-
-      const t = i / n;
-      // asphalt with a faint theme tint — reads as a real road surface, lets neon edges pop
+      const wHalf = s.w / 2;
       const tint = theme.skyBottom;
       let c = [0.075 + tint[0] * 0.08, 0.075 + tint[1] * 0.08, 0.09 + tint[2] * 0.10];
-      if (banded && (i % 16 < 2)) c = [c[0] + 0.06, c[1] + 0.06, c[2] + 0.07]; // expansion joints
-      if (s.surf === DD.SURF.GLASS) { const g = theme.glassColor; c = [g[0] * 0.4, g[1] * 0.4, g[2] * 0.5]; }
-      colors.set(c, i * 6); colors.set(c, i * 6 + 3);
-      if (i < n - 1 && !s.gap && !ss[i + 1].gap) {
-        const a = i * 2;
-        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      
+      if (banded && (i % 16 < 2)) {
+        c = [c[0] + 0.06, c[1] + 0.06, c[2] + 0.07];
+      }
+      if (shimmer) {
+        const f = Math.sin(i * 1.8) * Math.cos(i * 0.7);
+        const sh = 0.065 * (f * f);
+        c = [c[0] + sh, c[1] + sh, c[2] + sh * 1.25];
+      }
+      if (s.surf === DD.SURF.GLASS) {
+        const g = theme.glassColor;
+        c = [g[0] * 0.4, g[1] * 0.4, g[2] * 0.5];
+      }
+
+      if (edgelit) {
+        const L = V.addS(s.p, s.r, -wHalf);
+        const ML = V.addS(s.p, s.r, -wHalf * 0.82);
+        const MR = V.addS(s.p, s.r, wHalf * 0.82);
+        const R = V.addS(s.p, s.r, wHalf);
+        
+        const vIdx = i * 4;
+        pos.set(L, vIdx * 3);
+        pos.set(ML, (vIdx + 1) * 3);
+        pos.set(MR, (vIdx + 2) * 3);
+        pos.set(R, (vIdx + 3) * 3);
+        
+        uvs[vIdx * 2] = 0.0; uvs[vIdx * 2 + 1] = i * 0.4;
+        uvs[(vIdx + 1) * 2] = 0.18; uvs[(vIdx + 1) * 2 + 1] = i * 0.4;
+        uvs[(vIdx + 2) * 2] = 0.82; uvs[(vIdx + 2) * 2 + 1] = i * 0.4;
+        uvs[(vIdx + 3) * 2] = 1.0; uvs[(vIdx + 3) * 2 + 1] = i * 0.4;
+
+        let cEdge = V.lerp(theme.accent, [1, 1, 1], 0.15);
+        if (s.surf === DD.SURF.GLASS) {
+          const g = theme.glassColor;
+          cEdge = [g[0] * 0.8, g[1] * 0.8, g[2] * 0.9];
+        }
+        
+        colors.set(cEdge, vIdx * 3);
+        colors.set(c, (vIdx + 1) * 3);
+        colors.set(c, (vIdx + 2) * 3);
+        colors.set(cEdge, (vIdx + 3) * 3);
+
+        if (i < n - 1 && !s.gap && !ss[i + 1].gap) {
+          const a = i * 4;
+          idx.push(a, a + 1, a + 4, a + 1, a + 5, a + 4);
+          idx.push(a + 1, a + 2, a + 5, a + 2, a + 6, a + 5);
+          idx.push(a + 2, a + 3, a + 6, a + 3, a + 7, a + 6);
+        }
+      } else {
+        const L = V.addS(s.p, s.r, -wHalf);
+        const R = V.addS(s.p, s.r, wHalf);
+        
+        const vIdx = i * 2;
+        pos.set(L, vIdx * 3);
+        pos.set(R, (vIdx + 1) * 3);
+        
+        uvs[vIdx * 2] = 0.0; uvs[vIdx * 2 + 1] = i * 0.4;
+        uvs[(vIdx + 1) * 2] = 1.0; uvs[(vIdx + 1) * 2 + 1] = i * 0.4;
+        
+        colors.set(c, vIdx * 3);
+        colors.set(c, (vIdx + 1) * 3);
+
+        if (i < n - 1 && !s.gap && !ss[i + 1].gap) {
+          const a = i * 2;
+          idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -1384,8 +1435,9 @@
     const lampMat = new THREE.MeshBasicMaterial({ color: col(V.lerp(theme.accent2, [1, 1, 1], 0.4)), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     const lamps = new THREE.InstancedMesh(lampGeo, lampMat, n);
 
+    const isFoggy = theme.atmosphere === 'foggy';
     const haloGeo = new THREE.SphereGeometry(1.15, 10, 8);
-    const haloMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false });
+    const haloMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: isFoggy ? 0.45 : 0.16, blending: THREE.AdditiveBlending, depthWrite: false });
     const halos = new THREE.InstancedMesh(haloGeo, haloMat, n);
 
     const poolGeo = new THREE.CircleGeometry(1, 18);
@@ -1408,6 +1460,12 @@
       const headP = V.addS(V.clone(baseP), s.r, -sd * 1.4);
       m4.compose(pos.set(headP[0], gy + H, headP[2]), qI, one);
       lamps.setMatrixAt(i, m4);
+      if (isFoggy) {
+        scl.set(2.5, 2.5, 2.5);
+        m4.compose(pos.set(headP[0], gy + H, headP[2]), qI, scl);
+      } else {
+        m4.compose(pos.set(headP[0], gy + H, headP[2]), qI, one);
+      }
       halos.setMatrixAt(i, m4);
       if (quality !== 'low') {
         // register as a light-source for the dynamic pool instead of adding a real PointLight
@@ -1766,6 +1824,67 @@
     return group;
   }
 
+  let _auroraTexCache = null;
+  function getAuroraTexture() {
+    if (_auroraTexCache) return _auroraTexCache;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 64);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    _auroraTexCache = tex;
+    return tex;
+  }
+
+  function buildAurora(track, theme, rng) {
+    const group = new THREE.Group();
+    const bands = DD.GLOW.aurora.bands;
+    const tex = getAuroraTexture();
+    const colors = [
+      theme.accent,
+      theme.accent2,
+      V.lerp(theme.accent, theme.accent2, 0.5)
+    ];
+    const scales = [1.0, 1.15, 0.85];
+    const angles = [0.15, -0.3, 0.1];
+
+    track.auroraMaterials = [];
+
+    for (let i = 0; i < bands; i++) {
+      const clonedTex = tex.clone();
+      clonedTex.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({
+        color: col(colors[i % colors.length]),
+        map: clonedTex,
+        transparent: true,
+        opacity: 0.22 * DD.GLOW.aurora.glow,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false
+      });
+      track.auroraMaterials.push(mat);
+
+      // vertical CURTAINS hung near the horizon (sky furniture, camera-followed like the
+      // planet). The first cut used near-flat ceiling strips at y~850 — seen edge-on from the
+      // road they read as thin lines, i.e. no aurora at all.
+      const geo = new THREE.PlaneGeometry(2600 * scales[i], 430);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(-650 + i * 620, 420 + i * 75, -1500 - i * 130);
+      m.rotation.set(0.10, angles[i] * 0.5, 0.05 + i * 0.05);
+      group.add(m);
+    }
+    return group;
+  }
+
   function buildSciFiPlanet(theme, rng) {
     const group = new THREE.Group();
     // A luminous dream-moon. `fog: false` is load-bearing: the planet sits beyond fogFar, so
@@ -1813,7 +1932,10 @@
 
     let fogNear = theme.fogNear;
     let fogFar = theme.fogFar;
-    if (quality !== 'low') {
+    if (theme.atmosphere === 'foggy') {
+      fogNear = 20;
+      fogFar = 220;
+    } else if (quality !== 'low') {
       fogNear = Math.min(fogNear, 350);
       fogFar = Math.min(fogFar, 1100);
     }
@@ -1927,9 +2049,15 @@
     if (quality !== 'low') {
       root.add(buildHorizonMountains(track, theme, rng));
       
-      const nebulae = buildNebulae(theme, rng);
-      root.add(nebulae);
-      track.nebulaeMesh = nebulae;
+      if (theme.atmosphere === 'aurora') {
+        const aurora = buildAurora(track, theme, rng);
+        root.add(aurora);
+        track.auroraMesh = aurora;
+      } else {
+        const nebulae = buildNebulae(theme, rng);
+        root.add(nebulae);
+        track.nebulaeMesh = nebulae;
+      }
       
       const planet = buildSciFiPlanet(theme, rng);
       root.add(planet);
@@ -2820,6 +2948,18 @@
       // apparent direction; group rotation in the loop = slow drift across the sky)
       if (track.planetMesh) track.planetMesh.position.copy(camera.position);
       if (track.nebulaeMesh) track.nebulaeMesh.position.copy(camera.position);
+      if (track.auroraMesh) {
+        track.auroraMesh.position.copy(camera.position);
+        if (track.auroraMaterials) {
+          const speeds = DD.GLOW.aurora.scrollSpeed;
+          for (let i = 0; i < track.auroraMaterials.length; i++) {
+            const mat = track.auroraMaterials[i];
+            if (mat && mat.map) {
+              mat.map.offset.x += (speeds[i % speeds.length] || 0.02) * dt;
+            }
+          }
+        }
+      }
 
       const theme = track.theme;
       if (theme && DD.game && DD.game.scene) {

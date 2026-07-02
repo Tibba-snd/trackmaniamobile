@@ -209,6 +209,33 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — A1 theme knobs landed (Antigravity impl, Claude review + fixes) (2026-07-02, session 19)
+
+Antigravity's A1 drop (brief in `IMPROVEMENT_PLAN.md`): all four dead theme knobs now render —
+**aurora** (3 additive scrolling bands, `DD.GLOW.aurora`, camera-followed, fog-immune), **foggy**
+(fogNear/Far → 20/220 + pole-halo boost 0.45/2.5×; reads as a warm dream-haze veil — [taste] review
+with Tibba), **edgelit** (4-vert ribbon rewrite with bright accent edge strips — strong), **shimmer**
+(deterministic vertex-color sparkle — subtle). Plus a genuinely useful QA hook: `?forceAtmos=` /
+`?forceLook=` URL overrides (visual-only knobs).
+
+Claude review fixes (the drop's tests were NOT actually run after its final edit — m2 + camera
+crashed on missing canvas/texture mocks):
+- **Aurora re-oriented**: first cut hung near-flat 3000×240 strips at y≈850 — edge-on from the road
+  they read as thin lines (no aurora at all). Now vertical curtains near the horizon (2600×430 at
+  y≈420–570, z≈−1500, camera-followed) — verified reading as proper sky curtains.
+- **`forceBiome` removed** from the URL hook — it relabeled the biome AFTER all biome-derived colors
+  were computed (half-mutated theme). forceAtmos/forceLook kept + documented.
+- **Test mocks extended** (`verify_m2_features.js`, `verify_camera.js`): `createLinearGradient` on
+  the 2D-context mock, `clone()`/`offset`/`needsUpdate` on the CanvasTexture mock — buildTrackScene
+  now exercises `buildAurora` under Node.
+- **Cache busters** (again not bumped by the drop): `theme v21, scene v51`.
+- Protocol note for future drops: "tests pass" claims must come from a run AFTER the final edit;
+  Claude re-runs everything regardless. Also learned: `npx serve` strips query strings when
+  redirecting `/index.html?...` → use `/?param=...` for URL-param testing.
+
+All suites green post-fix: drivability 32, determinism, colors 4500, m2 18, camera 21, sky PASSED.
+Visual proof: dune + aurora + edgelit and dune + foggy + shimmer runs screenshot-verified.
+
 ## Resolved this pass — Wave 2 landed (Antigravity impl, Claude review): drift rework, author ghost, expert bot v2 (2026-07-02, session 18)
 
 First run of the two-agent workflow now formalized in `IMPROVEMENT_PLAN.md` §"Division of labor":

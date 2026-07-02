@@ -143,6 +143,9 @@ globalThis.THREE = {
   },
   CanvasTexture: function() {
     this.repeat = { set: function() {} };
+    this.offset = { x: 0, y: 0 };
+    this.needsUpdate = false;
+    this.clone = function() { return new THREE.CanvasTexture(); };
     return this;
   },
   Group: function() {
@@ -240,6 +243,9 @@ globalThis.document = {
             },
             putImageData: function() {},
             createRadialGradient: function() {
+              return { addColorStop: function() {} };
+            },
+            createLinearGradient: function() {
               return { addColorStop: function() {} };
             }
           };
