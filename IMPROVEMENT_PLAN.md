@@ -279,3 +279,26 @@ brief-shaped task directly if it fits the protocol invariants._
   needles. HARD CONSTRAINT: still exactly 2 InstancedMeshes total (vary per-instance matrix
   composition, not mesh count); flicker keeps using the one shared `userData.mat`; lights only
   via `addLightSource`. DoD: field notes 1-3 + `DD.debugGL()` draw-call count unchanged ±2.
+- **A10 — Chevrons OFF the arches, onto real corner boards** (direct Tibba feedback: "chevrons
+  in the middle of the road dangling from the pole don't make any sense — we need separate
+  chevron signs in tighter turns, neatly built out"). Two halves, one drop:
+  1. **Remove the hanging sign from `buildNeonArches`** (`js/scene-decor.js`): delete the
+     `signs` panel + `chevrons` InstancedMeshes and their per-arch placement blocks entirely.
+     Arches keep posts/crossbar/brackets/underside neon strip/road pool — they are gantries,
+     not signage.
+  2. **Rebuild the corner chevron boards in `buildCornerSigns` as proper track furniture**
+     (they currently FLOAT at +2 m with no supports): each board = dark backing panel +
+     **two support posts reaching the ground** (`DD.terrainAt(track.terrain, x, z)` for the
+     base height, posts sized to span board-bottom → ground) + faint emissive frame (session
+     17 sign treatment) + **1-3 big chevron glyphs by severity** (`c.minRad < 40` → 3,
+     `< 70` → 2, else 1 — replaces the current single-glyph + scale hack), glyphs pointing
+     INTO the corner (`c.insideSign`), boards facing oncoming traffic (existing `lookAt`
+     against `s.f` is correct). Place 3-4 boards from `entry − ~20` samples through `apex`
+     along the outside edge. **HARD CONSTRAINT: instance the components** — one InstancedMesh
+     each for panels / glyph slats / posts across ALL corners (the current one-Group-per-board
+     approach costs ~5 draws × boards; technical tracks have 10+ corners). Brake bars, apex
+     beacons, kerbs unchanged. Corners are precomputed indices — no new sample scans, so no
+     wrap concerns; keep the existing `bi < 2` guards.
+  DoD: field notes 1-3 (run the FULL suite, BOOT the game, bump busters) + two screenshots:
+  a hairpin with the new built-out boards, and an arch showing no dangling panel +
+  `DD.debugGL()` draw calls within ±3 of before.
