@@ -339,5 +339,27 @@ console.log('[16] closed circuits (multilap)');
   }
 }
 
+/* ---- [17] terrain landforms: rise beyond the corridor, never touch the road ---- */
+console.log('[17] terrain landforms (C3 height policy)');
+{
+  let worstClear = 1e9, gapWorst = 1e9, canyonRise = -1e9;
+  for (const [s, tier] of [['TERRA-0', 5], ['TERRA-1', 3], ['CAMP-T3-01', 3], ['CAMP-T2-03', 2]]) {
+    const t = DD.generateTrack(s, tier, 0);
+    const T = t.terrain;
+    const oldCeiling = Math.min.apply(null, t.samples.map(x => x.p[1])) - 8;
+    let maxH = -1e9;
+    for (let k = 0; k < T.heights.length; k++) maxH = Math.max(maxH, T.heights[k]);
+    if (t.theme.biome === 'canyon') canyonRise = Math.max(canyonRise, maxH - oldCeiling);
+    for (const smp of t.samples) {
+      const th = DD.terrainAt(T, smp.p[0], smp.p[2]);
+      if (smp.gap) gapWorst = Math.min(gapWorst, smp.p[1] - th);
+      else worstClear = Math.min(worstClear, (smp.p[1] - Math.abs(smp.r[1]) * (smp.w / 2)) - th);
+    }
+  }
+  check('road always clears terrain', worstClear > 1.0, 'worst clearance ' + worstClear.toFixed(2) + 'm');
+  check('gap chasms stay deep', gapWorst > 10, 'shallowest chasm ' + gapWorst.toFixed(1) + 'm');
+  check('canyon walls rise above the old global ceiling', canyonRise > 20, '+' + canyonRise.toFixed(1) + 'm (CAMP-T3-01)');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

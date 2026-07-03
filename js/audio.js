@@ -12,6 +12,7 @@
 
   const GEARS = [0, 18, 32, 48, 66, 86, 200]; // upshift speeds (m/s) per gear 1..6
   const NGEARS = 6;
+  let noiseBuf = null;
 
   DD.initAudio = function (volumes) {
     if (A.started) return;
@@ -37,7 +38,7 @@
     A.nodes.o1 = o1; A.nodes.o2 = o2; A.nodes.o3 = o3;
 
     // ---- wind whoosh: filtered noise ----
-    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const nd = noiseBuf.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource(); noise.buffer = noiseBuf; noise.loop = true;
@@ -182,5 +183,42 @@
   DD.sfxRespawn = function () { if (A.started) { blip(220, 0.25, 'sine', 0.3); blip(165, 0.35, 'sine', 0.25, 0.05); } };
   DD.sfxClick = function () { if (A.started) blip(880, 0.08, 'sine', 0.2); };
   DD.sfxCountdown = function (go) { if (A.started) blip(go ? 880 : 440, go ? 0.5 : 0.15, 'square', 0.22); };
+
+  function noiseSfx(filterType, filterFreq, dur, vol, q) {
+    if (!A.started || !noiseBuf) return;
+    const ctx = A.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    
+    const filt = ctx.createBiquadFilter();
+    filt.type = filterType || 'lowpass';
+    filt.frequency.setValueAtTime(filterFreq, ctx.currentTime);
+    if (q !== undefined) filt.Q.setValueAtTime(q, ctx.currentTime);
+    
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol * A.volumes.sfx, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    
+    src.connect(filt).connect(g).connect(A.nodes.master);
+    const offset = Math.random() * 1.5;
+    src.start(t, offset);
+    src.stop(t + dur + 0.05);
+  }
+
+  DD.sfxWallThud = function (speedScale) {
+    const vol = DD.clamp(speedScale, 0, 1) * 0.7;
+    if (vol > 0.02) {
+      noiseSfx('lowpass', 150, 0.2, vol, 1.0);
+    }
+  };
+
+  DD.sfxLandingWhump = function (speedScale) {
+    const vol = DD.clamp(speedScale, 0, 1) * 0.6;
+    if (vol > 0.02) {
+      noiseSfx('lowpass', 90, 0.3, vol, 0.8);
+    }
+  };
 
 })(typeof window !== 'undefined' ? window : globalThis);

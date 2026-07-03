@@ -209,6 +209,31 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — C3 core: terrain height-policy rework (2026-07-03, session 22)
+
+The "black nothing around the track" root cause is fixed at the generator (`js/trackgen.js`
+`buildTerrainData` — heights only; the color bake is Antigravity's parallel brief A7):
+
+- **Terrain follows the LOCAL road height** instead of hiding 8m below the track's GLOBAL minimum
+  (the old rule flattened the whole world to a sunken plane). Elevated sections keep
+  proportionally more air underneath (`elev·0.55`), so bridges still fly over a drop.
+- **Landform uplift outside the racing corridor**: within `roadEdge+26m` nothing changed (safety
+  basin); from there to `+85m` further, terrain fades up into biome landforms (`TERRAIN_RISE`:
+  canyon 48 — plus a ridged-noise wall component, frozen 32, dune 20, neon 6), placed by a
+  large-feature noise so it reads as hills/walls/ridges, not a berm ring. Terracing now applies
+  to the composed landform (terraced mesas). All seeded noise — deterministic.
+- **Safety clamps unchanged and applied LAST**: road-edge clearance (≥1.25m within
+  `roadEdge+10`) and gap chasms (≥12m) override everything. Verified across 15,324 samples /
+  14 seeds: worst clearance 1.21m, shallowest chasm 12.2m, canyon rises +65.9m above the old
+  ceiling. New drivability test **[17]** locks these invariants (41/41).
+- **Perf**: the two full per-cell sample scans (the documented load-time hotspot) are fused into
+  one pass (nearest + clearance collected together) — ~half the distance checks per cell.
+
+Verified visually: canyon (CAMP-T3-01) runs between ridges/walls with crystals layered up the
+slopes; dune (TERRA-0 t5) rolls through lit sand crests. All suites green. `trackgen v20`.
+**Note for A7 (terrain color bake)**: height range per map is much larger now — the bake's
+height-based color ramp (`tt`) will stretch; calibrate against the new relief.
+
 ## Resolved this pass — A2/A3/A4/A6 landed (Antigravity impl, Claude review + 2 crash fixes); A5 NOT done (2026-07-03, session 21)
 
 Antigravity dropped briefs A2–A6 on top of the (then-uncommitted) C2 work. Review verdict:

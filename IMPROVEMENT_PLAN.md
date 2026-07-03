@@ -200,12 +200,14 @@ and review/integration of every drop. Antigravity executes well-specified, test-
   HUD. Drivability test 16 covers it. **Remaining in C2:** trackgen VARIETY (elevation drama,
   width modulation, surface rhythm, set-piece placement) judged via a bot playtest report;
   lap-count/length balance with Tibba.
-- **C3 — Terrain & world architecture** (item 9) — NEXT UP (Claude): the height-policy rework
-  is the risky core — corridor-limited basin (the ≥8m-below rule holds only within ~40m of the
-  ribbon), landforms allowed to rise to/above track level beyond it (canyon walls, dune crests,
-  frozen ridges), gap-chasm and jump-flightpath clearance guarantees, deterministic. Claude
-  implements the generator change + safety tests; the COLOR/bake side is already delegated as
-  brief A7 below (parallel-safe: A7 touches only vertex colors, C3 touches only heights).
+- **C3 — Terrain & world architecture** (item 9) — ✅ HEIGHT CORE LANDED (session 22): local
+  road-following reference height, corridor-limited basin (unchanged ≤ roadEdge+26m), biome
+  landform uplift beyond it (`TERRAIN_RISE`: canyon 48 + ridged walls / frozen 32 / dune 20 /
+  neon 6), elevated sections keep air underneath, clearance + chasm clamps applied last,
+  fused single-pass sample scan (halved the load-time hotspot). Drivability test 17 locks the
+  invariants. **Remaining in C3:** A7 (color bake — Antigravity, note the larger height range),
+  landform-aware decor placement polish (emissive elements on slopes), and Tibba's per-biome
+  taste pass on the RISE numbers.
 - **C4 — Balance calibration with Tibba**: medal factor (0.97 flag above), drift feel tuning
   passes, campaign gating difficulty. Judgment work — numbers move only after human playtests.
 - **C5 — Garage editor deep slices** (item 13): cross-section mode (end-on camera tween +

@@ -119,6 +119,21 @@
     return new THREE.Points(g, m);
   }
 
+  // Local noise utilities for terrain color bake
+  function noise2(seed, x, y) {
+    let n = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ (seed | 0);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+  function valueNoise(seed, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const fx = x - xi, fy = y - yi;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = noise2(seed, xi, yi), b = noise2(seed, xi + 1, yi);
+    const c = noise2(seed, xi, yi + 1), d = noise2(seed, xi + 1, yi + 1);
+    return DD.lerp(DD.lerp(a, b, sx), DD.lerp(c, d, sx), sy);
+  }
+
   /* ---------------- TERRAIN (mesh from trackgen heightfield) ---------------- */
   function buildTerrain(track, theme) {
     const T = track.terrain;
@@ -126,10 +141,15 @@
     const pos = new Float32Array(RES * RES * 3);
     const idx = [];
     const g = theme.groundColor;
+    const B = DD.TERRAIN_BAKE;
     
     // Base colors derived from theme.groundColor (unshaded, will be shaded below)
-    const cLo = [g[0] * 0.65, g[1] * 0.65, g[2] * 0.75];
-    const cHi = [Math.min(g[0] * 0.95, 0.8), Math.min(g[1] * 0.92, 0.78), Math.min(g[2] * 0.95, 0.82)];
+    const cLo = [g[0] * B.cLoScale[0], g[1] * B.cLoScale[1], g[2] * B.cLoScale[2]];
+    const cHi = [
+      Math.min(g[0] * B.cHiScale[0], B.cHiMax[0]),
+      Math.min(g[1] * B.cHiScale[1], B.cHiMax[1]),
+      Math.min(g[2] * B.cHiScale[2], B.cHiMax[2])
+    ];
 
     for (let j = 0; j < RES; j++) {
       for (let i = 0; i < RES; i++) {
@@ -153,6 +173,18 @@
     const flatColors = new Float32Array(vertexCount * 3);
     const range = Math.max(T.maxH - T.minH, 1);
 
+    // Compute track AABB center and radius
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (const s of track.samples) {
+      minX = Math.min(minX, s.p[0]);
+      maxX = Math.max(maxX, s.p[0]);
+      minZ = Math.min(minZ, s.p[2]);
+      maxZ = Math.max(maxZ, s.p[2]);
+    }
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const maxRadius = Math.max((maxX - minX) / 2, (maxZ - minZ) / 2, 1);
+
     // Sun direction for baked shading
     const sunAngle = theme.lightAngle;
     const lx = Math.sin(sunAngle);
@@ -160,17 +192,17 @@
     const lz = Math.cos(sunAngle);
     const lLen = Math.sqrt(lx * lx + ly * ly + lz * lz) || 1;
     const L = [lx / lLen, ly / lLen, lz / lLen];
-    const sunIntensity = 0.55;
+    const sunIntensity = B.sunIntensity;
     const sunColor = theme.sunColor;
 
     // Ambient light values
-    const ambSky = [0.26, 0.30, 0.48];
-    const ambGrd = [0.04, 0.04, 0.07];
-    const ambInt = theme.ambient != null ? Math.max(theme.ambient, 0.45) : 0.45;
+    const ambSky = B.ambSky;
+    const ambGrd = B.ambGrd;
+    const ambInt = theme.ambient != null ? Math.max(theme.ambient, B.ambientFloor) : B.ambientFloor;
 
     // Emissive self-glow (tinted by theme's accent)
     const glowColor = theme.accent;
-    const glowIntensity = 0.06;
+    const glowIntensity = B.glowIntensity;
     const glowTerm = [
       glowColor[0] * glowIntensity,
       glowColor[1] * glowIntensity,
@@ -223,19 +255,47 @@
         (ambGrd[2] + (ambSky[2] - ambGrd[2]) * ambWeight) * ambInt
       ];
 
-      // Fine-grained hash noise for sand grain
-      const hash = Math.sin(xAvg * 12.9898 + zAvg * 78.233) * 43758.5453;
-      const grain = (hash - Math.floor(hash)) - 0.5;
+      // 2-3 octaves of valueNoise modulating color (biome-tinted - mix toward groundDetailColor)
+      const nSeed = DD.hashSeed(track.seed + '::terrainBakeV2');
+      let nVal = 0;
+      let ampSum = 0;
+      let scale = B.noiseScale;
+      let amp = 1.0;
+      for (let oct = 0; oct < B.octaves; oct++) {
+        nVal += valueNoise(nSeed ^ (oct * 0x3f2d), xAvg * scale, zAvg * scale) * amp;
+        ampSum += amp;
+        scale *= 2.0;
+        amp *= 0.5;
+      }
+      nVal /= ampSum; // normalized 0..1
 
-      // Large-scale geological bands (horizontal striping)
-      const bands = Math.sin(hAvg * 0.15 + xAvg * 0.005 + zAvg * 0.005) * 0.04;
-
-      const noise = bands + grain * 0.025;
+      // Subtle geological bands
+      const bands = Math.sin(hAvg * 0.15 + xAvg * 0.005 + zAvg * 0.005) * B.bandsStrength;
 
       const tt = Math.pow((hAvg - T.minH) / range, 1.3);
-      const baseR = Math.max(0, Math.min(1, DD.lerp(cLo[0], cHi[0], tt) + noise));
-      const baseG = Math.max(0, Math.min(1, DD.lerp(cLo[1], cHi[1], tt) + noise));
-      const baseB = Math.max(0, Math.min(1, DD.lerp(cLo[2], cHi[2], tt) + noise));
+      let baseR = DD.lerp(cLo[0], cHi[0], tt) + bands;
+      let baseG = DD.lerp(cLo[1], cHi[1], tt) + bands;
+      let baseB = DD.lerp(cLo[2], cHi[2], tt) + bands;
+
+      // Mix toward groundDetailColor based on multi-octave noise
+      const detailColor = theme.groundDetailColor;
+      const mixAmt = nVal * B.varianceStrength;
+      baseR = DD.lerp(baseR, detailColor[0], mixAmt);
+      baseG = DD.lerp(baseG, detailColor[1], mixAmt);
+      baseB = DD.lerp(baseB, detailColor[2], mixAmt);
+
+      // Subtle radial warm->cool shade with distance from track AABB center
+      const dx = xAvg - centerX;
+      const dz = zAvg - centerZ;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const radialBlend = Math.min(1, dist / maxRadius);
+      const tintR = DD.lerp(B.radialWarmth[0], B.radialCoolness[0], radialBlend);
+      const tintG = DD.lerp(B.radialWarmth[1], B.radialCoolness[1], radialBlend);
+      const tintB = DD.lerp(B.radialWarmth[2], B.radialCoolness[2], radialBlend);
+
+      baseR += tintR;
+      baseG += tintG;
+      baseB += tintB;
 
       // Combine unshaded colors with baked lighting
       const r = Math.max(0.02, Math.min(1, baseR * (ambColor[0] + sunTerm[0]) + glowTerm[0]));
@@ -536,35 +596,171 @@
     const coreMat = new THREE.MeshBasicMaterial({ color: col(V.lerp(theme.accent2, [1, 1, 1], 0.75)), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     const haloMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
 
-    // one shared chevron geometry: '>' built from two angled slats on a backing board
-    const makeBoard = (flip) => {
-      const board = new THREE.Group();
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.4), darkMat);
-      board.add(back);
-      for (const k of [-1, 1]) {
-        const slat = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.42), chevMat);
-        slat.position.set(flip * -0.2, k * 0.48, 0.03);
-        slat.rotation.z = flip * k * 0.7;
-        board.add(slat);
-      }
-      return board;
-    };
-
+    // First pass: count total boards and total slat instances for all corners
+    let totalBoards = 0;
+    let totalSlats = 0;
     for (const c of track.corners) {
-      const outside = -c.insideSign;
-      const severity = c.minRad < 45 ? 2 : 1;
-      // chevron boards along the outside of the corner entry
-      const boardAt = [Math.max(2, c.entry - 15), Math.max(2, c.entry - 5), c.apex];
+      const numGlyphs = c.minRad < 40 ? 3 : (c.minRad < 70 ? 2 : 1);
+      const startIdx = Math.max(2, c.entry - 20);
+      const endIdx = Math.max(2, c.apex);
+      const boardAt = Array.from(new Set([
+        startIdx,
+        Math.round(startIdx + (endIdx - startIdx) * 0.33),
+        Math.round(startIdx + (endIdx - startIdx) * 0.67),
+        endIdx
+      ]));
       for (const bi of boardAt) {
         const s = ss[bi];
-        if (!s || s.gap) continue;
-        const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
-        const board = makeBoard(c.insideSign);
-        board.position.set(p[0], p[1], p[2]);
-        board.lookAt(p[0] - s.f[0] * 10, p[1] - s.f[1] * 10, p[2] - s.f[2] * 10);
-        if (severity === 2) board.scale.setScalar(1.3);
-        group.add(board);
+        if (!s || s.gap || bi < 2) continue;
+        totalBoards++;
+        totalSlats += 4 + 2 * numGlyphs;
       }
+    }
+
+    if (totalBoards > 0) {
+      const panelGeo = new THREE.BoxGeometry(3.6, 2.4, 0.15);
+      const postGeo = new THREE.CylinderGeometry(0.08, 0.11, 1.0, 6);
+      const slatGeo = new THREE.PlaneGeometry(1.0, 1.0);
+
+      const panelIM = new THREE.InstancedMesh(panelGeo, darkMat, totalBoards);
+      const postIM = new THREE.InstancedMesh(postGeo, darkMat, totalBoards * 2);
+      const slatIM = new THREE.InstancedMesh(slatGeo, chevMat, totalSlats);
+
+      panelIM.castShadow = panelIM.receiveShadow = true;
+      postIM.castShadow = postIM.receiveShadow = true;
+
+      let boardIdx = 0;
+      let postIdx = 0;
+      let slatIdx = 0;
+
+      for (const c of track.corners) {
+        const outside = -c.insideSign;
+        const numGlyphs = c.minRad < 40 ? 3 : (c.minRad < 70 ? 2 : 1);
+        const startIdx = Math.max(2, c.entry - 20);
+        const endIdx = Math.max(2, c.apex);
+        const boardAt = Array.from(new Set([
+          startIdx,
+          Math.round(startIdx + (endIdx - startIdx) * 0.33),
+          Math.round(startIdx + (endIdx - startIdx) * 0.67),
+          endIdx
+        ]));
+
+        for (const bi of boardAt) {
+          const s = ss[bi];
+          if (!s || s.gap || bi < 2) continue;
+
+          // Position of the board center (2m above the track surface)
+          const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
+
+          // Build board orientation matrix (xAxis = -s.r, yAxis = s.u, zAxis = -s.f)
+          const basis = new THREE.Matrix4();
+          if (basis.makeBasis) {
+            basis.makeBasis(
+              new THREE.Vector3(-s.r[0], -s.r[1], -s.r[2]),
+              new THREE.Vector3(s.u[0], s.u[1], s.u[2]),
+              new THREE.Vector3(-s.f[0], -s.f[1], -s.f[2])
+            );
+          }
+          const qBoard = new THREE.Quaternion();
+          if (qBoard.setFromRotationMatrix) qBoard.setFromRotationMatrix(basis);
+
+          const mBoard = new THREE.Matrix4();
+          if (mBoard.compose) {
+            mBoard.compose(
+              new THREE.Vector3(p[0], p[1], p[2]),
+              qBoard,
+              new THREE.Vector3(1, 1, 1)
+            );
+          }
+
+          // 1. Backing Panel
+          panelIM.setMatrixAt(boardIdx++, mBoard);
+
+          // 2. Posts (left and right at bottom edge local y = -1.2)
+          const postTops = [
+            [
+              p[0] + s.r[0] * 1.0 - s.u[0] * 1.2,
+              p[1] + s.r[1] * 1.0 - s.u[1] * 1.2,
+              p[2] + s.r[2] * 1.0 - s.u[2] * 1.2
+            ],
+            [
+              p[0] - s.r[0] * 1.0 - s.u[0] * 1.2,
+              p[1] - s.r[1] * 1.0 - s.u[1] * 1.2,
+              p[2] - s.r[2] * 1.0 - s.u[2] * 1.2
+            ]
+          ];
+
+          for (const postTop of postTops) {
+            const g = track.terrain ? DD.terrainAt(track.terrain, postTop[0], postTop[2]) : 0;
+            const height = Math.max(0.1, postTop[1] - g);
+            const yCenter = (postTop[1] + g) / 2;
+
+            const mPost = new THREE.Matrix4();
+            if (mPost.compose) {
+              mPost.compose(
+                new THREE.Vector3(postTop[0], yCenter, postTop[2]),
+                new THREE.Quaternion(),
+                new THREE.Vector3(1, height, 1)
+              );
+            }
+            postIM.setMatrixAt(postIdx++, mPost);
+          }
+
+          // 3. Slat matrix composition helper
+          const placeSlat = (lx, ly, lz, rotZ, sx, sy) => {
+            const sPos = new THREE.Vector3(lx, ly, lz);
+            const sQuat = new THREE.Quaternion();
+            if (sQuat.setFromEuler) sQuat.setFromEuler(new THREE.Euler(0, 0, rotZ));
+            const sScl = new THREE.Vector3(sx, sy, 1);
+            const mLocal = new THREE.Matrix4();
+            if (mLocal.compose) mLocal.compose(sPos, sQuat, sScl);
+            const mWorld = new THREE.Matrix4();
+            if (mWorld.multiplyMatrices) mWorld.multiplyMatrices(mBoard, mLocal);
+            return mWorld;
+          };
+
+          // Emissive Frame (4 slats)
+          slatIM.setMatrixAt(slatIdx++, placeSlat(0, 1.15, 0.08, 0, 3.5, 0.08));
+          slatIM.setMatrixAt(slatIdx++, placeSlat(0, -1.15, 0.08, 0, 3.5, 0.08));
+          slatIM.setMatrixAt(slatIdx++, placeSlat(-1.75, 0, 0.08, 0, 0.08, 2.38));
+          slatIM.setMatrixAt(slatIdx++, placeSlat(1.75, 0, 0.08, 0, 0.08, 2.38));
+
+          // Chevron Glyphs (1-3)
+          let centers = [0];
+          if (numGlyphs === 2) {
+            centers = [-0.65, 0.65];
+          } else if (numGlyphs === 3) {
+            centers = [-1.1, 0, 1.1];
+          }
+
+          const flip = c.insideSign;
+          for (const cx of centers) {
+            for (const k of [-1, 1]) {
+              slatIM.setMatrixAt(slatIdx++, placeSlat(
+                cx + flip * -0.15,
+                k * 0.38,
+                0.08,
+                flip * k * 0.7,
+                1.2,
+                0.32
+              ));
+            }
+          }
+        }
+      }
+
+      panelIM.instanceMatrix.needsUpdate = true;
+      postIM.instanceMatrix.needsUpdate = true;
+      slatIM.instanceMatrix.needsUpdate = true;
+
+      group.add(panelIM);
+      group.add(postIM);
+      group.add(slatIM);
+    }
+
+    // Keep non-instanced components (brake bars & apex beacons)
+    for (const c of track.corners) {
+      const outside = -c.insideSign;
       // braking-marker bars across the track on approach
       for (const dM of [80, 55, 30]) {
         const bi = c.entry - Math.round(dM / track.ds);
@@ -581,7 +777,7 @@
         bar.rotateX(-Math.PI / 2);
         group.add(bar);
       }
-      // apex beacon: a dual-layer cylinder (thin bright core + wider volumetric-glow halo)
+      // apex beacon
       const sA = ss[c.apex];
       if (sA && !sA.gap) {
         const p = V.addS(sA.p, sA.r, outside * (sA.w / 2 + 5));
@@ -593,6 +789,7 @@
         group.add(halo);
       }
     }
+
     return group;
   }
 
@@ -777,9 +974,9 @@
     });
 
     const baseCount = Math.round(110 * dens * (theme.decorDensity || 1.0));
-    const totalCount = baseCount + 1; // +1 hero
-    const bodyInst = new THREE.InstancedMesh(bodyGeo, bodyMat, totalCount);
-    const glowInst = new THREE.InstancedMesh(glowGeo, glowMat, totalCount);
+    const maxInstances = (baseCount + 1) * 3;
+    const bodyInst = new THREE.InstancedMesh(bodyGeo, bodyMat, maxInstances);
+    const glowInst = new THREE.InstancedMesh(glowGeo, glowMat, maxInstances);
 
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
@@ -792,33 +989,107 @@
     };
 
     let placedCount = 0;
-    // writes a body+glow pair at the current instance index; `facing` points toward the track
-    const place = (p, gy, w, h, facing, registerLight) => {
-      const yaw = Math.atan2(facing[0], facing[2]);
-      if (comp === 'strip') {
-        const d = role === 'pylon' ? w : Math.max(w * 0.5, 1.0); // pylon round; monolith slab
-        e.set(0, yaw, 0); q.setFromEuler(e);
-        pos.set(p[0], gy + h * 0.5, p[2]); scl.set(w, h, d);
-        m4.compose(pos, q, scl); bodyInst.setMatrixAt(placedCount, m4);
-        // bright seam on the track-facing front face
-        const off = (role === 'pylon' ? w * 0.5 : d * 0.5) + 0.12;
-        const gx = p[0] + facing[0] * off, gz = p[2] + facing[2] * off, gyc = gy + h * 0.52;
-        pos.set(gx, gyc, gz);
-        scl.set(role === 'pylon' ? w * 0.16 : w * 0.24, h * 0.86, role === 'pylon' ? w * 0.16 : d * 0.3);
-        m4.compose(pos, q, scl); glowInst.setMatrixAt(placedCount, m4);
-        if (registerLight) addLightSource(track, [gx, gyc, gz], col(theme.accent2 || theme.accent), 1.1, 17.0);
-      } else { // onbase
-        const baseH = Math.max(h * 0.14, 0.6);
-        e.set(0, yaw, 0); q.setFromEuler(e);
-        pos.set(p[0], gy + baseH * 0.5, p[2]); scl.set(w * 0.85, baseH, w * 0.85);
-        m4.compose(pos, q, scl); bodyInst.setMatrixAt(placedCount, m4);
-        const gyc = gy + baseH + h * 0.5;
-        e.set(0, rng.range(0, 6.2832), 0); q.setFromEuler(e);
-        pos.set(p[0], gyc, p[2]); scl.set(w, role === 'crystal' ? h * 0.5 : h, w);
-        m4.compose(pos, q, scl); glowInst.setMatrixAt(placedCount, m4);
-        if (registerLight) addLightSource(track, [p[0], gyc, p[2]], col(theme.accent2 || theme.accent), 1.1, 17.0);
-      }
+
+    // Place a single monolith/pylon (dune/neon)
+    const placeSingleStrip = (p, gy, w, h, yaw, roll, registerLight) => {
+      e.set(0, yaw, roll); q.setFromEuler(e);
+      pos.set(p[0], gy + h * 0.5, p[2]); scl.set(w, h, role === 'pylon' ? w : Math.max(w * 0.5, 1.0));
+      m4.compose(pos, q, scl); bodyInst.setMatrixAt(placedCount, m4);
+      
+      const d = role === 'pylon' ? w : Math.max(w * 0.5, 1.0);
+      const off = (role === 'pylon' ? w * 0.5 : d * 0.5) + 0.12;
+      const facingX = Math.sin(yaw), facingZ = Math.cos(yaw);
+      const gx = p[0] + facingX * off, gz = p[2] + facingZ * off, gyc = gy + h * 0.52;
+      pos.set(gx, gyc, gz);
+      scl.set(role === 'pylon' ? w * 0.16 : w * 0.24, h * 0.86, role === 'pylon' ? w * 0.16 : d * 0.3);
+      m4.compose(pos, q, scl); glowInst.setMatrixAt(placedCount, m4);
+      
+      if (registerLight) addLightSource(track, [gx, gyc, gz], col(theme.accent2 || theme.accent), 1.1, 17.0);
       placedCount++;
+    };
+
+    // Place a single onbase element (canyon/frozen)
+    const placeSingleOnbase = (p, gy, w, h, yaw, roll, registerLight) => {
+      const baseH = Math.max(h * 0.14, 0.6);
+      e.set(0, yaw, roll); q.setFromEuler(e);
+      pos.set(p[0], gy + baseH * 0.5, p[2]); scl.set(w * 0.85, baseH, w * 0.85);
+      m4.compose(pos, q, scl); bodyInst.setMatrixAt(placedCount, m4);
+      
+      const gyc = gy + baseH + h * (role === 'crystal' ? 0.25 : 0.5);
+      e.set(0, rng.range(0, 6.2832), roll); q.setFromEuler(e);
+      pos.set(p[0], gyc, p[2]); scl.set(w, role === 'crystal' ? h * 0.5 : h, w);
+      m4.compose(pos, q, scl); glowInst.setMatrixAt(placedCount, m4);
+      
+      if (registerLight) addLightSource(track, [p[0], gyc, p[2]], col(theme.accent2 || theme.accent), 1.1, 17.0);
+      placedCount++;
+    };
+
+    // Place a broken arch pair (dune only)
+    const placeBrokenArchPair = (p, gy, w, h, yaw, registerLight) => {
+      const facingX = Math.sin(yaw), facingZ = Math.cos(yaw);
+      const perpX = -facingZ, perpZ = facingX;
+      
+      // Left monolith leaning right
+      const pLeft = [p[0] - perpX * (w * 0.9), p[1], p[2] - perpZ * (w * 0.9)];
+      const hLeft = h * 0.95;
+      placeSingleStrip(pLeft, gy, w, hLeft, yaw, 0.22, registerLight);
+
+      // Right monolith broken and shorter, leaning left
+      const pRight = [p[0] + perpX * (w * 0.9), p[1], p[2] + perpZ * (w * 0.9)];
+      const hRight = h * 0.65;
+      placeSingleStrip(pRight, gy, w, hRight, yaw, -0.36, false);
+    };
+
+    // Place stacked billboard slabs (neon only)
+    const placeStackedSlabs = (p, gy, w, h, yaw, registerLight) => {
+      const hLower = h * 0.58;
+      placeSingleStrip(p, gy, w, hLower, yaw, 0, registerLight);
+
+      const hUpper = h * 0.38;
+      const pUpper = [p[0], p[1], p[2]];
+      placeSingleStrip(pUpper, gy + hLower, w * 0.78, hUpper, yaw, 0.16, false);
+    };
+
+    // Place leaning shard cluster (canyon only)
+    const placeShardCluster = (p, gy, w, h, yaw, registerLight) => {
+      const facingX = Math.sin(yaw), facingZ = Math.cos(yaw);
+      const perpX = -facingZ, perpZ = facingX;
+
+      // Shard 1 (Tall, center)
+      placeSingleOnbase(p, gy, w, h, yaw, 0.08, registerLight);
+
+      // Shard 2 (Medium, left)
+      const pLeft = [
+        p[0] - perpX * (w * 0.45) + facingX * (w * 0.1),
+        p[1],
+        p[2] - perpZ * (w * 0.45) + facingZ * (w * 0.1)
+      ];
+      placeSingleOnbase(pLeft, gy, w * 0.8, h * 0.7, yaw, -0.26, false);
+
+      // Shard 3 (Small, right)
+      const pRight = [
+        p[0] + perpX * (w * 0.45) - facingX * (w * 0.1),
+        p[1],
+        p[2] + perpZ * (w * 0.45) - facingZ * (w * 0.1)
+      ];
+      placeSingleOnbase(pRight, gy, w * 0.65, h * 0.5, yaw, 0.32, false);
+    };
+
+    // Place aurora-lit needles (frozen only)
+    const placeNeedles = (p, gy, w, h, yaw, registerLight) => {
+      const facingX = Math.sin(yaw), facingZ = Math.cos(yaw);
+      const perpX = -facingZ, perpZ = facingX;
+
+      // Needle 1 (Tall, center)
+      placeSingleOnbase(p, gy, w, h, yaw, -0.06, registerLight);
+
+      // Needle 2 (Medium, left)
+      const pLeft = [p[0] - perpX * (w * 0.38), p[1], p[2] - perpZ * (w * 0.38)];
+      placeSingleOnbase(pLeft, gy, w * 0.82, h * 0.72, yaw, -0.28, false);
+
+      // Needle 3 (Small, right)
+      const pRight = [p[0] + perpX * (w * 0.38), p[1], p[2] + perpZ * (w * 0.38)];
+      placeSingleOnbase(pRight, gy, w * 0.68, h * 0.54, yaw, 0.3, false);
     };
 
     const sizeFor = () => {
@@ -828,7 +1099,7 @@
       return [rng.range(2.5, 6), rng.range(10, 30)]; // spike
     };
 
-    // 1) Scatter, denser near corners
+    // 1) Scatter
     for (let i = 0; i < baseCount; i++) {
       let s = null, sIdx = 0;
       for (let attempt = 0; attempt < 8; attempt++) {
@@ -852,8 +1123,26 @@
       const gy = groundY(p[0], p[2]);
       const [w, h] = sizeFor();
       const facing = V.norm([-sign * s.r[0], 0, -sign * s.r[2]]);
+      const yaw = Math.atan2(facing[0], facing[2]);
       const registerLight = placedCount < 10 && off < s.w / 2 + 13.0 && quality !== 'low';
-      place(p, gy, w, h, facing, registerLight);
+
+      if (rng.chance(0.35)) {
+        if (theme.biome === 'dune') {
+          placeBrokenArchPair(p, gy, w, h, yaw, registerLight);
+        } else if (theme.biome === 'neon') {
+          placeStackedSlabs(p, gy, w, h, yaw, registerLight);
+        } else if (theme.biome === 'canyon') {
+          placeShardCluster(p, gy, w, h, yaw, registerLight);
+        } else {
+          placeNeedles(p, gy, w, h, yaw, registerLight);
+        }
+      } else {
+        if (comp === 'strip') {
+          placeSingleStrip(p, gy, w, h, yaw, 0, registerLight);
+        } else {
+          placeSingleOnbase(p, gy, w, h, yaw, 0, registerLight);
+        }
+      }
     }
 
     // 2) One dramatic "hero" landmark on the horizon
@@ -862,12 +1151,24 @@
     const heroP = V.addS(V.clone(heroSample.p), heroSample.r, heroSign * 430.0);
     const heroGy = groundY(heroP[0], heroP[2]);
     const heroFacing = V.norm([-heroSign * heroSample.r[0], 0, -heroSign * heroSample.r[2]]);
+    const heroYaw = Math.atan2(heroFacing[0], heroFacing[2]);
     const heroW = comp === 'strip' ? 40 : 58;
     const heroH = comp === 'strip' ? 210 : 150;
-    place(heroP, heroGy, heroW, heroH, heroFacing, false);
+    
+    if (theme.biome === 'dune') {
+      placeBrokenArchPair(heroP, heroGy, heroW, heroH, heroYaw, false);
+    } else if (theme.biome === 'neon') {
+      placeStackedSlabs(heroP, heroGy, heroW, heroH, heroYaw, false);
+    } else if (theme.biome === 'canyon') {
+      placeShardCluster(heroP, heroGy, heroW, heroH, heroYaw, false);
+    } else {
+      placeNeedles(heroP, heroGy, heroW, heroH, heroYaw, false);
+    }
 
     bodyInst.instanceMatrix.needsUpdate = true;
     glowInst.instanceMatrix.needsUpdate = true;
+    bodyInst.count = placedCount;
+    glowInst.count = placedCount;
     for (const im of [bodyInst, glowInst]) { im.frustumCulled = false; im.castShadow = true; im.receiveShadow = true; }
     group.add(bodyInst); group.add(glowInst);
 
@@ -1103,34 +1404,20 @@
     
     const neonGeo = new THREE.BoxGeometry(1, 0.08, 0.6);
     const neonMat = new THREE.MeshBasicMaterial({ color: col(theme.accent), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
-    
-    // Center sign display panel
-    const signGeo = new THREE.BoxGeometry(1.8, 1.0, 0.12);
-    // faint emissive tint so the panel reads as a powered board even when nothing lights it
-    const signMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.9, roughness: 0.1, emissive: col(theme.accent2), emissiveIntensity: 0.06 });
-    const signGlowMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
-    const chevronGeo = new THREE.BoxGeometry(0.45, 0.12, 0.14);
 
     // Glowing pool on road surface under the arches
     const poolGeo = new THREE.CircleGeometry(1, 16);
     const poolMat = new THREE.MeshBasicMaterial({ color: col(theme.accent), transparent: true, opacity: DD.GLOW.archPool, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     
-    // PERF: each arch used to be a Group of ~16 separate meshes — with ~28 arches that's ~450 draw
-    // calls, which was the single biggest CPU/draw-call cost in the scene. Instance every component
-    // so all arches render in ~7 draw calls. Per-instance matrices bake each arch's track-frame
-    // orientation/position plus the per-arch width/scale of the crossbar, neon strip and pool.
     const N = candidates.length;
     const posts = new THREE.InstancedMesh(postGeo, postMat, N * 4);
     const crossbars = new THREE.InstancedMesh(beamGeo, beamMat, N);
     const brackets = new THREE.InstancedMesh(bracketGeo, beamMat, N * 2);
     const neons = new THREE.InstancedMesh(neonGeo, neonMat, N);
-    const signs = new THREE.InstancedMesh(signGeo, signMat, N);
-    const chevrons = new THREE.InstancedMesh(chevronGeo, signGlowMat, N * 10);
     const pools = new THREE.InstancedMesh(poolGeo, poolMat, N);
     posts.castShadow = posts.receiveShadow = true;
     crossbars.castShadow = crossbars.receiveShadow = true;
     brackets.castShadow = brackets.receiveShadow = true;
-    signs.castShadow = signs.receiveShadow = true;
 
     const archMat = new THREE.Matrix4(), local = new THREE.Matrix4(), world = new THREE.Matrix4();
     const basis = new THREE.Matrix4();
@@ -1146,7 +1433,7 @@
       return world;
     };
 
-    let pi = 0, bi = 0, ci = 0;
+    let pi = 0, bi = 0;
     for (let i = 0; i < N; i++) {
       const s = candidates[i];
       const halfW = s.w / 2 + 0.6;
@@ -1170,23 +1457,6 @@
       brackets.setMatrixAt(bi++, place(halfW - 0.8, 7.8, 0, ez.set(0, 0, Math.PI / 4), 1, 1, 1));
       // glowing neon strip underside
       neons.setMatrixAt(i, place(0, 8.24, 0, null, halfW * 1.8, 1, 1));
-      // center sign panel (signGroup sat at y=7.3)
-      signs.setMatrixAt(i, place(0, 7.3, 0, null, 1, 1, 1));
-      // sign glyphs: two LARGE chevrons + top/bottom frame bars (10 instances/sign,
-      // front/back + frame bars). Big glyphs are the point — the old six mini-chevrons were sub-pixel at
-      // distance, so the panel read as a floating black box hanging over the road.
-      for (const sx of [-0.42, 0.30]) {
-        for (const sy of [-1, 1]) {
-          chevrons.setMatrixAt(ci++, place(sx, 7.3 + sy * 0.19, 0.07, ez.set(0, 0, sy * 0.62), 1.6, 1.4, 1));
-        }
-      }
-      for (const sx of [-0.42, 0.30]) {
-        for (const sy of [-1, 1]) {
-          chevrons.setMatrixAt(ci++, place(sx, 7.3 + sy * 0.19, -0.07, ez.set(0, Math.PI, sy * 0.62), 1.6, 1.4, 1));
-        }
-      }
-      chevrons.setMatrixAt(ci++, place(0, 7.82, 0.05, null, 4.2, 0.35, 0.5));
-      chevrons.setMatrixAt(ci++, place(0, 6.78, 0.05, null, 4.2, 0.35, 0.5));
       // flat neon pool on the road surface
       pools.setMatrixAt(i, place(0, 0.02, 0, ez.set(-Math.PI / 2, 0, 0), s.w * 0.7, 3.5, 1.0));
 
@@ -1200,7 +1470,7 @@
     }
 
     // arches span the whole track, so per-instance frustum culling can't help — keep them resident
-    for (const im of [posts, crossbars, brackets, neons, signs, chevrons, pools]) {
+    for (const im of [posts, crossbars, brackets, neons, pools]) {
       im.instanceMatrix.needsUpdate = true;
       im.frustumCulled = false;
       group.add(im);

@@ -298,6 +298,12 @@
   // retry-spam genre, so skip most of the countdown. Full 3.2s only on the first load of a track.
   function resetRun(fast) {
     G.car = DD.createCar(G.track);
+    G.car.lapSplits = [];
+    const finLaps = $('finLaps');
+    if (finLaps) {
+      finLaps.style.display = 'none';
+      finLaps.innerHTML = '';
+    }
     G.recFrames = [];
     G.tickCount = 0;
     G.ghostPlayhead = 0;
@@ -405,6 +411,29 @@
     $('finMedal').className = 'md ' + medal;
     $('finPB').textContent = isPB ? (rec.attempts === 1 ? 'first run!' : 'new personal best!') : ('PB ' + DD.formatTime(rec.pb));
     dialInText($('finSeed'), track.seed + '  ·  TIER ' + track.tier);
+
+    const finLaps = $('finLaps');
+    if (finLaps) {
+      if (track.laps > 1) {
+        finLaps.innerHTML = '';
+        finLaps.style.display = 'flex';
+        const splits = G.car.lapSplits || [];
+        let prevTime = 0;
+        for (let l = 0; l < track.laps; l++) {
+          const endTime = (l === track.laps - 1) ? ms : (splits[l] || ms);
+          const lapTime = endTime - prevTime;
+          prevTime = endTime;
+          
+          const row = document.createElement('div');
+          row.className = 'finLapRow';
+          finLaps.appendChild(row);
+          dialInText(row, 'LAP ' + (l + 1) + '  ·  ' + DD.formatTime(lapTime));
+        }
+      } else {
+        finLaps.style.display = 'none';
+        finLaps.innerHTML = '';
+      }
+    }
 
     const finishEl = $('finish');
     if (finishEl) {
@@ -599,10 +628,25 @@
         if (G.car.justLap) {
           // circuits: crossed the lap line — bump the LAP counter, chime, sector flash
           const lapN = G.car.justLap; G.car.justLap = 0;
+          if (!G.car.lapSplits) G.car.lapSplits = [];
+          G.car.lapSplits.push(Math.round(G.car.time));
           $('hudLap').textContent = 'LAP ' + (lapN + 1) + '/' + (G.track.laps || 1);
           DD.sfxCheckpoint(0);
           const lb = $('hudLeftBox');
           if (lb) { lb.classList.remove('purple-flash'); void lb.offsetWidth; lb.classList.add('purple-flash'); }
+          if (G.track.laps && lapN === G.track.laps - 1) {
+            const warnEl = $('hudWarn');
+            if (warnEl) {
+              warnEl.textContent = 'FINAL LAP';
+              warnEl.style.opacity = 1;
+              warnEl.classList.remove('final-sector-pulse');
+              void warnEl.offsetWidth;
+              warnEl.classList.add('final-sector-pulse');
+              setTimeout(() => {
+                if (warnEl.textContent === 'FINAL LAP') warnEl.style.opacity = 0;
+              }, 1500);
+            }
+          }
         }
         if (G.car.fellOff) {
           G.car.fellOff = false;
@@ -676,13 +720,19 @@
     if (G.sparks && DD.updateSparks) {
       const isDrifting = G.car.sliding && G.car.slideState && speed > 10;
       DD.updateSparks(G.sparks, G.car, G.track, dtReal, (G.car.hitWall && speed > 10) || isDrifting, isDrifting);
+      if (G.car.hitWall && speed > 10 && !G.prevHitWall) { DD.sfxWallThud(speedNorm); } G.prevHitWall = G.car.hitWall && speed > 10;
     }
     DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt);
     // off-track / missed checkpoint warnings
     const warnEl = cachedHudWarn;
     if (G.car.missedCkpt) { warnEl.textContent = 'checkpoint missed — respawn (⚑)'; warnEl.style.opacity = 1; }
     else if (G.car.onDirt && G.state === 'play') { warnEl.textContent = 'off track'; warnEl.style.opacity = 0.55; }
-    else warnEl.style.opacity = 0;
+    else {
+      if (warnEl.textContent !== 'FINAL SECTOR' && warnEl.textContent !== 'FINAL LAP') {
+        warnEl.style.opacity = 0;
+      }
+    }
+    if (G.camState.prevGrounded === false && G.car.grounded && (G.camState.prevVelY || 0) < -2) { DD.sfxLandingWhump(-(G.camState.prevVelY || 0) / 22); }
     DD.updateCamera(G.camera, G.camState, G.car, G.track, dtReal, speed);
 
     // iridescent shimmer

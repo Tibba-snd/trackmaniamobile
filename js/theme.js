@@ -212,6 +212,23 @@
     skid:  { drift: 1.15, straight: 0.2 },            // was 1.8 on drift — white-hot trails fed bloom hardest
     archPool: 0.22                                    // was 0.35 — additive pools on the road under arches
   };
+
+  DD.TERRAIN_BAKE = {
+    cLoScale: [0.65, 0.65, 0.75],
+    cHiScale: [0.95, 0.92, 0.95],
+    cHiMax: [0.8, 0.78, 0.82],
+    sunIntensity: 1.0,
+    ambientFloor: 0.7,
+    ambSky: [0.26, 0.30, 0.48],
+    ambGrd: [0.04, 0.04, 0.07],
+    glowIntensity: 0.06,
+    octaves: 3,
+    noiseScale: 0.015,
+    varianceStrength: 0.28,
+    radialWarmth: [0.06, 0.03, -0.02],
+    radialCoolness: [-0.02, -0.01, 0.04],
+    bandsStrength: 0.03
+  };
   // master × biome trim; applied to bloom strength + frame-driven emissives (not to baked
   // build-time opacities — those use the calmer constants above directly)
   DD.glowMul = function (settings, theme) {

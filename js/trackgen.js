@@ -145,6 +145,11 @@
     return DD.lerp(DD.lerp(a, b, sx), DD.lerp(c, d, sx), sy);
   }
 
+  // per-biome landform uplift beyond the safety corridor (m above the local basin) — the
+  // world stopped being a uniform sunken plane in session 22: terrain follows the LOCAL road
+  // height and may rise to/above track level once it's laterally clear of the racing corridor
+  const TERRAIN_RISE = { dune: 20, neon: 6, canyon: 48, frozen: 32 };
+
   function buildTerrainData(samples, seedStr, theme) {
     const seed = DD.hashSeed(seedStr + '::terrain');
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, minY = 1e9;
@@ -155,72 +160,92 @@
     const RES = 120;
     const stepX = (maxX - minX) / (RES - 1), stepZ = (maxZ - minZ) / (RES - 1);
     const amp = theme.terrainAmp;
-    const ceiling = minY - 8;          // terrain top stays 8m below the lowest track point
-    const floor = ceiling - amp * 2.2; // basin depth from rolling noise
+    const riseMax = TERRAIN_RISE[theme.biome] != null ? TERRAIN_RISE[theme.biome] : 16;
     const heights = new Float32Array(RES * RES);
     let hMin = 1e9, hMax = -1e9;
     for (let j = 0; j < RES; j++) {
       for (let i = 0; i < RES; i++) {
         const x = minX + i * stepX, z = minZ + j * stepZ;
-        const xr = (x * 0.809 + z * 0.588) / 110, zr = (-x * 0.588 + z * 0.809) / 110;
-        const nz = valueNoise(seed, x / 240, z / 240) * 0.7 + valueNoise(seed ^ 0x9e37, xr, zr) * 0.3;
-        const hBase = floor + nz * (ceiling - floor);
-        let h = hBase;
-        if (theme.terraced) h = Math.round(h / 9) * 9 + (h - Math.round(h / 9) * 9) * 0.25;
-        if (h > ceiling) h = ceiling;   // hard guarantee: never reaches the track
 
-        // Track conforming: shape terrain to fit road where close, leave chasms for jumps/elevated bridges
+        // ONE pass over the samples: nearest sample (for the local reference height + the
+        // embankment conforming) AND the hard clearance clamp from every sample whose safety
+        // radius covers this cell. (Was two full scans — this is the documented load hotspot.)
         let minDistSq = 1e18;
         let nearestSample = null;
-        // Search every 2nd sample for performance
+        let clampY = 1e9;
         for (let sIdx = 0; sIdx < samples.length; sIdx += 2) {
           const s = samples[sIdx];
           const dx = x - s.p[0];
           const dz = z - s.p[2];
           const dSq = dx * dx + dz * dz;
-          if (dSq < minDistSq) {
-            minDistSq = dSq;
-            nearestSample = s;
+          if (dSq < minDistSq) { minDistSq = dSq; nearestSample = s; }
+          const roadEdge = s.w / 2 + 1.0;
+          const limitDist = roadEdge + 10.0;
+          if (dSq < limitDist * limitDist) {
+            if (s.gap) {
+              clampY = Math.min(clampY, s.p[1] - 12.0); // chasm under gaps
+            } else {
+              const minRoadY = s.p[1] - Math.abs(s.r[1]) * (s.w / 2);
+              clampY = Math.min(clampY, minRoadY - 1.25); // clear road edges on banking
+            }
           }
         }
 
-        if (nearestSample && !nearestSample.gap) {
-          const dist = Math.sqrt(minDistSq);
-          const roadEdge = nearestSample.w / 2 + 1.0;
-          // Calculate lowest point of road cross section at this sample (accounting for banking tilt)
-          const minRoadY = nearestSample.p[1] - Math.abs(nearestSample.r[1]) * (nearestSample.w / 2);
-          const targetH = minRoadY - 0.85; // anchor below road bottom
+        // base field referenced to the LOCAL road height (terrain follows the track
+        // vertically); elevated sections keep proportionally more air underneath so bridges
+        // still fly over a drop instead of dragging the world up with them
+        const dist = Math.sqrt(minDistSq);
+        const roadY = nearestSample.p[1];
+        const elev = Math.max(0, roadY - minY);
+        const localCeil = roadY - 8 - elev * 0.55;
+        const localFloor = localCeil - amp * 2.2;
+        const xr = (x * 0.809 + z * 0.588) / 110, zr = (-x * 0.588 + z * 0.809) / 110;
+        const nz = valueNoise(seed, x / 240, z / 240) * 0.7 + valueNoise(seed ^ 0x9e37, xr, zr) * 0.3;
+        let h = localFloor + nz * (localCeil - localFloor);
+
+        // landform uplift OUTSIDE the racing corridor: fades in from corridor edge (C1) to
+        // open terrain (C2); placement driven by a large-feature noise so it reads as hills /
+        // walls / ridges, not a uniform berm ringing the road
+        const roadEdgeN = nearestSample.w / 2 + 1.0;
+        const C1 = roadEdgeN + 26.0, C2 = C1 + 85.0;
+        const zoneT = DD.smoothstep(DD.clamp((dist - C1) / (C2 - C1), 0, 1));
+        if (zoneT > 0) {
+          const rise01 = valueNoise(seed ^ 0x51ab, x / 380, z / 380);
+          let uplift = zoneT * rise01 * riseMax;
+          if (theme.biome === 'canyon') {
+            // ridged component: sharp mesa/wall crests instead of soft mounds
+            const rn = valueNoise(seed ^ 0x77cd, x / 210, z / 210);
+            const ridge = 1 - Math.abs(2 * rn - 1);
+            uplift += zoneT * ridge * ridge * riseMax * 0.6;
+          }
+          h += uplift;
+        }
+
+        // terracing applies to the composed landform (terraced mesas, not just basin steps)
+        if (theme.terraced) h = Math.round(h / 9) * 9 + (h - Math.round(h / 9) * 9) * 0.25;
+
+        // embankment conforming: raise terrain up to just under the road where it passes close
+        // (unchanged behavior; only ever RAISES toward the road underside)
+        if (!nearestSample.gap) {
+          const minRoadY = roadY - Math.abs(nearestSample.r[1]) * (nearestSample.w / 2);
+          const targetH = minRoadY - 0.85;
           const heightDiff = targetH - h;
           if (heightDiff > 0) {
             const maxEmbankmentHeight = 16.0;
             const clampTargetH = Math.min(targetH, h + maxEmbankmentHeight);
-            if (dist < roadEdge) {
+            if (dist < roadEdgeN) {
               h = clampTargetH;
-            } else if (dist < roadEdge + 32.0) {
-              const t = (dist - roadEdge) / 32.0;
+            } else if (dist < roadEdgeN + 32.0) {
+              const t = (dist - roadEdgeN) / 32.0;
               const smoothT = t * t * (3 - 2 * t);
               h = DD.lerp(clampTargetH, h, smoothT);
             }
           }
         }
 
-        // Bounded clearance check against all nearby samples to prevent spilling/clipping (crucial on banked curves)
-        for (let sIdx = 0; sIdx < samples.length; sIdx += 2) {
-          const s = samples[sIdx];
-          const dx = x - s.p[0];
-          const dz = z - s.p[2];
-          const distSq = dx * dx + dz * dz;
-          const roadEdge = s.w / 2 + 1.0;
-          const limitDist = roadEdge + 10.0;
-          if (distSq < limitDist * limitDist) {
-            const minRoadY = s.p[1] - Math.abs(s.r[1]) * (s.w / 2);
-            if (s.gap) {
-              h = Math.min(h, s.p[1] - 12.0); // push down under gaps
-            } else {
-              h = Math.min(h, minRoadY - 1.25); // clear road edges on banking
-            }
-          }
-        }
+        // hard safety clamp LAST — nothing (uplift, terrace, embankment) may violate road
+        // clearance or fill a gap chasm
+        if (clampY < 1e9) h = Math.min(h, clampY);
 
         heights[j * RES + i] = h;
         hMin = Math.min(hMin, h); hMax = Math.max(hMax, h);
