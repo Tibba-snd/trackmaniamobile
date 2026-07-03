@@ -249,9 +249,11 @@ and review/integration of every drop. Antigravity executes well-specified, test-
 
 ## Antigravity briefs
 
-_Done & reviewed: A1 (session 19), A2/A3/A4/A6 (session 21 — with integration fixes; read the
-STATUS entries). Adding new briefs: Claude writes them here; Tibba can also paste any
-brief-shaped task directly if it fits the protocol invariants._
+_Done & reviewed: **ALL briefs A1–A10 are now landed.** A1 (session 19), A2/A3/A4/A6 (session
+21, with integration fixes), A5/A7/A8/A9/A10 (session 23 — the cleanest drop yet: zero defects,
+busters bumped). The briefs below are kept for reference; new briefs get appended when Claude
+carves them from C4/C5 work. Tibba can also paste any brief-shaped task directly if it fits
+the protocol invariants._
 
 - **A5 (RETRY) — Impact audio**: this brief was reported done but `js/audio.js` was untouched —
   it is still open. Filtered-noise wall thud + landing whump in `js/audio.js` (synth only, no

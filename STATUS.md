@@ -209,6 +209,39 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — A5/A7/A8/A9/A10 reviewed & verified (2026-07-03, session 23)
+
+**Provenance note first:** Antigravity's five-brief drop landed in the working tree DURING
+Claude's C3 session, and C3's `git add -A` swept it (unreviewed) into commit `0857bb9` — so that
+commit contains BOTH workstreams, and its "all suites green + visual verification" evidence was
+unknowingly gathered against the combined state. Claude-side protocol fix: **`git status`
+immediately before every stage/commit** (mirror of Antigravity's field notes). This session is
+the retroactive review — verdict: **the cleanest drop yet, zero defects found.**
+
+- **A5 impact audio** ✓ — `noiseSfx` filtered-noise envelope helper; `sfxWallThud` (150 Hz LP,
+  edge-detected via `G.prevHitWall` so wall-scraping doesn't machine-gun) + `sfxLandingWhump`
+  (90 Hz LP, fall-speed-scaled) wired one line BEFORE `updateCamera` — correct, since it reads
+  the camera state's previous-frame `prevGrounded`. Volumes under `settings.sfx`.
+- **A7 terrain color bake** ✓ — `DD.TERRAIN_BAKE` table (theme.js) consumed in `buildTerrain`;
+  calibrated against the C3 relief (the lit canyon/dune slopes in session 22's screenshots were
+  in fact this bake at work).
+- **A8 lap HUD** ✓ — `lapSplits` per lap, per-lap time rows on the circuit finish screen
+  (dial-in styled), FINAL LAP banner on the last lap-line crossing, `hudWarn` opacity guard
+  extended so the banner isn't stomped by the off-track warning.
+- **A9 emissive variety** ✓ — new per-biome compositions, still exactly 2 InstancedMeshes.
+- **A10 chevrons** ✓ — the dangling arch panel is GONE (arches are pure gantries now); corner
+  boards rebuilt as real furniture: instanced panels + 2 ground-planted posts + severity-scaled
+  glowing glyphs (1-3) pointing into the turn, emissive frame. Screenshot-verified on a tight
+  corner sequence — reads like proper rally signage.
+- **Cache busters: bumped correctly by Antigravity for the first time** (theme v22, audio v16,
+  scene-decor v55, game v46). Field notes are working.
+
+Verified this session: full suite green on the combined state (drivability 41/41, determinism,
+colors, m2, camera, sky), zero console errors in live runs, corner-board close-up + wide shots.
+One benign investigation artifact worth recording: a seed's browser track can differ from a bare
+`generateTrack(seed, tier, 0)` in Node because `buildValidTrack` may ship attempt 1+ — compare
+against `buildValidTrack` output when cross-checking Node vs browser.
+
 ## Resolved this pass — C3 core: terrain height-policy rework (2026-07-03, session 22)
 
 The "black nothing around the track" root cause is fixed at the generator (`js/trackgen.js`
