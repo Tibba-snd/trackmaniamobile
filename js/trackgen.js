@@ -252,8 +252,14 @@
     const archetype = rng.pick(ARCHETYPES);
     const weights = WEIGHTS[archetype];
     const builders = makePieces(rng, tier);
-    const targetLen = 1300 + tier * 230 + rng.range(-150, 200);
+    let targetLen = 1300 + tier * 230 + rng.range(-150, 200);
     const theme = DD.makeTheme(seedStr);
+
+    // Closed-circuit decision on an ISOLATED rng stream: the main rng's draw sequence is
+    // untouched, so seeds that stay point-to-point generate exactly the track they always did.
+    // Loop tracks get a shorter per-lap budget (raced 2-3 times, total ≈ a sprint's length).
+    const wantLoop = DD.makeRng(seedStr + '::loop::t' + tier + '::a' + (attempt || 0)).chance(0.55);
+    if (wantLoop) targetLen *= 0.62;
 
     // occupancy grid for self-intersection avoidance
     const OC = 22;
@@ -379,6 +385,12 @@
     }
 
     while (total < targetLen && guard++ < 220) {
+      // loop tracks: stop the grammar when the remaining budget is roughly what the closure
+      // path home will cost (straight-line distance + arc overhead) — never mid-signature
+      if (wantLoop && hasSignature && forcedQueue.length === 0 && total > targetLen * 0.45) {
+        const dHome = Math.hypot(st.pos[0], st.pos[2]);
+        if (total + dHome + 320 >= targetLen) break;
+      }
       let name;
       if (forcedQueue.length > 0) {
         name = forcedQueue.shift();
@@ -451,8 +463,158 @@
       else if (placed === 'straight' || placed === 'boost') vEst = Math.min(95, vEst + p.len * 0.22);
       else vEst = Math.min(92, vEst + p.len * 0.1);
     }
-    // closing straight
-    {
+    /* ---------------- loop closure (closed circuits / multilap) ----------------
+       Dubins CSC path (arc–straight–arc, comfortable radius) from the grammar's end state back
+       to the origin state ([0,4,0], yaw 0) — the same primitive family the grammar itself uses,
+       so a closure reads like any other sweeper+straight section. Vertical closure = a per-step
+       glide-slope controller toward y=4. Deterministic: fixed radius candidates, shortest
+       feasible variant, no rng. Falls back to the classic open sprint when every candidate
+       collides with mid-track geometry. */
+    const mod2pi = (a) => { a = a % (Math.PI * 2); return a < 0 ? a + Math.PI * 2 : a; };
+
+    // heading-space: dir(θ) = (sinθ, cosθ) in xz; left turn (curv>0) center at p + R·(cosθ,−sinθ)
+    function dubinsCSC(x0, z0, th0, R) {
+      const paths = [];
+      const cL0 = [x0 + R * Math.cos(th0), z0 - R * Math.sin(th0)];
+      const cR0 = [x0 - R * Math.cos(th0), z0 + R * Math.sin(th0)];
+      const cL1 = [R * Math.cos(0), -R * Math.sin(0)];  // target: origin, θ=0
+      const cR1 = [-R * Math.cos(0), R * Math.sin(0)];
+      const add = (dir0, dir1, c0, c1, inner) => {
+        const Dx = c1[0] - c0[0], Dz = c1[1] - c0[1];
+        const d = Math.hypot(Dx, Dz);
+        let ths;
+        if (!inner) {
+          if (d < 1e-6) return;
+          ths = Math.atan2(Dx, Dz);
+        } else {
+          if (d < 2 * R + 1e-6) return;
+          const psi = Math.atan2(Dx, Dz);
+          // LSR: sin(ψ−θs) = −2R/d → θs = ψ + asin(2R/d);  RSL: θs = ψ − asin(2R/d)
+          ths = dir0 > 0 ? psi + Math.asin(2 * R / d) : psi - Math.asin(2 * R / d);
+        }
+        const s = inner ? Math.sqrt(Math.max(0, d * d - 4 * R * R)) : d;
+        const d0 = dir0 > 0 ? mod2pi(ths - th0) : mod2pi(th0 - ths);
+        const d1 = dir1 > 0 ? mod2pi(0 - ths) : mod2pi(ths - 0);
+        paths.push({ R, dir0, dir1, d0, d1, s, len: R * (d0 + d1) + s });
+      };
+      add(+1, +1, cL0, cL1, false); // LSL
+      add(-1, -1, cR0, cR1, false); // RSR
+      add(+1, -1, cL0, cR1, true);  // LSR
+      add(-1, +1, cR0, cL1, true);  // RSL
+      paths.sort((a, b) => a.len - b.len);
+      return paths;
+    }
+
+    // analytic endpoint of a CSC path from (x,z,θ) — used to reject any variant whose closed
+    // form doesn't land at the origin (guards the sign conventions above forever)
+    function cscEndpoint(x, z, th, path) {
+      const arc = (x, z, th, dir, sweep) => {
+        const cx = x + path.R * Math.cos(th) * dir, cz = z - path.R * Math.sin(th) * dir;
+        const th1 = th + dir * sweep;
+        return [cx - path.R * Math.cos(th1) * dir, cz + path.R * Math.sin(th1) * dir, th1];
+      };
+      let [ax, az, ath] = arc(x, z, th, path.dir0, path.d0);
+      ax += Math.sin(ath) * path.s; az += Math.cos(ath) * path.s;
+      return arc(ax, az, ath, path.dir1, path.d1);
+    }
+
+    // integrate a CSC path into ribbon samples with vertical closure toward y=4. Two passes:
+    // the second injects the measured yaw drift correction; the position residual is then
+    // sheared out linearly so the final sample lands EXACTLY one DS before samples[0].
+    function integrateClosure(path, st0, targetW) {
+      const totalLen = path.len;
+      const run = (yawCorrPerStep) => {
+        const arr = [];
+        const s1 = { pos: V.clone(st0.pos), yaw: st0.yaw, pitch: st0.pitch, bank: st0.bank, width: st0.width };
+        let traveled = 0;
+        const segs = [
+          { curv: path.dir0 / path.R, len: path.R * path.d0 },
+          { curv: 0, len: path.s },
+          { curv: path.dir1 / path.R, len: path.R * path.d1 }
+        ];
+        for (const seg of segs) {
+          const steps = Math.max(1, Math.round(seg.len / DS));
+          for (let i = 0; i < steps; i++) {
+            const remaining = Math.max(totalLen - traveled, DS);
+            const dy = 4 - s1.pos[1];
+            const pitchT = DD.clamp(Math.asin(DD.clamp(dy / remaining, -0.99, 0.99)), -0.135, 0.135);
+            s1.pitch += (pitchT - s1.pitch) * (1 - Math.exp(-DS / 9));
+            const k = 1 - Math.exp(-DS / 14);
+            s1.bank += (0 - s1.bank) * k;
+            s1.width += (targetW - s1.width) * k;
+            s1.yaw += seg.curv * DS + yawCorrPerStep;
+            const cosP = Math.cos(s1.pitch);
+            const f = [Math.sin(s1.yaw) * cosP, Math.sin(s1.pitch), Math.cos(s1.yaw) * cosP];
+            s1.pos = V.addS(s1.pos, f, DS);
+            arr.push({ p: V.clone(s1.pos), yaw: s1.yaw, pitch: s1.pitch, bank: s1.bank, w: s1.width, surf: 0, wall: 1, gap: 0, pieceName: seg.curv !== 0 ? 'sweeper' : 'straight' });
+            traveled += DS;
+          }
+        }
+        return arr;
+      };
+      let arr = run(0);
+      const yawErr = DD.angleDiff(arr[arr.length - 1].yaw, 0);
+      arr = run(yawErr / arr.length);
+      // shear the whole closure so the endpoint is exact (residual is a few meters over
+      // hundreds — sub-degree bending per sample)
+      const end = arr[arr.length - 1].p;
+      const err = [0 - end[0], 4 - end[1], 0 - end[2]];
+      for (let i = 0; i < arr.length; i++) {
+        const t = (i + 1) / arr.length;
+        arr[i].p = V.addS(arr[i].p, err, t);
+      }
+      return arr;
+    }
+
+    // occupancy check for the closure: same rule as collides(), but entries near the START
+    // (idx < 60) are the closure's legitimate destination, not a crossing
+    function closureCollides(arr, baseIdx) {
+      for (let i = 0; i < arr.length; i += 2) {
+        const s = arr[i];
+        const cx = Math.round(s.p[0] / OC), cz = Math.round(s.p[2] / OC);
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+          const e = occ.get(okey(cx + dx, cz + dz));
+          if (e && e.idx >= 60 && (baseIdx + i - e.idx) > 80 && Math.abs(s.p[1] - e.y) < 14) return true;
+        }
+      }
+      return false;
+    }
+
+    let closed = false;
+    if (wantLoop) {
+      const targetW = samples[0].w;
+      const RADII = [85, 60, 115, 72, 140, 50];
+      outer: for (const R of RADII) {
+        for (const path of dubinsCSC(st.pos[0], st.pos[2], st.yaw, R)) {
+          const [ex, ez, eth] = cscEndpoint(st.pos[0], st.pos[2], st.yaw, path);
+          if (Math.hypot(ex, ez) > 0.5 || Math.abs(DD.angleDiff(eth, 0)) > 0.02) continue; // sign-guard
+          if (path.len < 60) continue; // too short to descend/settle
+          const arr = integrateClosure(path, st, targetW);
+          if (closureCollides(arr, samples.length)) continue;
+          const startSample = samples.length;
+          commit(arr, samples.length);
+          for (const s of arr) samples.push(s);
+          const lenReal = arr.length * DS;
+          total += lenReal; dist += lenReal;
+          pieceSpans.push({ name: 'closure', start: startSample, end: samples.length });
+          // closures can run 300-900m — keep respawn gates coming at the usual cadence
+          // (stay clear of the seam: the finish filter needs c < finishIdx - 20)
+          let sinceCkpt = distSinceCkpt;
+          for (let ci = startSample; ci < samples.length - 40; ci++) {
+            sinceCkpt += DS;
+            if (sinceCkpt > nextCkptAt) {
+              ckpts.push(ci);
+              sinceCkpt = 0;
+              nextCkptAt = 340 + rng.range(0, 120);
+            }
+          }
+          closed = true;
+          break outer;
+        }
+      }
+    }
+    if (!closed) {
+      // classic open sprint: closing straight
       const p = builders.straight(); p.len = 70; p.rail = true;
       appendPiece(p, 'straight', false);
     }
@@ -460,7 +622,8 @@
     // --- frames ---
     for (let i = 0; i < samples.length; i++) {
       const s = samples[i];
-      const pNext = (i < samples.length - 1) ? samples[i + 1].p : V.add(s.p, V.sub(s.p, samples[i - 1].p));
+      const pNext = (i < samples.length - 1) ? samples[i + 1].p
+        : (closed ? samples[0].p : V.add(s.p, V.sub(s.p, samples[i - 1].p)));
       let f = V.norm(V.sub(pNext, s.p));
       let r0 = V.norm(V.cross([0, 1, 0], f));
       if (!isFinite(r0[0]) || V.lenSq(r0) < 1e-6) r0 = [1, 0, 0];
@@ -473,7 +636,11 @@
     }
 
     const startIdx = 2;
-    const finishIdx = samples.length - 3;
+    // closed circuits: the finish line IS the start line (one lap = the whole sample loop);
+    // open sprints keep the classic near-the-end finish
+    const finishIdx = closed ? samples.length - 2 : samples.length - 3;
+    // lap count from lap length so total race distance stays in sprint territory
+    const laps = closed ? (dist < 1350 ? 3 : 2) : 1;
 
     // --- detect sharp corners (for signage/beacons) ---
     const corners = [];
@@ -504,6 +671,7 @@
       samples, ds: DS,
       checkpoints: ckpts.filter(c => c > startIdx + 20 && c < finishIdx - 20),
       startIdx, finishIdx,
+      closed, laps,
       length: dist,
       pieceSpans,
       corners,
@@ -518,6 +686,15 @@
     const ss = track.samples;
     const n = ss.length;
     let best = -1, bestD = Infinity;
+    if (track.closed) {
+      // circuits: the search window wraps across the start/finish seam
+      for (let o = -8; o <= 26; o++) {
+        const i = (lastIdx + o + n) % n;
+        const d = V.distSq(ss[i].p, pos);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      return best;
+    }
     const lo = Math.max(0, lastIdx - 8), hi = Math.min(n - 1, lastIdx + 26);
     for (let i = lo; i <= hi; i++) {
       const d = V.distSq(ss[i].p, pos);

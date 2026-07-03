@@ -294,7 +294,10 @@ require('../js/theme.js');
 require('../js/carspec.js');
 require('../js/trackgen.js');
 require('../js/physics.js');
-require('../js/scene.js');
+require('../js/scene-core.js');
+require('../js/scene-decor.js');
+require('../js/scene-car.js');
+require('../js/scene-fx.js');
 
 const DD = globalThis.DD;
 

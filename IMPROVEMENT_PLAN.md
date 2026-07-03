@@ -192,12 +192,20 @@ and review/integration of every drop. Antigravity executes well-specified, test-
 ## Claude-owned (hard problems, architecture, judgment)
 
 - **C1 — Review & integration** of every Antigravity drop (ongoing, see protocol).
-- **C2 — Multilap / closed circuits** (item 11): loop-closure solver in the piece grammar,
-  lap/checkpoint/ghost/medal semantics, HUD `LAP n/m`. Hardest single item in the plan;
-  touches trackgen+physics+game+ghosts at once.
-- **C3 — Terrain & world architecture** (item 9): corridor-safety policy, landform height
-  design, bake redesign, playtest-telemetry hooks. Claude designs + prototypes the generator
-  changes, then splits implementable chunks into new A-briefs.
+- **C2 — Multilap / closed circuits** ✅ CORE LANDED (session 20): Dubins CSC loop closure in
+  trackgen (~55% of seeds are now 2-3-lap circuits; seam gap = one sample, existing open seeds
+  byte-identical via isolated `::loop` rng), lap semantics in physics (`car.lap`/`awaitSeam`,
+  absolute split indices), wrap-aware trackQuery/bot/expert-solver (steady-state modular
+  sweeps — no standing-start zero at the seam), lap-aware ghost delta (`lap*N+idx`) + `LAP n/m`
+  HUD. Drivability test 16 covers it. **Remaining in C2:** trackgen VARIETY (elevation drama,
+  width modulation, surface rhythm, set-piece placement) judged via a bot playtest report;
+  lap-count/length balance with Tibba.
+- **C3 — Terrain & world architecture** (item 9) — NEXT UP (Claude): the height-policy rework
+  is the risky core — corridor-limited basin (the ≥8m-below rule holds only within ~40m of the
+  ribbon), landforms allowed to rise to/above track level beyond it (canyon walls, dune crests,
+  frozen ridges), gap-chasm and jump-flightpath clearance guarantees, deterministic. Claude
+  implements the generator change + safety tests; the COLOR/bake side is already delegated as
+  brief A7 below (parallel-safe: A7 touches only vertex colors, C3 touches only heights).
 - **C4 — Balance calibration with Tibba**: medal factor (0.97 flag above), drift feel tuning
   passes, campaign gating difficulty. Judgment work — numbers move only after human playtests.
 - **C5 — Garage editor deep slices** (item 13): cross-section mode (end-on camera tween +
@@ -205,38 +213,69 @@ and review/integration of every drop. Antigravity executes well-specified, test-
   design. Plus the **garage room art-direction spec** (item 12) — Claude specs it, then the
   build can become an A-brief.
 
-## Antigravity briefs (ready to run, in priority order)
+## Field notes for Antigravity (accumulated from review cycles — READ BEFORE EVERY DROP)
 
-- **A1 — Theme knobs** (item 10): implement `atmosphere: 'aurora'` (2–3 additive scrolling
-  sky bands, camera-following like planet/nebulae, `fog:false`, registered under `DD.GLOW`
-  discipline — no new raw constants) and `'foggy'` (override `fogNear/fogFar` + halo boost on
-  pole lamps); implement `surfaceLook: 'shimmer'` and `'edgelit'` on the ribbon (banded
-  already works; `solid` = explicit no-op). Files: `js/scene.js`, `js/theme.js` (knob docs
-  only — do NOT change palette values; `verify_colors` locks them). Tests: colors, sky_stars,
-  determinism. Visual proof per biome required in the walkthrough.
-- **A2 — Ghost UX polish**: HUD shows WHICH ghost you're racing (small tag near `#hudPB`:
-  "vs PB" / "vs AUTHOR", hidden when ghost=off); `setGhost` change takes effect without a full
-  track reload if cheap (else document that it applies next load); finish screen shows delta
-  vs the raced target. Files: `index.html`, `js/game.js`. Keep `finishRun`'s PB-refresh
-  behavior (session 17) intact.
-- **A3 — Zero-alloc render path** (promoted from Parked — mechanical crunch): module-scope
-  scratch `Matrix4`/`Vector3`/color objects in `DD.poseCar`, `DD.updateShadow`,
-  `DD.updateCamera` (in-place vector helpers allowed in RENDER path only — physics `DD.v`
-  stays pure); cache the per-frame DOM lookups in the game loop (`hudWarn`, `hudSpeed`,
-  `hudGear`, rpm-arc fill, `hudDelta`); reuse one scratch `THREE.Color` for iridescent/boost.
-  ZERO behavior change; all suites must stay green byte-identical.
-- **A4 — Dead code + scene.js split**: delete `js/lib/GLTFLoader.js` (unused since session 12)
-  and `theme.js` `PALETTES`; split `js/scene.js` (~2.9k lines) into `scene-core.js` /
-  `scene-car.js` / `scene-decor.js` / `scene-fx.js` loaded in order from `index.html` (plain
-  script tags, shared closure state must become explicit `DD._sceneShared` or stay in one
-  file — propose the split in the walkthrough BEFORE moving code). Tests + a full visual pass.
-- **A5 — Impact audio**: filtered-noise wall thud + landing whump in `js/audio.js` (synth
-  only, no samples), wired where sparks already fire (`car.hitWall`) and on hard landings
-  (`justLanded`/`suspV` spike), volumes under the existing `sfx` setting. No changes outside
-  `audio.js`/`game.js` wiring lines.
-- **A6 — Sign polish**: arch chevrons currently face one way — add the mirrored glyphs on the
-  back face (same InstancedMesh, +4 instances/sign); check `buildCornerSigns` boards read as
-  powered (same emissive-frame treatment as session 17's arch signs).
+1. **Run the FULL suite after your FINAL edit**, not mid-way: `node tests/drivability.js`,
+   `verify_determinism`, `verify_colors`, `verify_m2_features`, `verify_camera`,
+   `verify_sky_stars`. Sessions 19 & 21 both shipped "all tests pass" claims with crashing
+   tests (stale mocks; deleted-file requires).
+2. **A green suite does not prove the game BOOTS. Launch it** (`npx serve`, open `/`, start a
+   race, reach `play`, check the console) after ANY structural change. Session 21 shipped two
+   loader-killing ReferenceErrors (`CAR_FIN` stranded by the split; `rec` hoisted out of
+   `startTrack`) inside a "done" drop — the game couldn't build a car or leave the loading
+   screen.
+3. **Bump `?v=` cache busters** in `index.html` for every changed js file. 0-for-3 so far —
+   without them Tibba's browser runs your OLD code against NEW html.
+4. **Moving code between the scene files? Move its file-local closure consts too** (or route
+   them through `DD._sceneShared`). Before finishing, grep each identifier you touched:
+   defined-in-file vs used-in-file must match.
+5. **Walkthrough lists every gameplay-affecting line** — the slope-gravity deletion (session
+   18) is the canonical incident. If you changed a number in `DD.PHYS` or removed a term, say
+   so, even if "it seemed unused".
+6. **Tracks can be CLOSED CIRCUITS now** (`track.closed`, `track.laps`, session 20). Any new
+   code that scans `track.samples` forward/backward MUST wrap modulo N when `track.closed`
+   (never bare `Math.min(N-1, i+k)`); progress/ghost indexing is `lap*N + idx`; splits are
+   absolute across laps; `car.awaitSeam` gates the seam handoff — don't fight it.
+7. **New randomness in trackgen = a NEW derived rng stream** (`DD.makeRng(seed + '::yourFeature')`),
+   never an extra draw from the main sequence — existing seeds must keep generating identical
+   tracks (that's how `::loop` was added without disturbing anything).
+8. **Testing URL params:** `npx serve` strips the query string when redirecting
+   `/index.html?x=y` — use `/?x=y`.
+9. **`DD.game` is the live game state** — use it to verify (teleport the car, inspect meshes,
+   force `DD.testMode`/`DD.autodrive` at runtime for bot-driven visual checks). Boot-time
+   `?testMode=true` forces quality LOW — set the flags at runtime when you need full visuals.
 
-_Adding new briefs: Claude writes them here (usually spun out of C2/C3/C5 designs); Tibba can
-also paste any brief-shaped task directly to Antigravity if it fits the protocol invariants._
+## Antigravity briefs
+
+_Done & reviewed: A1 (session 19), A2/A3/A4/A6 (session 21 — with integration fixes; read the
+STATUS entries). Adding new briefs: Claude writes them here; Tibba can also paste any
+brief-shaped task directly if it fits the protocol invariants._
+
+- **A5 (RETRY) — Impact audio**: this brief was reported done but `js/audio.js` was untouched —
+  it is still open. Filtered-noise wall thud + landing whump in `js/audio.js` (synth only, no
+  samples, follow the existing `blip`/noise-bed patterns), wired in `js/game.js` where sparks
+  already fire (`car.hitWall`, scale volume with impact speed) and on hard landings (the
+  `justLanded`/`suspV` path used by the camera kick), volumes under the existing `sfx`
+  setting. No changes outside `audio.js` + the two game.js wiring lines. DoD: field notes 1-3,
+  plus an audible in-game check.
+- **A7 — Terrain color bake v2** (the delegable half of C3; parallel-safe with Claude's height
+  work — touch ONLY vertex colors in `buildTerrain` (`js/scene-decor.js`), never the
+  heightfield): (a) new `DD.TERRAIN_BAKE` tuning table (theme.js, next to `DD.GLOW`) holding
+  every constant you use; (b) raise the bake out of the mud — sun term ~2× (0.55 → ~1.0),
+  ambient floor 0.45 → ~0.7, so terrain reads instead of multiplying to ~0.1 black; (c) real
+  variance: 2-3 octaves of the existing `valueNoise` modulating color (biome-tinted — mix
+  toward `groundDetailColor`), replacing the ±0.04 grain; (d) a subtle radial warm→cool shade
+  with distance from the track AABB centre (pre-computable per vertex, zero runtime cost).
+  Deterministic (seeded noise only). DoD: field notes 1-3 + before/after screenshots of all
+  four biomes (use `/?forceAtmos=clear` and the four CAMP tiers).
+- **A8 — Lap & finish HUD polish**: "FINAL LAP" banner via `#hudWarn` pulse when
+  `car.justLap` fires with `lap === track.laps - 1`; finish screen shows per-lap times on
+  circuits (derive from `car.splits` + lap boundaries — splits are absolute across laps);
+  respect existing dial-in/scramble styling. Files: `js/game.js`, `index.html`. Careful with
+  field note 6.
+- **A9 — Emissive landmark variety** (extends item 10 "then some"): 1-2 new per-biome
+  compositions in `buildEmissiveElements` (`js/scene-decor.js`) — e.g. dune: broken arch
+  pairs; neon: stacked billboard slabs; canyon: leaning shard clusters; frozen: aurora-lit
+  needles. HARD CONSTRAINT: still exactly 2 InstancedMeshes total (vary per-instance matrix
+  composition, not mesh count); flicker keeps using the one shared `userData.mat`; lights only
+  via `addLightSource`. DoD: field notes 1-3 + `DD.debugGL()` draw-call count unchanged ±2.

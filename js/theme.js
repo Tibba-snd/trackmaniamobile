@@ -14,19 +14,6 @@
   }
   DD.hsl = hsl;
 
-  const PALETTES = [
-    { name: 'dusk',     hues: [262, 312, 22],  sat: [0.55, 0.6, 0.85], lit: [0.10, 0.28, 0.62] },
-    { name: 'dawn',     hues: [340, 18, 48],   sat: [0.5, 0.75, 0.9],  lit: [0.16, 0.45, 0.72] },
-    { name: 'abyss',    hues: [222, 200, 178], sat: [0.6, 0.55, 0.7],  lit: [0.06, 0.2, 0.5] },
-    { name: 'neon',     hues: [285, 320, 165], sat: [0.7, 0.9, 1.0],   lit: [0.07, 0.3, 0.55] },
-    { name: 'pastel',   hues: [195, 260, 330], sat: [0.4, 0.45, 0.5],  lit: [0.6, 0.72, 0.82] },
-    { name: 'ember',    hues: [10, 32, 52],    sat: [0.6, 0.8, 0.95],  lit: [0.08, 0.32, 0.6] },
-    { name: 'meadow',   hues: [140, 170, 80],  sat: [0.45, 0.55, 0.7], lit: [0.12, 0.35, 0.65] },
-    { name: 'mono',     hues: [230, 230, 230], sat: [0.12, 0.1, 0.95], lit: [0.07, 0.3, 0.6] }, // 3rd stop = accent
-    { name: 'candy',    hues: [300, 350, 200], sat: [0.6, 0.7, 0.8],   lit: [0.2, 0.5, 0.75] },
-    { name: 'void',     hues: [255, 230, 60],  sat: [0.5, 0.4, 1.0],   lit: [0.04, 0.12, 0.6] }
-  ];
-
   const MOTIFS = ['slabs', 'pillars', 'spheres', 'islands', 'shards', 'mountains'];
   // Atmospheres: clear, foggy (thick haze + streetlight halos), starfield (default star density), aurora (additive scrolling sky bands)
   const ATMOS = ['clear', 'foggy', 'starfield', 'aurora'];

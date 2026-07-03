@@ -313,5 +313,31 @@ console.log('[15] hairpin: drift vs grip');
   check('drift did not spin out', Math.abs(carD.slipR) < 1.0, 'final slipR ' + (carD.slipR * 57.3).toFixed(1) + ' deg');
 }
 
+/* ---- [16] closed circuits: loop closure geometry + multilap completion ---- */
+console.log('[16] closed circuits (multilap)');
+{
+  let closedTrack = null, seedUsed = null;
+  for (let i = 0; i < 30 && !closedTrack; i++) {
+    const t = DD.generateTrack('DRIVLOOP-' + i, 3, 0);
+    if (t.closed && t.overlapForced === 0) { closedTrack = t; seedUsed = 'DRIVLOOP-' + i; }
+  }
+  check('closed circuits generate', !!closedTrack, seedUsed || 'none in 30 seeds');
+  if (closedTrack) {
+    const t = closedTrack;
+    const a = t.samples[t.samples.length - 1].p, b = t.samples[0].p;
+    const seam = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const yawErr = Math.abs(DD.angleDiff(t.samples[t.samples.length - 1].yaw, 0));
+    check('loop seam is one sample step', seam < t.ds * 1.5, 'seam gap ' + seam.toFixed(2) + 'm');
+    check('loop heading closes', yawErr < 0.03, 'yaw err ' + (yawErr * 57.3).toFixed(2) + ' deg');
+    check('circuit runs multiple laps', t.laps >= 2, t.laps + ' laps of ' + Math.round(t.length) + 'm');
+    const bot = DD.runBot(t, { recordFrames: true });
+    check('bot completes all laps', bot.ok && bot.respawns === 0, bot.ok ? (bot.ms + 'ms, ' + bot.respawns + ' respawns') : bot.reason);
+    if (bot.ok) {
+      check('splits cover every lap', bot.splits.length === t.checkpoints.length * t.laps,
+        bot.splits.length + ' splits vs ' + t.checkpoints.length + ' ckpts x ' + t.laps + ' laps');
+    }
+  }
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

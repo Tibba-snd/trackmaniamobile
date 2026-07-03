@@ -286,6 +286,18 @@
     color: rgba(255, 255, 255, 0.62);
     font-variant-numeric: tabular-nums;
   }
+  #hudGhostTag {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 9px;
+    color: #ffbc5f;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 188, 95, 0.15);
+    padding: 1px 4px;
+    border-radius: 3px;
+    display: none;
+  }
   #hudLap {
     font-family: 'Chakra Petch', sans-serif;
     font-size: 11px;
@@ -512,6 +524,9 @@
   #finTime { font-family:'Azeret Mono',monospace; font-size:56px; font-weight:700; letter-spacing:-0.02em; text-shadow:0 0 24px rgba(var(--accent-rgb),0.7); font-variant-numeric:tabular-nums; }
   #finMedal { font-family:'Chakra Petch',sans-serif; font-size:22px; letter-spacing:0.25em; margin:8px 0 2px; font-weight:700; }
   #finPB { font-family:'Azeret Mono',monospace; font-size:13px; opacity:0.65; margin-bottom:4px; font-weight:500; }
+  #finDelta { font-family:'Azeret Mono',monospace; font-size:15px; font-weight:700; margin:4px 0 8px; letter-spacing:-0.01em; display:none; }
+  #finDelta.neg { color:#7bffb3; }
+  #finDelta.pos { color:#ff8d7b; }
   #finSeed { font-family:'Azeret Mono',monospace; font-size:11px; opacity:0.4; letter-spacing:0.15em; margin-bottom:20px; text-transform:uppercase; }
   .finRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
   .finRow button { padding:12px 24px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.3); background:rgba(var(--accent-rgb),0.1); color:#e8e4f5; font-size:14px; letter-spacing:0.1em; cursor:pointer; font-weight:600; transition:all .2s;
@@ -852,6 +867,7 @@
     </div>
     <div class="hud-info-row">
       <div id="hudPB"></div>
+      <div id="hudGhostTag"></div>
       <div id="hudLap">LAP 1/1</div>
     </div>
   </div>
@@ -921,6 +937,7 @@
 <div class="screen overlay" id="finish">
   <div class="card">
     <div id="finTime">0.000</div>
+    <div id="finDelta"></div>
     <div id="finMedal"></div>
     <div id="finPB"></div>
     <div id="finSeed"></div>
@@ -944,12 +961,15 @@
 <script src="js/lib/FXAAShader.js?v=16"></script>
 <script src="js/core.js?v=17"></script>
 <script src="js/theme.js?v=21"></script>
-<script src="js/trackgen.js?v=18"></script>
-<script src="js/physics.js?v=18"></script>
+<script src="js/trackgen.js?v=19"></script>
+<script src="js/physics.js?v=19"></script>
 <script src="js/audio.js?v=15"></script>
 <script src="js/input.js?v=16"></script>
 <script src="js/carspec.js?v=2"></script>
-<script src="js/scene.js?v=51"></script>
-<script src="js/game.js?v=41"></script>
+<script src="js/scene-core.js?v=52"></script>
+<script src="js/scene-decor.js?v=52"></script>
+<script src="js/scene-car.js?v=52"></script>
+<script src="js/scene-fx.js?v=52"></script>
+<script src="js/game.js?v=44"></script>
 </body>
 </html>

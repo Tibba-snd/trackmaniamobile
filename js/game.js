@@ -6,6 +6,15 @@
 
   const $ = (id) => document.getElementById(id);
 
+  let cachedHudWarn = null;
+  let cachedHudSpeed = null;
+  let cachedHudGear = null;
+  let cachedHudSpeedBox = null;
+  let cachedRpmFill = null;
+  let cachedHudDelta = null;
+
+  const scratchColor = new THREE.Color();
+
   const G = DD.game = {
     state: 'menu', // menu | loading | countdown | play | finish
     save: null,
@@ -72,38 +81,99 @@
     } catch (e) { return null; }
   }
 
+  function updateHudGhostTag() {
+    const tag = $('hudGhostTag');
+    if (!tag) return;
+    if (!G.track || !G.racedGhostType || G.racedGhostType === 'off') {
+      tag.style.display = 'none';
+      tag.textContent = '';
+    } else {
+      tag.style.display = 'inline-block';
+      tag.textContent = G.racedGhostType === 'pb' ? 'vs PB' : 'vs AUTHOR';
+    }
+  }
+
+  function updateActiveGhost() {
+    if (!G.track) return;
+    const track = G.track;
+    if (G.ghostMesh) {
+      DD.disposeGroup(G.scene, G.ghostMesh);
+      G.ghostMesh = null;
+    }
+    const rec = G.save.tracks[seedKey(track.seed, track.tier)];
+    const ghostOpt = G.save.settings.ghost || 'pb';
+    let ghostToPlay = null;
+    let racedGhostType = 'off';
+    let racedGhostTime = null;
+
+    if (ghostOpt === 'pb') {
+      if (rec && rec.ghost) {
+        ghostToPlay = decodeGhost(rec.ghost);
+        racedGhostType = 'pb';
+        racedGhostTime = rec.pb;
+      } else if (track.authorGhost) {
+        ghostToPlay = track.authorGhost;
+        racedGhostType = 'author';
+        racedGhostTime = track.medals.author;
+      }
+    } else if (ghostOpt === 'author') {
+      if (track.authorGhost) {
+        ghostToPlay = track.authorGhost;
+        racedGhostType = 'author';
+        racedGhostTime = track.medals.author;
+      }
+    }
+
+    G.racedGhostType = racedGhostType;
+    G.racedGhostTime = racedGhostTime;
+    G.ghostData = ghostToPlay;
+    G.ghostTimes = precomputeGhostTimes(track, G.ghostData);
+
+    if (G.ghostData) {
+      G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
+      G.scene.add(G.ghostMesh);
+    }
+    
+    updateHudGhostTag();
+  }
+
   function precomputeGhostTimes(track, ghostData) {
     if (!ghostData) return null;
-    const len = track.samples.length;
+    const N = track.samples.length;
+    const laps = track.laps || 1;
+    const len = N * laps; // circuits: one slot per sample PER LAP (progress index = lap*N + idx)
     const times = new Float32Array(len).fill(-1);
-    let lastSampleIdx = 0;
+    // walk the ghost tracking UNWRAPPED progress so each lap's pass maps to its own slot.
+    // (This mapper was dead code until now — it read s[0] on sample OBJECTS (undefined → NaN
+    // distances), so every frame "matched" index 0 and the tail-fill extrapolated a constant
+    // pace. The live delta has been a linear approximation since it shipped.)
+    let lastAbs = 0;
     const numFrames = ghostData.length / 4;
-    
+
     for (let fi = 0; fi < numFrames; fi++) {
       const gx = ghostData[fi * 4];
       const gy = ghostData[fi * 4 + 1];
       const gz = ghostData[fi * 4 + 2];
-      
-      let bestIdx = lastSampleIdx;
+
+      let bestOff = 0;
       let minDist = Infinity;
-      const searchStart = Math.max(0, lastSampleIdx - 30);
-      const searchEnd = Math.min(len, lastSampleIdx + 100);
-      
-      for (let si = searchStart; si < searchEnd; si++) {
-        const s = track.samples[si];
-        const dx = gx - s[0];
-        const dy = gy - s[1];
-        const dz = gz - s[2];
-        const d = dx*dx + dy*dy + dz*dz;
+      for (let o = -30; o <= 100; o++) {
+        const abs = lastAbs + o;
+        if (abs < 0 || abs >= len) continue;
+        const s = track.samples[abs % N];
+        const dx = gx - s.p[0];
+        const dy = gy - s.p[1];
+        const dz = gz - s.p[2];
+        const d = dx * dx + dy * dy + dz * dz;
         if (d < minDist) {
           minDist = d;
-          bestIdx = si;
+          bestOff = o;
         }
       }
-      lastSampleIdx = bestIdx;
+      lastAbs = Math.max(0, Math.min(len - 1, lastAbs + bestOff));
       const timeMs = fi * G.recEvery * DD.TICK * 1000;
-      if (times[bestIdx] === -1 || timeMs < times[bestIdx]) {
-        times[bestIdx] = timeMs;
+      if (times[lastAbs] === -1 || timeMs < times[lastAbs]) {
+        times[lastAbs] = timeMs;
       }
     }
     
@@ -197,28 +267,17 @@
       G.shadow = DD.buildShadow();
       G.scene.add(G.shadow);
       // ghost
-      if (G.ghostMesh) { DD.disposeGroup(G.scene, G.ghostMesh); G.ghostMesh = null; }
-      const rec = G.save.tracks[seedKey(seed, tier)];
-      const ghostOpt = G.save.settings.ghost || 'pb';
-      let ghostToPlay = null;
-      if (ghostOpt === 'pb') {
-        ghostToPlay = (rec && rec.ghost) ? decodeGhost(rec.ghost) : (track.authorGhost || null);
-      } else if (ghostOpt === 'author') {
-        ghostToPlay = track.authorGhost || null;
-      }
-      G.ghostData = ghostToPlay;
-      G.ghostTimes = precomputeGhostTimes(track, G.ghostData);
-      if (G.ghostData) {
-        G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
-        G.scene.add(G.ghostMesh);
-      }
+      updateActiveGhost();
       // hud targets
+      // (rec was hoisted into updateActiveGhost by the A2 refactor — redeclare locally or the
+      // whole loader tail dies on a ReferenceError and the game never leaves 'loading')
+      const rec = G.save.tracks[seedKey(seed, tier)];
       $('valAuthor').textContent = DD.formatTime(track.medals.author);
       $('valGold').textContent = DD.formatTime(track.medals.gold);
       $('valSilver').textContent = DD.formatTime(track.medals.silver);
       $('valBronze').textContent = DD.formatTime(track.medals.bronze);
       $('hudPB').textContent = rec && rec.pb ? 'PB ' + DD.formatTime(rec.pb) : '';
-      $('hudLap').textContent = 'LAP 1/1';
+      $('hudLap').textContent = 'LAP 1/' + (track.laps || 1);
       $('hudArch').textContent = track.archetype + ' · ' + track.theme.name;
 
       DD.startPads(track.theme);
@@ -259,6 +318,7 @@
     if (ribbon) ribbon.style.width = '0%';
     G.lastBeep = 4;
     G.prevSlideState = false;
+    $('hudLap').textContent = 'LAP 1/' + ((G.track && G.track.laps) || 1);
     G.driftFlash = 0;
     G.prevSecondsVal = -1;
     G.prevSpeedVal = -1;
@@ -312,18 +372,35 @@
       if (ghostOpt === 'pb') {
         G.ghostData = flat;
         G.ghostTimes = precomputeGhostTimes(track, flat);
+        G.racedGhostType = 'pb';
+        G.racedGhostTime = ms;
         if (!G.ghostMesh) {
           G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
           G.scene.add(G.ghostMesh);
         }
       }
       $('hudPB').textContent = 'PB ' + DD.formatTime(ms);
+      updateHudGhostTag();
     }
 
     DD.engineQuiet();
     DD.sfxFinish(medal);
 
     dialInText($('finTime'), DD.formatTime(ms));
+
+    const finDelta = $('finDelta');
+    if (finDelta) {
+      if (G.racedGhostType !== 'off' && G.racedGhostTime > 0) {
+        const d = ms - G.racedGhostTime;
+        finDelta.textContent = DD.formatDelta(d) + ' vs ' + (G.racedGhostType === 'pb' ? 'PB' : 'AUTHOR');
+        finDelta.className = d <= 0 ? 'neg' : 'pos';
+        finDelta.style.display = 'block';
+      } else {
+        finDelta.style.display = 'none';
+        finDelta.textContent = '';
+      }
+    }
+
     $('finMedal').textContent = medal === 'none' ? 'no medal' : (medal === 'author' ? '◆ AUTHOR' : '● ' + medal.toUpperCase());
     $('finMedal').className = 'md ' + medal;
     $('finPB').textContent = isPB ? (rec.attempts === 1 ? 'first run!' : 'new personal best!') : ('PB ' + DD.formatTime(rec.pb));
@@ -503,7 +580,7 @@
                 void leftBox.offsetWidth;
                 leftBox.classList.add('purple-flash');
               }
-              if (i === G.track.checkpoints.length - 1) {
+              if (i === G.track.checkpoints.length * (G.track.laps || 1) - 1) {
                 const warnEl = $('hudWarn');
                 if (warnEl) {
                   warnEl.textContent = 'FINAL SECTOR';
@@ -518,6 +595,14 @@
               }
             }
           }
+        }
+        if (G.car.justLap) {
+          // circuits: crossed the lap line — bump the LAP counter, chime, sector flash
+          const lapN = G.car.justLap; G.car.justLap = 0;
+          $('hudLap').textContent = 'LAP ' + (lapN + 1) + '/' + (G.track.laps || 1);
+          DD.sfxCheckpoint(0);
+          const lb = $('hudLeftBox');
+          if (lb) { lb.classList.remove('purple-flash'); void lb.offsetWidth; lb.classList.add('purple-flash'); }
         }
         if (G.car.fellOff) {
           G.car.fellOff = false;
@@ -594,7 +679,7 @@
     }
     DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt);
     // off-track / missed checkpoint warnings
-    const warnEl = $('hudWarn');
+    const warnEl = cachedHudWarn;
     if (G.car.missedCkpt) { warnEl.textContent = 'checkpoint missed — respawn (⚑)'; warnEl.style.opacity = 1; }
     else if (G.car.onDirt && G.state === 'play') { warnEl.textContent = 'off track'; warnEl.style.opacity = 0.55; }
     else warnEl.style.opacity = 0;
@@ -603,7 +688,7 @@
     // iridescent shimmer
     if (G.carMesh.userData.iridescent) {
       const h = (t * 0.00012) % 1;
-      G.carMesh.userData.iridescent.emissive = new THREE.Color().setHSL(h, 0.7, 0.25);
+      G.carMesh.userData.iridescent.emissive.copy(scratchColor.setHSL(h, 0.7, 0.25));
       G.carMesh.userData.iridescent.emissiveIntensity = 0.5;
     }
     // car boost glow — pulse the body shell while on a boost pad (consumes car.boostGlow)
@@ -663,7 +748,7 @@
     const speedVal = Math.round(speed * 3.6);
     if (speedVal !== G.prevSpeedVal) {
       G.prevSpeedVal = speedVal;
-      const speedEl = $('hudSpeed');
+      const speedEl = cachedHudSpeed;
       if (speedEl) {
         speedEl.textContent = speedVal;
         speedEl.classList.remove('digit-change');
@@ -671,23 +756,25 @@
         speedEl.classList.add('digit-change');
       }
     }
-    const gearEl = $('hudGear');
-    gearEl.textContent = G.state === 'play' || G.state === 'finish' ? G.car.gear : '·';
-    gearEl.classList.toggle('shift-cut', G.car.shiftCut > 0);
+    const gearEl = cachedHudGear;
+    if (gearEl) {
+      gearEl.textContent = G.state === 'play' || G.state === 'finish' ? G.car.gear : '·';
+      gearEl.classList.toggle('shift-cut', G.car.shiftCut > 0);
+    }
 
     // RPM tach: fill the arc around the gear; redline drives the shift state (red arc + red gear)
-    const speedBox = $('hudSpeedBox');
+    const speedBox = cachedHudSpeedBox;
     if (speedBox && G.car) {
-      const fill = speedBox.querySelector('#hudRpmArc .rpm-fill');
+      const fill = cachedRpmFill;
       if (fill) fill.style.strokeDasharray = (184.3 * DD.clamp(G.car.rpm01, 0, 1)).toFixed(1) + ' 276.46';
       speedBox.classList.toggle('redline', G.car.rpm01 > 0.92 && (G.state === 'play'));
     }
 
     // continuous delta vs the player ghost — shown as a live coloured NUMBER (green ahead / red behind)
-    const deltaEl = $('hudDelta');
+    const deltaEl = cachedHudDelta;
     if (deltaEl && G.state === 'play') {
       if (G.ghostTimes && G.car) {
-        const pIdx = Math.min(G.car.idx, G.ghostTimes.length - 1);
+        const pIdx = Math.min((G.car.lap || 0) * G.track.samples.length + G.car.idx, G.ghostTimes.length - 1);
         const gt = G.ghostTimes[pIdx];
         if (gt > 0 && G.car.time > 250) {
           const d = G.car.time - gt;
@@ -1086,6 +1173,13 @@
 
   /* ---------------- boot ---------------- */
   DD.boot = function () {
+    cachedHudWarn = $('hudWarn');
+    cachedHudSpeed = $('hudSpeed');
+    cachedHudGear = $('hudGear');
+    cachedHudSpeedBox = $('hudSpeedBox');
+    cachedRpmFill = document.querySelector('#hudRpmArc .rpm-fill');
+    cachedHudDelta = $('hudDelta');
+
     const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     DD.testMode = params.get('testMode') === 'true';
     DD.seed = params.get('seed');
@@ -1195,7 +1289,7 @@
     $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); };
     $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
     $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
-    $('setGhost').onchange = (e) => { G.save.settings.ghost = e.target.value; saveSet(); };
+    $('setGhost').onchange = (e) => { G.save.settings.ghost = e.target.value; saveSet(); updateActiveGhost(); };
     function saveSet() { DD.persistSave(G.save); }
 
     // touch controls

@@ -103,6 +103,8 @@
       finished: false,
       missedCkpt: false,
       nextCkpt: 0,
+      lap: 0,
+      awaitSeam: false, // circuits: set after a non-final lap-line crossing until idx wraps
       time: 0,
       splits: [],
       ckptState: null,
@@ -112,7 +114,7 @@
   };
 
   DD.snapshotCheckpoint = function (car) {
-    car.ckptState = { speed: V.len(car.vel), idx: car.idx, nextCkpt: car.nextCkpt };
+    car.ckptState = { speed: V.len(car.vel), idx: car.idx, nextCkpt: car.nextCkpt, lap: car.lap, awaitSeam: car.awaitSeam };
   };
 
   DD.respawnCheckpoint = function (car, track) {
@@ -125,6 +127,8 @@
     car.vel = V.scale(s.f, sp);
     car.idx = idx;
     car.nextCkpt = c ? c.nextCkpt : 0;
+    car.lap = c ? (c.lap || 0) : 0;
+    car.awaitSeam = c ? !!c.awaitSeam : false;
     car.grounded = true; car.onDirt = false; car.slideState = false;
     car.yawRate = 0; car.steerPos = 0; car.airTime = 0; car.missedCkpt = false;
     car.shiftCut = 0; car.suspY = 0; car.suspV = 0;
@@ -169,27 +173,42 @@
     const onRibbon = !gap && Math.abs(lat) <= halfW;
     const onShoulder = !gap && !onRibbon && Math.abs(lat) <= halfW + P.shoulderWidth;
 
-    // ---- checkpoints / finish (gate proximity enforced) ----
+    // ---- checkpoints / finish (gate proximity enforced; circuits add lap semantics) ----
     const cks = track.checkpoints;
-    if (car.nextCkpt < cks.length && car.idx >= cks[car.nextCkpt]) {
-      const g = track.samples[cks[car.nextCkpt]];
-      if (V.dist(car.pos, g.p) < g.w * 1.9) {
-        car.splits.push(Math.round(car.time));
-        car.nextCkpt++;
-        DD.snapshotCheckpoint(car);
-        car.justCkpt = car.nextCkpt;
-        car.missedCkpt = false;
-      } else if (car.idx > cks[car.nextCkpt] + 40) {
-        car.missedCkpt = true;
+    if (car.awaitSeam) {
+      // circuits: just crossed the lap line — hold checkpoint/miss logic until the ribbon
+      // index wraps back past the start seam, so the high pre-seam idx can't false-trigger
+      if (car.idx < 60) car.awaitSeam = false;
+    } else {
+      if (car.nextCkpt < cks.length && car.idx >= cks[car.nextCkpt]) {
+        const g = track.samples[cks[car.nextCkpt]];
+        if (V.dist(car.pos, g.p) < g.w * 1.9) {
+          car.splits.push(Math.round(car.time));
+          car.nextCkpt++;
+          DD.snapshotCheckpoint(car);
+          car.justCkpt = car.splits.length; // absolute split index (lap-safe), 1-based
+          car.missedCkpt = false;
+        } else if (car.idx > cks[car.nextCkpt] + 40) {
+          car.missedCkpt = true;
+        }
       }
-    }
-    if (car.idx >= track.finishIdx) {
-      if (car.nextCkpt >= cks.length) {
-        car.finished = true;
-        car.finalMs = Math.round(car.time);
-        return;
+      if (car.idx >= track.finishIdx) {
+        if (car.nextCkpt >= cks.length) {
+          car.lap++;
+          if (car.lap >= (track.laps || 1)) {
+            car.finished = true;
+            car.finalMs = Math.round(car.time);
+            return;
+          }
+          // next lap: checkpoint cycle restarts once we're across the seam
+          car.nextCkpt = 0;
+          car.awaitSeam = true;
+          car.justLap = car.lap; // consumed by the HUD (LAP n/m + chime)
+          DD.snapshotCheckpoint(car);
+        } else {
+          car.missedCkpt = true;
+        }
       }
-      car.missedCkpt = true;
     }
 
     // ---- ground resolution: ribbon > terrain > air ----
@@ -482,14 +501,20 @@
   function buildExpertData(track) {
     const ss = track.samples;
     const N = ss.length;
+    const closed = !!track.closed;
+    // circuits wrap every scan/neighbor across the start/finish seam
+    const wr = (i) => closed ? ((i % N) + N) % N : Math.min(N - 1, Math.max(0, i));
 
     // 1. Precompute Racing Line
     const offsets = new Float32Array(N);
     const iterations = 100;
+    const relaxLo = closed ? 0 : track.startIdx + 1;
+    const relaxHi = closed ? N : track.finishIdx;
     for (let iter = 0; iter < iterations; iter++) {
-      for (let i = track.startIdx + 1; i < track.finishIdx; i++) {
-        const prev = V.addS(V.clone(ss[i-1].p), ss[i-1].r, offsets[i-1]);
-        const next = V.addS(V.clone(ss[i+1].p), ss[i+1].r, offsets[i+1]);
+      for (let i = relaxLo; i < relaxHi; i++) {
+        const im = wr(i - 1), ip = wr(i + 1);
+        const prev = V.addS(V.clone(ss[im].p), ss[im].r, offsets[im]);
+        const next = V.addS(V.clone(ss[ip].p), ss[ip].r, offsets[ip]);
         const target = V.scale(V.add(prev, next), 0.5);
         const toTarget = V.sub(target, ss[i].p);
         const w = V.dot(toTarget, ss[i].r);
@@ -503,16 +528,21 @@
         const kickerBuffer = 8;
         const gapBuffer = 8;
 
-        for (let j = i; j < Math.min(N, i + 15); j++) {
-          if (j - i < iceBuffer && ss[j].surf === DD.SURF.GLASS) isIce = true;
-          if (j - i < kickerBuffer && ss[j].pieceName === 'kicker') isKicker = true;
-          if (j - i < gapBuffer && ss[j].gap) isGap = true;
+        for (let o = 0; o < 15; o++) {
+          const j = closed ? wr(i + o) : i + o;
+          if (!closed && j >= N) break;
+          const sj = ss[j];
+          if (o < iceBuffer && sj.surf === DD.SURF.GLASS) isIce = true;
+          if (o < kickerBuffer && sj.pieceName === 'kicker') isKicker = true;
+          if (o < gapBuffer && sj.gap) isGap = true;
         }
 
         let limit = ss[i].w * 0.35;
         if (isIce || isKicker || isGap) {
           limit = 0; // force centerline on/before dangerous features
         }
+        // circuits: pin the line to center through the seam so laps hand over seamlessly
+        if (closed && (i < track.startIdx + 6 || i > N - 8)) limit = 0;
 
         offsets[i] = DD.clamp(w, -limit, limit);
       }
@@ -526,22 +556,24 @@
 
     // Use Centerline Curvature for the Speed Solver (for safety)
     const curvatures = new Float32Array(N);
-    for (let i = 1; i < N - 1; i++) {
-      curvatures[i] = Math.abs(DD.angleDiff(ss[i-1].yaw, ss[i].yaw)) / track.ds;
+    for (let i = closed ? 0 : 1; i < (closed ? N : N - 1); i++) {
+      curvatures[i] = Math.abs(DD.angleDiff(ss[wr(i - 1)].yaw, ss[i].yaw)) / track.ds;
     }
 
-    // 2. Precompute Target Speeds
-    const botSpeeds = new Float32Array(N);
-    botSpeeds[N-1] = P.vmax;
-
-    // Backward pass
-    for (let i = N - 2; i >= 0; i--) {
+    // 2. Precompute Target Speeds — corner-limit table first, then constraint sweeps
+    const nearIceAt = (i) => {
+      for (let o = 0; o < 15; o++) {
+        const j = closed ? wr(i + o) : i + o;
+        if (!closed && j >= N) break;
+        if (ss[j].surf === DD.SURF.GLASS) return true;
+      }
+      return false;
+    };
+    const gmulAt = (i) => ss[i].surf === DD.SURF.GLASS ? P.glassGripMul : (ss[i].surf === DD.SURF.DIRT ? P.dirtGripMul : 1.0);
+    const vCornerAt = (i) => {
       const curv = curvatures[i];
-      const isGlass = ss[i].surf === DD.SURF.GLASS;
-      const isDirt = ss[i].surf === DD.SURF.DIRT;
-      const gmul = isGlass ? P.glassGripMul : (isDirt ? P.dirtGripMul : 1.0);
-
-      let vCorner = isGlass ? 46 : P.vmax;
+      const gmul = gmulAt(i);
+      let vCorner = ss[i].surf === DD.SURF.GLASS ? 46 : P.vmax;
       if (curv > 1e-4) {
         const rad = (1 / curv) * (1 + Math.abs(ss[i].bank) * 0.9);
         const bankBonus = 1 + Math.abs(ss[i].bank) * 0.9;
@@ -551,36 +583,40 @@
         const gripCombined = gripMech + df;
         vCorner = Math.min(vCorner, Math.sqrt(gripCombined * bankBonus * gmul * 1.05 * rad));
       }
+      if (nearIceAt(i)) vCorner = Math.min(vCorner, 18);
+      return vCorner;
+    };
 
-      // Slow down proactively if approaching ice
-      let nearIce = false;
-      for (let j = i; j < Math.min(N, i + 15); j++) {
-        if (ss[j].surf === DD.SURF.GLASS) { nearIce = true; break; }
+    const botSpeeds = new Float32Array(N);
+    if (closed) {
+      // circuits: steady-state solve around the loop — two modular sweeps each way; the seam
+      // speed must be continuous (lap 2 arrives flying), so there is NO standing-start zero
+      for (let i = 0; i < N; i++) botSpeeds[i] = vCornerAt(i);
+      for (let k = 2 * N - 1; k >= 0; k--) {
+        const i = k % N, nx = (i + 1) % N;
+        const maxDecel = P.brakeDec * gmulAt(i) * 0.90;
+        botSpeeds[i] = Math.min(botSpeeds[i], Math.sqrt(botSpeeds[nx] * botSpeeds[nx] + 2 * maxDecel * track.ds));
       }
-      if (nearIce) {
-        vCorner = Math.min(vCorner, 18);
+      for (let k = 0; k < 2 * N; k++) {
+        const i = k % N, pv = (i - 1 + N) % N;
+        const maxAccel = 16 * gmulAt(i);
+        botSpeeds[i] = Math.min(botSpeeds[i], Math.sqrt(botSpeeds[pv] * botSpeeds[pv] + 2 * maxAccel * track.ds));
       }
-
-      const maxDecel = P.brakeDec * gmul * 0.90;
-      botSpeeds[i] = Math.min(vCorner, Math.sqrt(botSpeeds[i+1] * botSpeeds[i+1] + 2 * maxDecel * track.ds));
-    }
-
-    // Forward pass
-    botSpeeds[0] = 0;
-    for (let i = 1; i < N; i++) {
-      const isGlass = ss[i].surf === DD.SURF.GLASS;
-      const isDirt = ss[i].surf === DD.SURF.DIRT;
-      const gmul = isGlass ? P.glassGripMul : (isDirt ? P.dirtGripMul : 1.0);
-      const maxAccel = 16 * gmul;
-      botSpeeds[i] = Math.min(botSpeeds[i], Math.sqrt(botSpeeds[i-1] * botSpeeds[i-1] + 2 * maxAccel * track.ds));
+    } else {
+      botSpeeds[N - 1] = P.vmax;
+      for (let i = N - 2; i >= 0; i--) {
+        const maxDecel = P.brakeDec * gmulAt(i) * 0.90;
+        botSpeeds[i] = Math.min(vCornerAt(i), Math.sqrt(botSpeeds[i + 1] * botSpeeds[i + 1] + 2 * maxDecel * track.ds));
+      }
+      botSpeeds[0] = 0;
+      for (let i = 1; i < N; i++) {
+        const maxAccel = 16 * gmulAt(i);
+        botSpeeds[i] = Math.min(botSpeeds[i], Math.sqrt(botSpeeds[i - 1] * botSpeeds[i - 1] + 2 * maxAccel * track.ds));
+      }
     }
 
     for (let i = 0; i < N; i++) {
-      let nearIce = false;
-      for (let j = i; j < Math.min(N, i + 15); j++) {
-        if (ss[j].surf === DD.SURF.GLASS) { nearIce = true; break; }
-      }
-      const floor = nearIce ? 18 : 22;
+      const floor = nearIceAt(i) ? 18 : 22;
       botSpeeds[i] = DD.clamp(botSpeeds[i], floor, P.vmax);
     }
 
@@ -599,7 +635,8 @@
     const N = ss.length;
 
     const vT = data.botSpeeds[idx];
-    const aimI = Math.min(N - 1, idx + 3 + Math.floor(speed * 0.14));
+    const aimRaw = idx + 3 + Math.floor(speed * 0.14);
+    const aimI = track.closed ? aimRaw % N : Math.min(N - 1, aimRaw);
 
     const targetPos = data.positions[aimI];
 
@@ -628,8 +665,10 @@
   DD.runBot = function (track, opts) {
     opts = opts || {};
     const car = DD.createCar(track);
-    const maxTicks = (opts.maxSeconds || 200) * 60;
-    let stuckTicks = 0, lastIdx = 0;
+    const laps = track.laps || 1;
+    const maxTicks = (opts.maxSeconds || 120 + 110 * laps) * 60;
+    const n = track.samples.length;
+    let stuckTicks = 0, lastProgress = 0;
     const recordFrames = !!opts.recordFrames;
     const frames = recordFrames ? [] : null;
 
@@ -653,8 +692,10 @@
         };
       }
       if (t % 120 === 0) {
-        if (car.idx <= lastIdx + 2) stuckTicks++; else stuckTicks = 0;
-        lastIdx = car.idx;
+        // lap-aware progress so the seam wrap (idx n-1 → 0) never reads as "stuck"
+        const progress = (car.lap || 0) * n + car.idx;
+        if (progress <= lastProgress + 2) stuckTicks++; else stuckTicks = 0;
+        lastProgress = progress;
         if (stuckTicks > 5) return { ok: false, reason: 'stuck', at: car.idx, frames: null };
       }
     }

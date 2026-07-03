@@ -209,6 +209,75 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — A2/A3/A4/A6 landed (Antigravity impl, Claude review + 2 crash fixes); A5 NOT done (2026-07-03, session 21)
+
+Antigravity dropped briefs A2–A6 on top of the (then-uncommitted) C2 work. Review verdict:
+
+- **A2 ghost UX** ✓ — `#hudGhostTag` ("vs PB"/"vs AUTHOR") next to the delta, `updateActiveGhost()`
+  refactor, live `setGhost` switching. ⚠️ **The refactor broke the game loader**: it hoisted
+  `const rec` out of `startTrack`'s tail into `updateActiveGhost()`, leaving a dead `rec` reference
+  → ReferenceError inside the load `setTimeout` → the game NEVER left the loading screen. Fixed
+  (redeclared locally).
+- **A3 zero-alloc render path** ✓ — module-scope scratch Matrix4/Vector3s in pose/shadow, `DD._ip*`
+  in-place vector helpers (render path only — physics `DD.v` untouched, verified), cached HUD DOM
+  refs. All suites byte-identical green.
+- **A4 scene split + dead code** ✓ structure — `scene.js` (3,042 lines) → `scene-core/decor/car/fx`
+  with a proper `DD._sceneShared` registry (col/textures), `js/lib/GLTFLoader.js` (3,629 lines) and
+  `theme.js` `PALETTES` deleted. ⚠️ **The split stranded `CAR_FIN` + the `_box/_cyl/_tor/_sph/_mesh/
+  _stdMat` helpers in scene-core's closure while every user lives in scene-car → `buildCar` threw
+  ReferenceError = no car, game unplayable.** Moved to scene-car (fixed). Also: `verify_m2_features`/
+  `verify_camera` still required the deleted `../js/scene.js` (fixed → the four files in index
+  order), and **no cache busters were bumped** (fixed: scene-* v52, game v44).
+- **A6 sign backs** ✓ — mirrored back-face chevrons (10 instances/sign), corner boards checked.
+- **A5 impact audio** ✗ **NOT IMPLEMENTED** — `js/audio.js` untouched, no thud/whump anywhere.
+  Re-briefed (see IMPROVEMENT_PLAN.md).
+
+Verified end-to-end after fixes: full suite green (drivability 38, m2 18, camera 21, determinism,
+colors, sky) AND a live circuit race boots → "vs AUTHOR" tag + REAL pace-based delta (the fixed
+mapper reads ±0.07s tight vs the author schedule) + LAP 1/2 + medal tower. **Protocol lesson #3
+(added to the plan's field notes): a green test suite does not prove the game BOOTS — launch it.
+Both crash bugs shipped inside "all tests pass" claims.**
+
+## Resolved this pass — C2: closed circuits + multilap (2026-07-02, session 20)
+
+Closes the core of `IMPROVEMENT_PLAN.md` item 11 (Claude-owned C2). **~55% of seeds now generate
+CLOSED CIRCUITS raced over 2-3 laps**; the rest stay point-to-point sprints. Existing open-track
+seeds generate byte-identically (the loop decision draws from an isolated `seed+'::loop'` rng).
+
+- **Loop closure** (`js/trackgen.js`): after ~62%-budget grammar (loop tracks get a shorter per-lap
+  budget), a **Dubins CSC solver** (arc–straight–arc over deterministic radius candidates
+  85/60/115/72/140/50) routes back to the origin state; every variant is verified against its own
+  closed form (sign-guard) before use; vertical closure = per-step glide-slope controller to y=4
+  (|pitch| ≤ 0.135); two-pass integration cancels yaw drift, a linear shear lands the final sample
+  EXACTLY one DS before samples[0] (seam gap 2.00m, yaw err 0.00° across all test seeds).
+  Closure-aware occupancy check (start region exempt — it's the destination); mid-track collision
+  → next radius → fall back to open sprint. Checkpoints continue through the closure at normal
+  cadence. `track.closed`, `track.laps` (2, or 3 under 1350m), `finishIdx = N-2` (the start line).
+- **Lap semantics** (`js/physics.js`): `car.lap` + `car.awaitSeam` (after a non-final lap-line
+  crossing, checkpoint/miss logic holds until idx wraps past the seam — prevents false
+  missed-checkpoint from the high pre-seam index); `car.justCkpt` is now the ABSOLUTE split index
+  (lap-safe; single-lap value unchanged); lap crossings snapshot for respawn (lap + awaitSeam
+  restored); `car.justLap` event for the HUD. `DD.trackQuery` wraps its search window on circuits.
+- **Bot on circuits** (`js/physics.js`): expert data is seam-aware — racing-line relaxation +
+  hazard scans wrap; the speed solver runs 2× modular sweeps with NO standing-start zero (lap 2
+  arrives at the seam flying); line pinned to center through the seam. `runBot` uses lap-aware
+  progress for stuck detection and scales its time budget by laps. Author ghosts record through
+  all laps automatically (existing time-indexed playback needs no change).
+- **HUD/ghost** (`js/game.js`): `LAP n/m` live (init + resetRun + `justLap` chime/flash);
+  continuous delta indexes `lap*N + idx`; **fixed a latent bug**: `precomputeGhostTimes` read
+  `s[0]` on sample objects (undefined → NaN) so every frame "matched" index 0 and the tail-fill
+  extrapolated constant pace — the live delta has been a linear approximation since session 7.
+  Now a real per-lap nearest-sample walk (`s.p[…]`), so deltas reflect actual pace.
+- **Tests**: new drivability [16] (closure generates; seam 1-step; heading closes; laps ≥ 2; bot
+  completes all laps with 0 respawns; splits == ckpts × laps) — **38/38**; determinism, colors,
+  m2, camera, sky all green. Campaign seeds validated: mix of sprints and circuits (T1-05 is a
+  3-lap 1336m circuit; T4-03 a 2-lap 2712m one), author ghosts full-length. Verified live in
+  browser: LAP 1/2 → lap-line rollover → LAP 2/2 → checkpoints cycle → finish at 2/2; lap-indexed
+  delta live; zero console errors. Cache busters: `trackgen v19, physics v19, game v42`.
+- **Still open from item 11** (next C2 slice): trackgen VARIETY (elevation drama pieces, width
+  modulation, surface rhythm, set-piece placement) judged via a bot playtest report; balance pass
+  on lap counts/lengths with Tibba.
+
 ## Resolved this pass — A1 theme knobs landed (Antigravity impl, Claude review + fixes) (2026-07-02, session 19)
 
 Antigravity's A1 drop (brief in `IMPROVEMENT_PLAN.md`): all four dead theme knobs now render —
