@@ -4,6 +4,11 @@ _Living doc of every active Antigravity brief. Claude (orchestrator) specs + rev
 executes one brief per drop, uncommitted, in the main checkout. Read this top-to-bottom before
 every drop. Status legend: 🔴 open · 🟡 in-progress · 🟢 landed · ⚪ deferred._
 
+> **→ Antigravity: read [`ANTIGRAVITY.md`](ANTIGRAVITY.md) first, every drop.** It's your standing
+> instructions + file map + rules, and its **KNOWLEDGE BASE** section grows after each review with
+> distilled tips. Newest entries at the top — scan them before you start editing. This file is just
+> your task queue; `ANTIGRAVITY.md` is your home.
+
 **Branch layout (2026-07-04):**
 - `baseline-v1` — **frozen playable version**, current game BEFORE the C4 balance pass. Never commit here. `git checkout baseline-v1` to see/play the pre-C4 game.
 - `c4-work` — **active branch**, all C4 + campaign work. You are here.
