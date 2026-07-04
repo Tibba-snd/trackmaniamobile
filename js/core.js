@@ -103,13 +103,34 @@
 
   // ---- storage ----
   const SAVE_KEY = 'driftdream_v1';
+  // Bump when campaign tracks change in a way that invalidates old PBs/medals (re-rolled layouts,
+  // width reworks, etc). The migration wipes campaign track records so they re-derive on the new
+  // tracks; garage/settings/daily+random PBs are preserved.
+  const SAVE_VER = 2;
   DD.loadSave = function () {
+    let save;
     try {
       const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(SAVE_KEY) : null;
-      if (raw) return JSON.parse(raw);
+      if (raw) save = JSON.parse(raw);
     } catch (e) { /* corrupted */ }
-    // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
-    return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now() } };
+    if (!save) {
+      // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
+      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now(), ver: SAVE_VER } };
+    }
+    // Migration: if the save predates this SAVE_VER, clear campaign track records (PBs/medals/
+    // ghosts/author) so they re-derive against the new tracks. Daily/random PBs are keyed by their
+    // own seeds and stay valid.
+    if (!save.meta) save.meta = {};
+    if (save.meta.ver !== SAVE_VER) {
+      if (save.tracks) {
+        for (const k of Object.keys(save.tracks)) {
+          if (k.indexOf('CAMP-') === 0) delete save.tracks[k];
+        }
+      }
+      save.meta.ver = SAVE_VER;
+      DD.persistSave(save);
+    }
+    return save;
   };
   DD.persistSave = function (save) {
     if (DD.testMode) return;

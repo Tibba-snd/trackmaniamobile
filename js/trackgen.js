@@ -31,9 +31,13 @@
 
   function makePieces(rng, tier) {
     const t01 = (tier - 1) / 4;
-    const wBase = DD.lerp(13.5, 9, t01);
+    // T1: wider tracks for creative driving. Old 13.5->9 left tight T5 corners as narrow as
+    // 7.2m (9*0.8) — drifting a rear-end-out at 250 km/h hit the fence almost every corner.
+    // New 20->14 with a higher wVar floor (0.92) keeps the tier skill curve (T1 widest, T5
+    // tighter) while giving every piece enough runoff to drift through.
+    const wBase = DD.lerp(20, 14, t01);
     const sharp = DD.lerp(0.75, 1.25, t01);
-    const wVar = () => wBase * rng.range(0.8, 1.35);
+    const wVar = () => wBase * rng.range(0.92, 1.35);
 
     return {
       straight: () => {
@@ -47,7 +51,8 @@
       },
       hairpin: () => {
         const dir = rng.sign(), ang = rng.range(2.4, 3.1), rad = rng.range(24, 40) / sharp;
-        const len = ang * rad, w = wVar() * 1.25;
+        // T1: hairpins get extra runoff (1.25 -> 1.45) for drift entry/exit.
+        const len = ang * rad, w = wVar() * 1.45;
         return { name: 'hairpin', len, fn: () => ({ curv: dir / rad, pitchT: 0, bankT: 0, widthT: w }) };
       },
       tighten: () => {
@@ -116,7 +121,9 @@
       },
       wallride: () => {
         const dir = rng.sign(), rad = rng.range(60, 120) / sharp, ang = rng.range(0.8, 1.6);
-        const len = ang * rad, w = wBase * rng.range(0.7, 0.85);
+        // T1: wallride was NARROWER than normal (0.7-0.85x) — backwards for a commitment piece.
+        // Wider (1.05-1.2x) so you have room. (T8 adds real banking on top of this width.)
+        const len = ang * rad, w = wBase * rng.range(1.05, 1.2);
         return { name: 'wallride', len, fn: () => ({ curv: dir / rad, pitchT: 0, bankT: 0, widthT: w, wall: 1 }) };
       },
       weave: () => {
