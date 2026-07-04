@@ -208,8 +208,22 @@ and review/integration of every drop. Antigravity executes well-specified, test-
   invariants. **Remaining in C3:** A7 (color bake — Antigravity, note the larger height range),
   landform-aware decor placement polish (emissive elements on slopes), and Tibba's per-biome
   taste pass on the RISE numbers.
-- **C4 — Balance calibration with Tibba**: medal factor (0.97 flag above), drift feel tuning
-  passes, campaign gating difficulty. Judgment work — numbers move only after human playtests.
+- **C4 — Balance calibration with Tibba** — broken into four slices (2026-07-04):
+  - **C4a — Impact audio** → delegated as **A11** (Antigravity): the A5 sounds fire but are
+    gated too strictly (`speed > 10`, `prevVelY < -2`) and masked by the engine. Brief in BRIEFS.md.
+  - **C4b — Drift feel** ✅ **LANDED** (Claude, session 24): honest-model retune. Root cause was
+    velocity-follows-heading coupling at a flat 2.2/s vs grip's 12/s — nose rotated in but velocity
+    plowed ~16m wide at 35 m/s. Fix: speed-scaled `driftCouplingLo 7.0 / driftCouplingHi 3.5` +
+    scrub trim 0.5/0.22 → 0.38/0.16. New test 15 (steady-state radius) proves the crossover: at
+    ~25 m/s drift is now tighter than grip (33m vs 37.6m) — drift is a genuine cornering tool.
+  - **C4c — Bot speed + medals** ✅ **LANDED** (Claude, session 24): the expert solver budgeted
+    only (gripF+gripR)*0.5 ≈ 1.66g while the player's grip regime allows ~3g — bot cornered at
+    ~0.74× human speed, medals trivial. Fix: solver gripAvail 0.5 → 0.90 of (gripF+gripR); medals
+    author = bot×1.00, gold/silver/bronze 1.08/1.20/1.45 (was 0.97/1.10/1.25/1.55). New test 18
+    locks it (bot 48.5 m/s vs grip-limit 47.2 m/s at R=80m). **Final medal numbers await Tibba
+    playtests** — the bot-speed fix is defect correction, the tier spreads are judgment.
+  - **C4d — Campaign rework** → delegated as **A12/A13/A14** (Antigravity): flow fixes + track
+    caching / UI rebuild + gamification / polish. Briefs in BRIEFS.md.
 - **C5 — Garage editor deep slices** (item 13): cross-section mode (end-on camera tween +
   `profile` primitive + 2D-outline-equals-3D-viewport editing), add/remove-parts interaction
   design. Plus the **garage room art-direction spec** (item 12) — Claude specs it, then the

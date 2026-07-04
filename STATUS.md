@@ -209,6 +209,49 @@ All automated headless tests pass. Visual framing has been regenerated via CDP s
    - **RPM Breathing Glow**: Synced `#hudSpeedBox` border and shadow glow intensity to engine RPM and breathed dynamically at RPM-dependent frequencies.
    - **Flashes & PB Celebrations**: Checkpoint splits trigger a purple sector flash. Crossing the final checkpoint triggers a centered "FINAL SECTOR" pulse. Beating the personal best flashes the finish screen and rotates a golden/pink color gradient around the finish stats card.
 
+## Resolved this pass — C4 balance pass (drift + bot/medals) + collaboration scaffold (2026-07-04, session 24)
+
+**Branch layout change:** work now lives on `c4-work` (active); `baseline-v1` is a frozen branch at
+the pre-C4 commit (`8df94c5`) for playing the old version; `master` is untouched. New collaboration
+docs: `BRIEFS.md` (active Antigravity briefs A11–A14 + opportunistic O1–O8), `ANTIGRAVITY.md`
+(Antigravity's standing instructions + knowledge base).
+
+**C4b — Drift honest-model retune** (Claude-owned physics). Verified root cause: the velocity-
+follows-heading coupling was a flat 2.2/s while grip couples at 12/s — ~5× slower — so the nose
+rotated in fast (`driftYawAuthority 5.5`) but the velocity vector took ~0.45s to follow, plowing
+~16m wide at 35 m/s (the reported "looks good but understeers, hits the wall"). Fix preserves the
+slip model (no arcade bonus layer):
+- `driftCoupling` (flat 2.2) → **speed-scaled** `driftCouplingLo 7.0` / `driftCouplingHi 3.5`
+  (lerp by speed/40). Low speed tightens the line; high speed keeps some slip for the visual +
+  skill commitment. Still < grip's 12, so drift stays a choice.
+- scrub coefficients 0.5/0.22 → **0.38/0.16** so mid-speed drift (30–42 m/s, below `sdBoost`)
+  isn't purely punitive now that coupling genuinely tightens.
+- **Test 15 rewritten** from a misleading nose-rotation test to a steady-state-radius test
+  (controller-independent): at 15 m/s grip is tighter (3.7m vs 22m — guards against drift OP); at
+  the **~25 m/s crossover drift is tighter** (33m vs 37.6m) — drift is now a genuine cornering tool.
+
+**C4c — Bot grip budget + medal retune** (Claude-owned physics). Verified root cause: the expert
+speed solver budgeted only `(gripF+gripR)*0.5 = 15.5` (~1.66g) lateral per corner, while the
+player's grip regime allows `~0.95*(gripF+gripR) ≈ 29 m/s²` (~3g) — so the bot cornered at
+**~0.74× human speed** and every medal was trivial (`author = bot×0.97` on a slow bot).
+- solver `gripAvail`: `(gripF+gripR)*0.5` → **`(gripF+gripR)*0.90`** (90% of what the player's grip
+  regime can use — fast, with a hair of margin). Downforce folded in consistently; the old 1.05
+  fudge factor removed (it compensated for the too-low budget).
+- medals: `author = bot×1.00` (bot IS the reference lap, now near-optimal); gold/silver/bronze
+  **1.08/1.20/1.45** (was 1.10/1.25/1.55). **Final numbers await Tibba playtests** — bot-speed is
+  defect correction, tier spreads are judgment.
+- **Test 18 added** — locks the fix: bot corner speed at R=80m is 48.5 m/s vs the grip-limit
+  prediction 47.2 m/s (within 3%), clearly above the old buggy 35.2 m/s.
+- **Quantified:** circuit test 16 lap time 80.7s → 71.4s (~11.5% faster, exactly what raising the
+  grip budget predicts). Bot still completes all tracks 0-respawn.
+
+**Open C4 slices:** C4a (impact audio → A11, Antigravity WIP in tree), C4d (campaign rework →
+A12/A13/A14, Antigravity started — `#finReplay` button added). **Judgment awaiting Tibba:** drift
+crossover feel, final medal tier spreads (playtest both).
+
+**Suite green:** drivability **43/43** (was 41; +test 18), determinism, colors, m2 18, camera 21,
+sky. Cache busters: `physics v21`.
+
 ## Resolved this pass — A5/A7/A8/A9/A10 reviewed & verified (2026-07-03, session 23)
 
 **Provenance note first:** Antigravity's five-brief drop landed in the working tree DURING
@@ -715,9 +758,11 @@ is 0, the scene renders with full materials. Pre-existing, not a regression.
 ## Gotchas for whoever continues
 
 - **This IS a git repo (since 2026-07-01).** Use `git status`/`git diff`/`git log` to inspect
-  unexpected changes (multiple AI tools edit this folder). Note the branch layout: session work may
-  live on feature branches (e.g. `garage-editor-fixes-session16`) ahead of `master` — check
-  `git branch -av` before assuming `master` is current.
+  unexpected changes (multiple AI tools edit this folder). **Branch layout (2026-07-04):**
+  `c4-work` = active (C4 balance + campaign work, sessions 24+); `baseline-v1` = frozen playable
+  version at the pre-C4 commit (`8df94c5`); `master` = untouched trunk. Older session work lives on
+  `garage-editor-fixes-session16` (sessions 15–23). Always `git status` before staging — the
+  two-agent workflow (Claude + Antigravity) means Antigravity's uncommitted WIP may be in the tree.
 - **Determinism is load-bearing.** `core`/`theme`/`trackgen`/`physics` must stay Three-free and
   must not introduce `Math.random` in any path that affects race outcome or golden screenshots
   (particles use a deterministic trig-hash for exactly this reason).

@@ -145,14 +145,46 @@ while working, post a 🟠 FLAG — **flag it, don't fix it** (the protocol rule
 ## 6. Your first action, every drop
 
 1. `git status` — confirm you're on `c4-work` with a clean tree (or understand what's already there).
-2. Read **this file** top-to-bottom (especially the [KNOWLEDGE BASE](#knowledge-base) — it changes).
-3. Read `BRIEFS.md` — pick the lowest-numbered 🔴 open critical brief (A11 before A12 before …), or
+2. **Check [`INBOX.md`](INBOX.md)** for replies to your threads or new messages addressed to you
+   (§7). This is how Claude answers your BLOCKER/QUESTION, and how Tibba or Claude may reach you.
+3. Read **this file** top-to-bottom (especially the [KNOWLEDGE BASE](#knowledge-base) — it changes).
+4. Read `BRIEFS.md` — pick the lowest-numbered 🔴 open critical brief (A11 before A12 before …), or
    an opportunistic O# if Claude flagged the critical path as blocked.
-4. Read the relevant `.agents/skills/<subsystem>/SKILL.md` for any subsystem you'll touch.
-5. Implement, staying strictly inside the brief's scope.
-6. Run the DoD checklist (§4 above). Capture the verification artifact.
-7. Write the walkthrough (every gameplay-affecting line). Leave it uncommitted.
-8. **Stop.** Do not commit. Do not start a second brief. Wait for Claude's review.
+5. Read the relevant `.agents/skills/<subsystem>/SKILL.md` for any subsystem you'll touch.
+6. Implement, staying strictly inside the brief's scope.
+7. Run the DoD checklist (§4 above). Capture the verification artifact.
+8. Write the walkthrough (every gameplay-affecting line). Leave it uncommitted.
+9. **Stop.** Do not commit. Do not start a second brief. Wait for Claude's review.
+
+---
+
+## 7. Talking to the team — `INBOX.md`
+
+You're not working in a vacuum. [`INBOX.md`](INBOX.md) is the team's async message board — file-based,
+so it survives across your sessions (you're fresh-context each drop; a live chat wouldn't). Check it
+at the **start** (for replies) and **end** (to post) of every drop.
+
+**When to post, by tag:**
+
+| Tag | Use it when | Stop work? |
+|------|-------------|------------|
+| **🚫 BLOCKER** | You genuinely can't proceed without a decision/answer. Name the exact `file:line` and what you need. | **Yes — stop, post, wait.** |
+| **❓ QUESTION** | You need a call but can continue with a safe assumption meanwhile. Note the assumption in your walkthrough. | No — keep going. |
+| **🟠 FLAG** | You spotted an out-of-scope bug, smell, or latent issue. **Flag it, don't fix it** (protocol). | No. |
+| **👀 NEEDS EYES** | A taste/visual call needs a human look — attach/describe the screenshot, say what decision you need. | Only if the brief can't proceed without the call. |
+| **📢 FYI / NOTE** | One-way info: "I refactored X", "Heads-up, Y changed", "Heads-up, Z is broken." | No. |
+
+**Format and lifecycle** are documented at the top of `INBOX.md` itself — read that once and follow
+it. Replies come back as indented `↳` lines under your message; resolved threads move to the bottom.
+
+**Rules of the road:**
+- BLOCKER is the **only** tag that justifies stopping mid-drop. For everything else, post and keep
+  moving — a dropped brief costs more than a recorded uncertainty.
+- One topic per message. Don't bundle.
+- Be concrete: `file:line`, exact value, the decision you need. "Is this ok?" without context will
+  get bounced back to you.
+- You can address Claude (`→ @Claude`), Tibba (`→ @Tibba`), or all (`→ @all`). Default to Claude;
+  route to Tibba only for taste/visual calls (or when Claude tells you to).
 
 ---
 

@@ -19,12 +19,17 @@ every drop. Status legend: 🔴 open · 🟡 in-progress · 🟢 landed · ⚪ d
 ## PROTOCOL (re-read every drop)
 
 1. **One brief per drop.** Don't mix. Leave changes uncommitted in the working tree on `c4-work`.
-2. **Definition of Done for every brief:**
+2. **Check [`INBOX.md`](INBOX.md)** at the start of every drop — for replies to your threads and for
+   any message addressed to you. Post there (don't sit on doubts): 🚫 BLOCKER to stop+ask,
+   ❓ QUESTION to keep going, 🟠 FLAG for out-of-scope issues you notice but aren't fixing. See
+   `ANTIGRAVITY.md` §7 for the full taxonomy.
+3. **Definition of Done for every brief:**
    - All listed tests green (`node tests/...`).
    - `?v=` cache busters bumped in `index.html` for **every** changed `js/` file.
    - **Launch the game** (`node dd.js serve`, open `/?...` not `/index.html?...`, start a race, reach `play`, watch the console) after ANY structural change. A green suite does not prove the game boots.
    - A walkthrough listing **every gameplay-affecting line** (the slope-gravity incident, session 18 — an undocumented physics change is a defect even if tests pass).
-3. **Claude reviews the `git diff`** (not the walkthrough), fixes/integrates, commits, updates STATUS.md. Nothing merges unreviewed.
+4. **Post unresolved notes to [`INBOX.md`](INBOX.md)** before stopping — 🚫 BLOCKER, ❓ QUESTION (with the assumption you proceeded on), or 🟠 FLAG for anything out-of-scope you noticed. Don't leave a silent doubt; the next session won't have your context.
+5. **Claude reviews the `git diff`** (not the walkthrough), fixes/integrates, commits, updates STATUS.md. Nothing merges unreviewed.
 
 ## FIELD NOTES (hard-won from review cycles — READ BEFORE EVERY DROP)
 
