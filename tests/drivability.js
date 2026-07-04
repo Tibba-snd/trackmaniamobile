@@ -277,40 +277,65 @@ console.log('[14] air control');
   check('air brake stops rotation', Math.abs(car.yawRate) < 0.25, 'yawRate ' + car.yawRate.toFixed(2));
 }
 
-/* 15 — hairpin: drift line beats grip line (Wave 2) */
-console.log('[15] hairpin: drift vs grip');
+/* 15 — drift tightens the racing line (C4b rewrite): steady-state turn radius
+   The OLD test measured nose-rotation (yaw reaching -90°) — how fast the nose swings, NOT whether
+   the car's PATH is tighter. That "proved" drift was faster while in reality the car plowed wide
+   (understeer): the nose pointed in but velocity didn't follow. This rewrite measures the actual
+   physics quantity — steady-state turn RADIUS on a flat track at a fixed speed, with full steer:
+   - GRIP circle: full steer, no drift → settles to a constant radius set by the grip yaw cap.
+   - DRIFT circle: brake-tap to break traction, then full steer + hold drift → settles to a
+     constant radius set by the drift yaw authority + velocity coupling.
+   A drift radius no wider than grip's (at a speed where grip holds a clean circle) is the direct
+   proof that drift no longer understeers. Controller-independent: full steer, no path-following AI. */
+console.log('[15] drift tightens the racing line (steady-state radius)');
 {
-  // 15a: Grip cornering (full steer, no drift, stays in grip regime)
-  const carG = spawn(35);
-  let reachedG = false;
-  let stepsG = 0;
-  for (let t = 0; t < 60 * 5; t++) {
-    DD.stepCar(carG, { steer: 1.0, throttle: 1, brake: 0 }, FT);
-    stepsG++;
-    if (carG.yaw <= -Math.PI / 2) { reachedG = true; break; }
+  // Steady-state turn radius from a settled circular path: radius = mean distance to the path's
+  // centroid over the measurement window (once the circle has settled).
+  function settledRadius(pathTrail) {
+    let cx = 0, cz = 0;
+    for (const p of pathTrail) { cx += p[0]; cz += p[2]; }
+    cx /= pathTrail.length; cz /= pathTrail.length;
+    let sumR = 0;
+    for (const p of pathTrail) sumR += Math.hypot(p[0] - cx, p[2] - cz);
+    return sumR / pathTrail.length;
   }
-  const zG = carG.pos[2];
 
-  // 15b: Drift cornering (brake tap to break traction, then hold drift + full steer)
-  const carD = spawn(35);
-  let reachedD = false;
-  let stepsD = 0;
-  for (let t = 0; t < 60 * 5; t++) {
-    const brake = (t < 8) ? 1 : 0;
-    const steer = 1.0;
-    const throttle = brake ? 0 : 1;
-    const drift = (t >= 8);
-    DD.stepCar(carD, { steer, throttle, brake, drift }, FT);
-    stepsD++;
-    if (carD.yaw <= -Math.PI / 2) { reachedD = true; break; }
+  const SETTLE = 60 * 2;  // 2s to settle into the circle
+  const MEASURE = 60 * 3; // 3s of path to measure radius over
+
+  function gripRad(V0) {
+    const c = spawn(V0); const tr = [];
+    for (let t = 0; t < SETTLE + MEASURE; t++) { DD.stepCar(c, { steer: 1.0, throttle: 1, brake: 0, drift: false }, FT); if (t >= SETTLE) tr.push(c.pos.slice()); }
+    return settledRadius(tr);
   }
-  const zD = carD.pos[2];
+  function driftRad(V0) {
+    const c = spawn(V0); const tr = [];
+    for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; const dr = (t >= 8); DD.stepCar(c, { steer: 1.0, throttle: thr, brake, drift: dr }, FT); if (t >= SETTLE) tr.push(c.pos.slice()); }
+    return settledRadius(tr);
+  }
 
-  check('grip line completed 90 deg turn', reachedG, 'z=' + zG.toFixed(1) + 'm in ' + (stepsG/60).toFixed(2) + 's');
-  check('drift line completed 90 deg turn', reachedD, 'z=' + zD.toFixed(1) + 'm in ' + (stepsD/60).toFixed(2) + 's');
-  check('drift line turns tighter than grip line', zD < zG - 25, 'drift z: ' + zD.toFixed(1) + 'm vs grip z: ' + zG.toFixed(1) + 'm');
-  check('drift line completed turn faster', stepsD < stepsG - 50, 'drift: ' + (stepsD/60).toFixed(2) + 's vs grip: ' + (stepsG/60).toFixed(2) + 's');
-  check('drift did not spin out', Math.abs(carD.slipR) < 1.0, 'final slipR ' + (carD.slipR * 57.3).toFixed(1) + ' deg');
+  // Probe: at LOW speed (15 m/s) grip is far tighter than drift (the low-speed kinematic blend
+  // makes grip nearly go-kart tight) — drift should NOT beat grip here. This guards against drift
+  // becoming overpowered at low speed.
+  const rGlow = gripRad(15), rDlow = driftRad(15);
+  check('low speed: grip tighter than drift', rGlow < rDlow, 'grip ' + rGlow.toFixed(1) + 'm vs drift ' + rDlow.toFixed(1) + 'm');
+
+  // The core C4b assertion — the crossover exists: at ~25 m/s DRIFT is the tighter line. This is
+  // the verifiable design claim ("drift as a cornering tool", the TrackMania skill curve). The old
+  // coupling 2.2/s produced no crossover — drift was wider at every speed (pure understeer).
+  // 25 m/s sits just past the kinematic-blend handoff, where grip's yaw cap binds (~v/yawMax).
+  const Vcross = 25;
+  const rGx = gripRad(Vcross), rDx = driftRad(Vcross);
+  check('crossover speed: drift tighter than grip', rDx < rGx, 'at ' + Vcross + ' m/s — drift ' + rDx.toFixed(1) + 'm vs grip ' + rGx.toFixed(1) + 'm');
+
+  // Sanity: both regimes produce real circles (not straight lines / not spinning on the spot).
+  check('grip circle plausible', rGx > 10 && rGx < 120, 'grip ' + rGx.toFixed(1) + 'm');
+  check('drift circle plausible', rDx > 10 && rDx < 120, 'drift ' + rDx.toFixed(1) + 'm');
+
+  // Drift must not spin out even at the crossover.
+  const carSpin = spawn(Vcross);
+  for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(carSpin, { steer: 1.0, throttle: thr, brake, drift: t >= 8 }, FT); }
+  check('drift did not spin out', Math.abs(carSpin.slipR) < 1.0, 'final slipR ' + (carSpin.slipR * 57.3).toFixed(1) + ' deg');
 }
 
 /* ---- [16] closed circuits: loop closure geometry + multilap completion ---- */
