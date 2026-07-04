@@ -70,9 +70,9 @@ every drop. Status legend: 🔴 open · 🟡 in-progress · 🟢 landed · ⚪ d
 
 ---
 
-# ACTIVE CRITICAL BRIEFS (C4 — do these first)
+# C4 BRIEFS (balance/audio/campaign) — all 🟢 LANDED session 24, kept for reference
 
-## A11 — Impact audio fix (hearing + vision required)  🔴
+## A11 — Impact audio fix  🟢 LANDED (session 24)
 
 **Verified root cause (Claude, 2026-07-04):** the audio path is *healthy* — `initAudio`
 (`audio.js:17`) sets master gain 1, `volumes.sfx` defaults to **0.8** (`audio.js:10`), unlocked on
@@ -101,7 +101,7 @@ and a jump landing) + your aural confirmation. **No changes outside `audio.js` +
 
 ---
 
-## A12 — Campaign flow fixes + track caching (foundation, no visual change)  🔴
+## A12 — Campaign flow fixes + track caching  🟢 LANDED (session 24)
 **Depends on: nothing (do first of the campaign trio).**
 
 **Verified root cause (Claude, 2026-07-04):**
@@ -132,7 +132,7 @@ select track 5 → DRIVE → finish → REPLAY → same track reloads (not track
 
 ---
 
-## A13 — Campaign UI rebuild (vision-friendly)  🔴
+## A13 — Campaign UI rebuild + gamification  🟢 LANDED (session 24)
 **Depends on: A12 landed (uses the track cache + persisted selection).**
 
 **Scope:**
@@ -153,8 +153,160 @@ select track 5 → DRIVE → finish → REPLAY → same track reloads (not track
 
 ---
 
-## A14 — Campaign polish + progression feel (vision-friendly)  🔴
+## A14 — Campaign polish + progression feel  🟢 LANDED (session 24, folded into A13)
 **Depends on: A13 landed.**
+
+---
+
+# TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)
+
+_Tibba: "tracks are too narrow for creative driving — you always hit the fence drifting. I want
+wider tracks + more module variety + track-attached lights/poles/tunnels/signs, road loops, bigger
+wider jumps, wallride rework, better boost pads, better start line, better checkpoints."_
+
+**Two decisions locked with Tibba:**
+1. **Full campaign re-roll.** Existing campaign PBs/medals are invalidated and re-derived from the
+   new bot on the new wider tracks. (Daily/random seeds are unaffected — they regenerate anyway.)
+   → **Claude does this** (it's a `buildValidTrack`/seed change, physics-adjacent). Do NOT preserve
+   old campaign layout — the whole point is new tracks built for the new width + new pieces.
+2. **Everything in parallel.** The T-briefs below are independent (different files / different
+   subsystems) and can be picked up simultaneously. Each is self-contained.
+
+**Verified root causes (Claude, 2026-07-05):**
+- **Width:** `wBase = lerp(13.5, 9, tier)` → **13.5m T1 → 9m T5**, varied 0.8–1.35×/piece. A tight
+  T5 corner hits **7.2m** wide. F1 car ~2m → ~2.6m each side. Drifting a rear-end-out at 250 km/h
+  needs ~6m+ each side. THIS is why you always hit the fence. (`trackgen.js:31`)
+- **Boost pads have NO visual** — `SURF.BOOST` is a physics flag only; nothing in `scene-decor.js`
+  marks where a pad is. You can't see them.
+- **No tunnels, no loops, no dedicated start line** — nothing overhead; the grammar is yaw-only
+  banking (pitch is gentle hills, can't make a vertical loop); start line reuses the finish torus.
+- **Checkpoints** are thin additive torus rings (`buildGates`, `scene-decor.js:796`) — easy to miss
+  at speed, no "sector" numbering, no progress feel.
+- **Wallride** is narrower than normal track (0.7–0.85× width) — backwards for a piece that needs
+  commitment room.
+
+## T1 — Widen all tracks (Claude-owned, physics-adjacent)  🔴
+
+**Scope (touch ONLY `js/trackgen.js` `makePieces` + the `wBase` line):**
+- `wBase`: `lerp(13.5, 9, t01)` → `lerp(20, 14, t01)` (T1 ~20m, T5 ~14m — both wide enough to drift
+  at race speed; T5 stays tighter than T1 for skill curve).
+- `wVar` floor: `rng.range(0.8, 1.35)` → `rng.range(0.92, 1.35)` (no piece narrower than 92% of an
+  already-wider base — kills the 7.2m horror case).
+- Hairpin `wVar() * 1.25` → `* 1.45` (tight corners get EXTRA runoff for drift entry/exit).
+- Wallride `wBase * range(0.7, 0.85)` → `wBase * range(1.05, 1.2)` (wider than normal — it's a
+  commitment piece, give it room).
+- Re-derive campaign medals after (the bot re-runs on the wider tracks). In `core.js`, bump the
+  save version so old `driftdream_v1` saves clear campaign progress on load (Tibba approved this).
+
+**DoD:** field notes 1–3 + drivability green (the wider tracks may shift bot times — re-run test 11
+"all generated tracks bot-completable" and confirm). The campaign re-roll means existing campaign
+PBs are gone — that's intended. **Touch nothing in physics or scene.**
+
+## T2 — Boost pad visuals (vision)  🔴
+**Parallel-safe: touch ONLY `js/scene-decor.js` (new `buildBoostPads` + call in `buildTrackScene`).**
+
+Boost pads are invisible today (`SURF.BOOST` flag only). Build a clear, readable pad:
+- Scan `track.samples` for `surf === DD.SURF.BOOST`; for each contiguous run, build a glowing
+  chevron-arrow pad on the road surface (emissive only, additive, `fog:false`, registered to the
+  light pool via `addLightSource` if near the front of the field).
+- **Instanced** (one InstancedMesh for the pad plates, one for the chevron arrows across all pads —
+  the instancing rule is load-bearing, see field notes). Bright accent/boostColor, animated forward
+  scroll in the loop (reuse the shared breath LFO or a dedicated fast scroll for "energy flowing").
+- Make it OBVIOUS from a distance — a driver at 300 km/h must see the pad coming and aim for it.
+**DoD:** field notes 1–3 + screenshot of a boost pad approached at speed (reads clearly), draw calls
+within ±2 (`DD.debugGL()`).
+
+## T3 — Dedicated start line + finish gantry (vision)  🔴
+**Parallel-safe: touch ONLY `js/scene-decor.js` (`buildGates` or a new `buildStartLine`).**
+
+The start line reuses the finish torus — no sense of "this is the start." Build a proper gantry:
+- A start gantry over `startIdx`: two lit posts + a crossbar + a big "START / SECTOR 0" sign panel
+  (chevron-board treatment from A10, emissive frame). Grid markings on the road surface (painted
+  start-line stripes via a strip overlay).
+- The finish gantry (at `finishIdx`) gets a distinct treatment — a "FINISH" sign + a checkered
+  accent so the two are visually distinct (you should instantly know which is which).
+- Keep checkpoint rings but make them clearly "intermediate" (see T4).
+**DoD:** field notes 1–3 + screenshot of the start gantry (reads as a start line, not a checkpoint),
+draw calls within ±3.
+
+## T4 — Checkpoint rework (vision)  🔴
+**Parallel-safe: touch ONLY `js/scene-decor.js` (`buildGates`).**
+
+Tibba: "better looking and more evident checkpoints." Current = thin additive torus rings, easy to
+miss at speed. Rework:
+- Heavier gantry-style frames (posts + crossbar, not just a floating ring) so they read as gates
+  you drive THROUGH, not rings you drive past.
+- **Sector numbering**: each checkpoint shows its number (1, 2, 3…) on the crossbar — use the
+  existing chevron-board dial-in styling. On circuits, number wraps per lap.
+- Brighter, more present: stronger emissive + a brief flash/pulse as you pass (wire in `game.js` the
+  existing `justCkpt` event — the purple sector flash already exists, extend it to a gate-mesh
+  pulse). Accent2 color so they're distinct from the start (accent) and finish.
+- Keep exactly one InstancedMesh strategy if you instance the posts; respect the 12-light pool.
+**DoD:** field notes 1–3 + screenshot of a checkpoint approached at speed (number reads, gate is
+unmistakable), draw calls within ±3.
+
+## T5 — Tunnels (vision)  🔴
+**Parallel-safe: touch ONLY `js/scene-decor.js` (new `buildTunnels`).**
+
+Nothing overhead exists today. Add tunnel gates at chosen sample ranges (e.g. on long straights or
+crest pieces, biased by biome — neon gets more tunnels, frozen/dune fewer):
+- Place tunnel "rings" (arched cross-section frames) at intervals over a sample range, with a
+  semi-transparent roof mesh between them (dark, so it reads as enclosed). Emissive frame edges in
+  accent color; lights hanging inside (registered to the pool). The enclosed feeling is the point —
+  you drive INTO and OUT of a lit tube.
+- Choose placement via a NEW derived rng stream (`DD.makeRng(seed + '::tunnels')`) — never draw from
+  the main trackgen sequence (existing non-campaign seeds must stay identical).
+- **Instance** the ring frames (one InstancedMesh across all tunnels). Roof can be a few merged
+  meshes per tunnel.
+**DoD:** field notes 1–3 + screenshot of entering a tunnel (reads as enclosed, frame edges glow),
+draw calls within ±4.
+
+## T6 — Big ramp jumps (vision)  🔴
+**Parallel-safe: touch ONLY `js/trackgen.js` (the `kicker` and `jumpgap` piece builders) AND
+`js/scene-decor.js` (landing-pad visual).**
+
+Current kicker is a small hop; jumpgap is a flat gap. Tibba wants "bigger wider jumps."
+- Widen both: `kicker` `wVar() * 1.15` → `* 1.5`; `jumpgap` `wVar() * 1.1` → `* 1.5` (wider = less
+  fence-punishment on a bad landing).
+- Add a new `bigjump` piece: longer lip (25–35m up-ramp at ~0.22 pitch), longer gap
+  (`rng.range(40, 70 + 15*t01)`), wider landing (`w * 1.6`), gentle downslope on landing for
+  smoothness. Weight it into the rhythm/vertical/mixed archetypes (low weight — signature piece, not
+  every track).
+- Landing-pad visual in scene-decor: a glowing chevron target zone where you should land (emissive,
+  additive — pairs with T2's boost-pad builder pattern).
+- Use a NEW derived rng stream for any new randomness (`seed + '::bigjump'`) so existing seeds keep
+  their non-bigjump layout identical.
+**DoD:** field notes 1–3 + screenshot of a bigjump approached + landed, draw calls within ±2.
+
+## T7 — Vertical loops (the big one — Claude specs, then delegable)  🔴
+
+This needs a design note first because the trackgen integrator is yaw-only. Two sub-pieces:
+
+**T7a (Claude): loop piece design** — spec how a vertical loop works in the current integrator:
+- A loop = a sample range where `pitchT` ramps to steep up → continues past vertical → the car is
+  inverted at the top → comes back down. The physics `stepGrounded` already tracks surface normal
+  (`s.u`), so driving upside-down works IF the road mesh follows. The gap: the integrator's
+  `pitchT` is currently clamped to gentle hills; needs a "loop mode" where pitch is unclamped and
+  the up-vector follows the heading continuously.
+- Output a design note in `IMPROVEMENT_PLAN.md` (the loop math + the integrator change + the
+  bot/expert-solver implication — the bot must be able to drive a loop or it'll fail validation).
+  **T7a blocks T7b.**
+
+**T7b (Antigravity, vision): loop rendering + placement** — after T7a lands, build the loop mesh
+(ribbon already follows samples, so the road bends through the loop naturally; add side-rollover
+guard rails so you can't fall off the side while inverted, + a glowing loop-frame). Place 0–1 loops
+per track (signature piece, high-tier only).
+**DoD:** field notes 1–3 + screenshot of a loop. **Do NOT start until T7a design note is in.**
+
+## T8 — Wallride rework (vision)  🔴
+**Parallel-safe: touch ONLY `js/trackgen.js` (the `wallride` piece) + `js/scene-decor.js` (visual).**
+
+- Widen (covered by T1's `wBase` change + wallride-specific `1.05–1.2×` here).
+- Make the wallread BANK actual (currently `bankT: 0` — it's a flat curved piece flagged `wall:1`,
+  relying on the invisible wall). Give it real banking `bankT: dir * rng.range(0.4, 0.7)` so the
+  road surface tilts and the car genuinely sticks — reads as a wallride, not a flat corner with a wall.
+- Visual: emissive edge strips that climb the bank (so the tilt reads), accent2 color.
+**DoD:** field notes 1–3 + screenshot of a banked wallride (surface clearly tilts), draw calls ±2.
 
 **Scope:**
 1. Tier-completion celebration: an unlock animation/flash when crossing the 5-medal threshold to
@@ -173,7 +325,7 @@ select track 5 → DRIVE → finish → REPLAY → same track reloads (not track
 _These are NOT blocking. They're scoped, valuable improvements Antigravity can pick up whenever
 the critical path is waiting on a Claude review or a Tibba playtest. Vision-friendly unless noted._
 
-## O1 — E2E golden re-baseline (vision + host Chrome required)  🔴
+## O1 — E2E golden re-baseline  🟢 LANDED (session 24)
 
 Every prior session flagged this as "needs a host re-baseline" and deferred it. Bloom/camera/car
 (all of Wave 1) + physics (Wave 2) + terrain (C3) have all moved since the last goldens. The e2e
@@ -192,7 +344,7 @@ helpers without touching determinism. **Do NOT touch the sim path** (`stepCar` a
 Claude's. DoD: field notes 1–3 + a before/after `renderer.info` or `performance.mark` measurement
 showing reduced allocations on a known scene.
 
-## O3 — Terrain decor placement polish (vision)  🔴
+## O3 — Terrain decor placement polish  🟢 LANDED (session 24)
 **Depends on: C3 (already landed). The C3 "remaining" item — landform-aware decor placement.**
 
 C3 raised landforms (canyon rises +65m) but emissive decor (`buildEmissiveElements`,
@@ -201,7 +353,7 @@ slopes/ridges (registered to the light pool where near the track), so canyon wal
 studded and dune crests catch the sun. DoD: field notes 1–3 + per-biome screenshots (canyon, dune,
 frozen, neon) showing decor reads on the new relief, `DD.debugGL()` draw calls within ±2.
 
-## O4 — HUD speed-feel: speed-recede at high velocity (vision)  🔴
+## O4 — HUD speed-feel: speed-recede  🟢 LANDED (session 24)
 
 STATUS "Still open" (session 8): side panels keep full opacity at all speeds; the speed-based fade
 described in the original redesign vision was never implemented. Low priority but a nice feel win.
@@ -214,14 +366,14 @@ C5 / Wave 4. The ring-drag Length mode (session 15) proved the raycast→drag→
 cross-section reuses it. Claude must spec the camera tween + `profile` primitive first; then it
 becomes a delegable brief. **Defer until C4 + campaign lands.**
 
-## O6 — Wheel spin cue for `glowDisc` (vision)  🟡
+## O6 — Wheel spin cue for `glowDisc`  🟢 LANDED (session 24)
 
 STATUS #14 (open from session 14): `glowDisc` (Neon Speeder's wheel) is rotationally symmetric — it
 can never show a visible spin cue. Add an asymmetric blade/marker to the `glowDisc` builder
 (`scene-car.js` `CAR_WHEEL_BUILDERS`). Small, self-contained. DoD: field notes 1–3 + a garage
 screenshot showing the wheel reads as spinning.
 
-## O7 — Wall-impact camera shake tuning (vision)  🟡
+## O7 — Wall-impact camera shake tuning  🟢 LANDED (session 24)
 
 The camera kick on `hitWall` exists (`scene-core.js:700`) but is a fixed `-0.7` magnitude regardless
 of impact speed. Scale it with `speedNorm` and add a FOV punch on heavy hits. Pair with A11 (you'll
@@ -251,8 +403,13 @@ work resumes.
 
 - **A1** theme knobs (aurora/foggy/edgelit/shimmer) — session 19
 - **A2** ghost UX, **A3** zero-alloc render path, **A4** scene split, **A6** sign backs — session 21
-- **A5** impact audio (implemented but gated/masked → **re-opened as A11**)
+- **A5** impact audio (implemented but gated/masked → re-opened as A11, now landed)
 - **A7** terrain color bake, **A8** lap HUD, **A9** emissive variety, **A10** chevron boards — session 23
 - **Wave 1** (ghost-on-retry, glow budget, sky/sign/particle/garage, car presence, close camera) — session 17
 - **Wave 2** (drift rework, author ghost, expert bot v2) — session 18
 - **C2** multilap/closed circuits — session 20 · **C3** terrain height-policy rework — session 22
+- **C4b** drift honest-model retune (v1 + v2) · **C4c** bot grip budget + medal retune — session 24
+- **A11** impact audio (scrape loop, whump body tap, debugAudio, substep hitWall accumulation) — session 24
+- **A12** campaign flow (track cache, finReplay, selection persistence, medal icons) — session 24
+- **A13** campaign UI + gamification (tier cards, progress bars, medal colors, unlock animation) — session 24
+- **O1** e2e golden re-baseline · **O3** terrain decor on slopes · **O4** HUD speed-recede · **O6** glowDisc spin cue · **O7** wall cam-shake — session 24
