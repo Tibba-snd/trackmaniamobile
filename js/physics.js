@@ -589,11 +589,16 @@
       if (curv > 1e-4) {
         const rad = (1 / curv) * (1 + Math.abs(ss[i].bank) * 0.9);
         const bankBonus = 1 + Math.abs(ss[i].bank) * 0.9;
-        const gripMech = (P.gripF + P.gripR) * 0.5;
-        const vEst = Math.sqrt(gripMech * bankBonus * gmul * rad);
+        // C4c: grip budget must track the player's actual GRIP-REGIME capability, not half of it.
+        // The old (gripF+gripR)*0.5 = 15.5 budgeted ~1.66g lateral; the player's grip regime allows
+        // ~0.95*(gripF+gripR) ~= 29 m/s^2 (~3g). A bot cornering at 0.74x human speed made every
+        // medal trivial. Use 0.90 of the player's available grip — fast, but a hair of margin so the
+        // bot is beatable by a cleaner line rather than a coin-flip at the limit.
+        const gripAvail = (P.gripF + P.gripR) * 0.90;
+        const vEst = Math.sqrt(gripAvail * bankBonus * gmul * rad);
         const df = Math.max(0, vEst - P.downforceV) * P.downforceK;
-        const gripCombined = gripMech + df;
-        vCorner = Math.min(vCorner, Math.sqrt(gripCombined * bankBonus * gmul * 1.05 * rad));
+        const gripCombined = gripAvail + df;
+        vCorner = Math.min(vCorner, Math.sqrt(gripCombined * bankBonus * gmul * rad));
       }
       if (nearIceAt(i)) vCorner = Math.min(vCorner, 18);
       return vCorner;
@@ -720,12 +725,17 @@
       if (track.overlapForced > 0) continue; // self-intersecting layout: regenerate
       const bot = DD.runBot(track, { recordFrames: true });
       if (bot.ok && bot.respawns === 0 && bot.ms > 25000) {
-        const author = Math.round(bot.ms * 0.97); // expert bot v2 is close to optimal
+        // C4c: with the bot now cornering at ~human grip (0.90 of available), it's near-optimal,
+        // so author = the bot's own time (the reference lap). Gold/silver/bronze spreads tightened
+        // from 1.10/1.25/1.55 to 1.08/1.20/1.45 so tiers feel meaningful against a fast bot while
+        // bronze stays achievable. Final numbers subject to Tibba playtests (C4 is judgment work),
+        // but the bot-speed fix itself is correcting a defect, not a judgment call.
+        const author = Math.round(bot.ms * 1.00);
         track.medals = {
           author,
-          gold: Math.round(author * 1.10),
-          silver: Math.round(author * 1.25),
-          bronze: Math.round(author * 1.55)
+          gold: Math.round(author * 1.08),
+          silver: Math.round(author * 1.20),
+          bronze: Math.round(author * 1.45)
         };
         track.attempt = attempt;
         track.authorGhost = bot.frames;
@@ -735,7 +745,7 @@
     }
     const track = DD.generateTrack(seedStr, tier, 0);
     const est = Math.round(track.length / 28 * 1000);
-    track.medals = { author: est, gold: Math.round(est * 1.10), silver: Math.round(est * 1.25), bronze: Math.round(est * 1.55) };
+    track.medals = { author: est, gold: Math.round(est * 1.08), silver: Math.round(est * 1.20), bronze: Math.round(est * 1.45) };
     track.attempt = -1;
     return track;
   };

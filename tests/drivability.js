@@ -386,5 +386,58 @@ console.log('[17] terrain landforms (C3 height policy)');
   check('canyon walls rise above the old global ceiling', canyonRise > 20, '+' + canyonRise.toFixed(1) + 'm (CAMP-T3-01)');
 }
 
+/* ---- [18] bot corner speed tracks the player's grip budget (C4c regression lock) ----
+   The expert solver used to budget only (gripF+gripR)*0.5 = 1.66g lateral while the player's grip
+   regime allows ~3g — so the bot cornered at ~0.74x human speed and every medal was trivial. This
+   test locks the fix: on a known-radius constant corner, the bot's target corner speed must be
+   within 10% of the physics grip-limit prediction v = sqrt(gripAvail * R), where gripAvail is the
+   player's available grip (0.90 of gripF+gripR, matching the solver). */
+console.log('[18] bot corner speed tracks grip budget (C4c)');
+{
+  // Build a flat track with a long constant-radius corner (R = 80m) so the speed solver settles.
+  const R = 80, DS = 2;
+  const pre = 60, post = 60;   // straights either side
+  const arcSamples = Math.round((Math.PI / 2) * R / DS); // 90 degrees of arc
+  const samples = [];
+  for (let i = 0; i < pre; i++) samples.push({ p: [0, 4, i * DS], yaw: 0, pitch: 0, bank: 0, w: 30, surf: 0, wall: 0, gap: 0, f: [0,0,1], u: [0,1,0], r: [1,0,0], pieceName: 'straight' });
+  const cx = R, cz = pre * DS;
+  for (let i = 0; i < arcSamples; i++) {
+    const a = (i + 1) * DS / R;
+    const px = cx - R * Math.sin(a), pz = cz + R * Math.cos(a), yaw = a;
+    samples.push({ p: [px, 4, pz], yaw, pitch: 0, bank: 0, w: 30, surf: 0, wall: 0, gap: 0,
+                   f: [Math.sin(yaw),0,Math.cos(yaw)], u: [0,1,0], r: [Math.cos(yaw),0,-Math.sin(yaw)], pieceName: 'sweeper' });
+  }
+  const last = samples[samples.length - 1];
+  for (let i = 0; i < post; i++) {
+    const px = last.p[0] + Math.sin(Math.PI/2)*(i+1)*DS, pz = last.p[2] + Math.cos(Math.PI/2)*(i+1)*DS;
+    samples.push({ p: [px, 4, pz], yaw: Math.PI/2, pitch: 0, bank: 0, w: 30, surf: 0, wall: 0, gap: 0, f: [1,0,0], u: [0,1,0], r: [0,0,-1], pieceName: 'straight' });
+  }
+  const total = samples.length;
+  const CT = { seed: 'CORNER18', tier: 3, samples, ds: DS, checkpoints: [], startIdx: 2, finishIdx: total - 1, length: total * DS, terrain: null, theme: null };
+  const cornerMidIdx = pre + Math.floor(arcSamples / 2);
+
+  // The bot's expert data carries the per-sample target speeds. buildExpertData is file-local in
+  // physics.js and is populated lazily onto track.expert by getBotInput (via runBot). Run the bot
+  // to populate it, then read the corner target speed.
+  DD.runBot(CT, { recordFrames: false });
+  const expert = CT.expert;
+  const botV = expert.botSpeeds[cornerMidIdx];
+
+  // Physics grip-limit prediction at this radius (no bank, no downforce at this speed regime):
+  // v = sqrt(gripAvail * R), gripAvail = 0.90*(gripF+gripR) — the solver's budget.
+  const gripAvail = (P.gripF + P.gripR) * 0.90;
+  const predictedV = Math.sqrt(gripAvail * R);
+
+  // The solver also applies accel/decel sweeps and a 22 m/s floor, so the realized speed may be a
+  // touch under the pure corner limit. Allow the bot within 10% of prediction (above 0.90x would
+  // mean it's not using the grip; the old code landed near 0.74x).
+  check('bot corner speed within 10% of grip-limit prediction', botV >= predictedV * 0.90 && botV <= predictedV * 1.05,
+    'bot ' + botV.toFixed(1) + ' m/s vs predicted ' + predictedV.toFixed(1) + ' m/s (R=' + R + 'm)');
+  // And the old defect must be gone: bot speed clearly above the half-grip prediction (the bug).
+  const buggyV = Math.sqrt((P.gripF + P.gripR) * 0.5 * R);
+  check('bot faster than the old half-grip budget', botV > buggyV * 1.10,
+    'bot ' + botV.toFixed(1) + ' m/s vs old buggy ' + buggyV.toFixed(1) + ' m/s');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
