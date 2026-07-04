@@ -85,10 +85,10 @@
     shoulderScrub: 0.99,
     shoulderPush: 9,
     wallBounce: 0.22,
-    wallFriction: 0.94,      // C4b v2: 0.986 -> 0.94. Wall-riding was nearly free (kept 98.6% speed
-                             // per impact), so railing the fence beat drifting in every corner.
-                             // 0.94 makes a real scrape cost ~6% speed/contact — sparks stay cool,
-                             // but leaning on the wall every corner is no longer the fast line.
+    wallFriction: 0.97,      // reverted from 0.94 (too punishing — every scrape on a narrow track
+                             // killed momentum). 0.97 = light scrape cost (~3%/contact) without the
+                             // "every small touch loses the run" feel. Wall-riding is solved by wider
+                             // tracks + good drift physics, not by a punishing fence.
     launchVu: 2.5,          // upward speed rel. surface that releases the car (jumps!)
     outOfWorld: 60          // below terrain min -> respawn
   };

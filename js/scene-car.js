@@ -183,6 +183,9 @@
       core.rotation.z = Math.PI / 2; core.position.set(side * 0.12, 0, 0); spin.add(core);
       const ring = _mesh(_tor(r * 0.65, 0.03, 6, 24), M.glowMat(M.grad.b, 0.9));
       ring.rotation.y = Math.PI / 2; ring.position.set(side * 0.14, 0, 0); spin.add(ring);
+      // O6: Asymmetric neon blade extending from core to ring to serve as a visible spin cue
+      const blade = _mesh(_box(0.03, r * 0.45, 0.02), M.glowMat(M.grad.a, 0.95));
+      blade.position.set(side * 0.13, r * 0.42, 0); spin.add(blade);
     },
     classicSpoke(spin, r, side, M, discMat) {
       for (let k = 0; k < 6; k++) {

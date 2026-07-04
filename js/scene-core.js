@@ -700,10 +700,14 @@
     if (car.hitWall) {
       if (vmag > 1) {
         ipNorm(camVelDir, camVproj);
-        ipAddS(camState.shake, camState.shake, camVelDir, -0.7);
+        // O7: Scale wall-impact camera shake kick with normalized speed (sv)
+        const kickMag = -0.3 - sv * 1.2;
+        ipAddS(camState.shake, camState.shake, camVelDir, kickMag);
       } else {
-        ipAddS(camState.shake, camState.shake, camF, -0.7);
+        ipAddS(camState.shake, camState.shake, camF, -0.3);
       }
+      // O7: Inject a temporary FOV punch on heavy wall impacts (sv * 15 degrees)
+      camState.fov = camState.fov + sv * 15;
     }
     camState.prevGrounded = car.grounded;
     camState.prevVelY = vel[1];

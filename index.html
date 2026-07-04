@@ -222,17 +222,21 @@
   }
   .track-pb-box .pb-val { font-family:'Azeret Mono',monospace; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-  .trackBtn.sel {
-    border-color: var(--accent2) !important;
-    background: rgba(var(--accent2-rgb), 0.18) !important;
-    box-shadow: 0 0 15px rgba(var(--accent2-rgb), 0.3) !important;
+  /* Campaign Responsive Layout and Viewport Adjustments */
+  @media (max-width: 850px) {
+    .campaign-left {
+      width: 320px !important;
+    }
+    .campaign-right {
+      left: 320px !important;
+    }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 768px) and (orientation: portrait) {
     #campaign { flex-direction: column !important; }
-    .campaign-left { width: 100% !important; height: 50% !important; border-right: none !important; border-bottom: 1px solid rgba(var(--accent-rgb), 0.16); position: relative !important; }
-    .campaign-right { width: 100% !important; height: 50% !important; left: 0 !important; top: 50% !important; position: absolute !important; padding: 15px !important; }
-    .details-content { height: 100% !important; width: 100% !important; justify-content: center !important; }
+    .campaign-left { width: 100% !important; height: 55% !important; border-right: none !important; border-bottom: 1px solid rgba(var(--accent-rgb), 0.16); position: relative !important; }
+    .campaign-right { width: 100% !important; height: 45% !important; left: 0 !important; top: 0 !important; position: relative !important; padding: 15px !important; }
+    .details-content { height: 100% !important; width: 100% !important; max-height: 100% !important; overflow-y: auto !important; justify-content: flex-start !important; padding: 15px !important; }
   }
 
   /* HUD */
@@ -537,18 +541,59 @@
   .finRow button:active { transform:scale(0.96); }
 
   /* campaign */
-  #campList { max-height:68vh; overflow-y:auto; width:min(92vw,560px); padding:4px; }
-  .tierHead { font-family:'Chakra Petch',sans-serif; font-size:13px; letter-spacing:0.25em; opacity:0.85; margin:18px 0 10px; font-weight:700; text-transform:uppercase; color:var(--accent); }
-  .tierHead.locked { opacity:0.45; }
-  .tierRow { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
-  .trackBtn { padding:10px 4px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.2); background:rgba(var(--accent-rgb),0.06);
-    color:inherit; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; transition:all .2s; font-family:inherit;
-    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
-  .trackBtn .num { font-family:'Azeret Mono',monospace; font-size:16px; font-weight:700; }
+  #campList { max-height:68vh; overflow-y:auto; width:100%; padding:4px; }
+  .campaign-header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .campaign-total-medals { background:rgba(var(--accent-rgb),0.12); border:1px solid rgba(var(--accent-rgb),0.3); padding:6px 12px; font-family:'Chakra Petch',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.05em; color:var(--accent2); display:flex; align-items:center; gap:6px; box-shadow:0 0 10px rgba(var(--accent-rgb),0.15); clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+  .campaign-total-medals .medals-label { opacity:0.6; font-size:9px; letter-spacing:0.1em; }
+  .campaign-total-medals .medals-val { font-family:'Azeret Mono',monospace; font-size:12px; text-shadow:0 0 5px rgba(var(--accent2-rgb),0.4); }
+  .tier-card { padding:15px; margin-bottom:20px; border:1px solid rgba(var(--accent-rgb),0.12); background:rgba(15,10,32,0.45); backdrop-filter:blur(5px); transition:border-color 0.25s; clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%); }
+  .tier-card.locked { opacity:0.55; border-color:rgba(255,255,255,0.06); background:rgba(5,3,10,0.35); }
+  .tier-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .tier-title { font-family:'Chakra Petch',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.15em; color:var(--accent); text-transform:uppercase; display:flex; align-items:center; gap:6px; }
+  .tier-title .lock-icon { font-size:11px; }
+  .tier-completion { font-family:'Azeret Mono',monospace; font-size:10px; font-weight:600; opacity:0.75; letter-spacing:0.05em; }
+  .tier-progress-container { width:100%; margin-bottom:12px; }
+  .tier-progress-bar { height:6px; width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(var(--accent-rgb),0.1); }
+  .tier-progress-fill { height:100%; background:linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow:0 0 8px rgba(var(--accent-rgb),0.4); transition:width 0.3s ease-out; }
+  .tier-lock-hint { font-family:'Chakra Petch',sans-serif; font-size:11px; font-weight:600; color:var(--warm); letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:4px; opacity:0.85; }
+  .tierRow { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .trackBtn { padding:10px 4px; border-radius:0; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; transition:all .2s; font-family:inherit; clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .trackBtn .num { font-family:'Azeret Mono',monospace; font-size:15px; font-weight:700; }
   .trackBtn .ico { font-size:11px; }
   .trackBtn .pb { font-family:'Azeret Mono',monospace; font-size:9px; opacity:0.65; font-variant-numeric:tabular-nums; font-weight:500; }
-  .trackBtn:hover { background:rgba(var(--accent-rgb),0.15); border-color:rgba(var(--accent-rgb),0.45); }
+  .trackBtn:hover { transform:translateY(-2px); }
   .trackBtn:active { transform:scale(0.95); }
+  .trackBtn.none { border:1px solid rgba(var(--accent-rgb),0.2); background:rgba(var(--accent-rgb),0.04); color:rgba(232, 228, 245, 0.45); }
+  .trackBtn.none .ico { color:rgba(232, 228, 245, 0.2); }
+  .trackBtn.none:hover { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); color:rgba(232, 228, 245, 0.85); }
+  .trackBtn.bronze { border:1px solid rgba(205, 127, 50, 0.35); background:rgba(205, 127, 50, 0.08); color:#cd7f32; }
+  .trackBtn.bronze .ico { color:#cd7f32; text-shadow:0 0 5px rgba(205,127,50,0.5); }
+  .trackBtn.bronze:hover { background:rgba(205,127,50,0.18); border-color:rgba(205,127,50,0.6); }
+  .trackBtn.silver { border:1px solid rgba(192, 192, 192, 0.4); background:rgba(192, 192, 192, 0.08); color:#dfdfe5; }
+  .trackBtn.silver .ico { color:#ffffff; text-shadow:0 0 6px rgba(192,192,192,0.6); }
+  .trackBtn.silver:hover { background:rgba(192,192,192,0.18); border-color:rgba(192,192,192,0.65); }
+  .trackBtn.gold { border:1px solid rgba(255, 215, 0, 0.4); background:rgba(255, 215, 0, 0.08); color:#ffd700; }
+  .trackBtn.gold .ico { color:#ffd700; text-shadow:0 0 8px rgba(255,215,0,0.6); }
+  .trackBtn.gold:hover { background:rgba(255,215,0,0.18); border-color:rgba(255,215,0,0.65); }
+  .trackBtn.author { border:1px solid rgba(255, 123, 213, 0.55); background:rgba(255, 123, 213, 0.1); color:#ff7bd5; box-shadow:0 0 10px rgba(255,123,213,0.18), inset 0 0 5px rgba(255,123,213,0.08); animation:author-glow-pulse 2s infinite ease-in-out; }
+  .trackBtn.author .ico { color:#ff7bd5; text-shadow:0 0 10px rgba(255,123,213,0.85); }
+  .trackBtn.author:hover { background:rgba(255,123,213,0.22); border-color:rgba(255,123,213,0.85); }
+  @keyframes author-glow-pulse { 0% { box-shadow:0 0 8px rgba(255,123,213,0.15), inset 0 0 4px rgba(255,123,213,0.05); border-color:rgba(255,123,213,0.5); } 50% { box-shadow:0 0 16px rgba(255,123,213,0.38), inset 0 0 8px rgba(255,123,213,0.18); border-color:rgba(255,123,213,0.8); } 100% { box-shadow:0 0 8px rgba(255,123,213,0.15), inset 0 0 4px rgba(255,123,213,0.05); border-color:rgba(255,123,213,0.5); } }
+  .trackBtn.sel { border-color:#ffffff !important; background:rgba(var(--accent-rgb),0.22) !important; box-shadow:0 0 15px rgba(255,255,255,0.4) !important; transform:scale(1.05) translateY(-2px) !important; }
+  .trackBtn.last-played { position:relative; box-shadow:inset 0 0 0 1px rgba(var(--accent2-rgb), 0.5); }
+  .trackBtn.last-played::after { content:''; position:absolute; top:3px; right:3px; width:4px; height:4px; background-color:var(--accent2); border-radius:50%; box-shadow:0 0 6px var(--accent2); }
+  .tier-author-badge { font-size:9px; padding:2px 6px; border:1px solid var(--accent2); background:rgba(var(--accent2-rgb),0.12); color:var(--accent2); font-weight:700; margin-left:10px; letter-spacing:0.1em; text-shadow:0 0 5px rgba(var(--accent2-rgb),0.5); box-shadow:0 0 8px rgba(var(--accent2-rgb),0.2); clip-path:polygon(0 3px, 3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%); }
+  @keyframes unlock-flicker {
+    0% { opacity:0; transform:scale(0.97); filter:brightness(1.5); }
+    15% { opacity:1; transform:scale(1.01); filter:brightness(2.2); box-shadow:0 0 25px rgba(var(--accent2-rgb),0.7); }
+    30% { opacity:0.6; transform:scale(1); filter:brightness(1.2); }
+    45% { opacity:1; transform:scale(1.005); filter:brightness(1.8); box-shadow:0 0 35px rgba(var(--accent2-rgb),0.9); }
+    60% { opacity:0.8; }
+    100% { opacity:1; transform:scale(1); filter:brightness(1); box-shadow:none; }
+  }
+  .tier-unlock-flash { animation:unlock-flicker 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @media (min-width: 1024px) { .tierRow { grid-template-columns:repeat(5, 1fr); } }
+  @media (max-width: 480px) { .tierRow { grid-template-columns:repeat(3, 1fr); } }
 
   /* settings & garage */
   .panel { width:min(88vw,420px); max-height:72vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
@@ -767,7 +812,13 @@
 <!-- CAMPAIGN -->
 <div class="screen" id="campaign" style="flex-direction: row; justify-content: flex-start; align-items: stretch; padding: 0; background: transparent;">
   <div class="campaign-left">
-    <h2 class="campaign-title">CAMPAIGN</h2>
+    <div class="campaign-header-row">
+      <h2 class="campaign-title">CAMPAIGN</h2>
+      <div class="campaign-total-medals">
+        <span class="medals-label">MEDALS</span>
+        <span id="campaign-total-medals-val" class="medals-val">0 / 50</span>
+      </div>
+    </div>
     <p class="campaign-subtitle">race through the tiers to unlock new challenges</p>
     <div id="campList"></div>
     <button class="backBtn campaign-back">back</button>
@@ -792,6 +843,11 @@
       </div>
       
       <div id="campTrackPB" class="track-pb-box"></div>
+      
+      <div id="campTrackStats" class="track-stats-row" style="display: none; justify-content: space-between; width: 100%; margin-bottom: 18px; font-size: 11px; opacity: 0.75; font-family: 'Chakra Petch', sans-serif; letter-spacing: 0.05em; font-weight: 600;">
+        <span>ATTEMPTS: <span id="campAttemptsVal" class="target-val">0</span></span>
+        <span id="campLastPlayedVal">LAST PLAYED: --</span>
+      </div>
       
       <button class="mbtn primary" id="btnPlayCampTrack" style="margin-top: auto; width: 100%;">DRIVE</button>
     </div>
@@ -946,6 +1002,7 @@
     <div id="finLaps"></div>
     <div class="finRow">
       <button id="finRetry">retry</button>
+      <button id="finReplay">replay</button>
       <button id="finNext">next</button>
       <button id="finShare">share</button>
       <button id="finMenu">menu</button>
@@ -966,13 +1023,13 @@
 <script src="js/theme.js?v=22"></script>
 <script src="js/trackgen.js?v=20"></script>
 <script src="js/physics.js?v=22"></script>
-<script src="js/audio.js?v=16"></script>
+<script src="js/audio.js?v=17"></script>
 <script src="js/input.js?v=16"></script>
 <script src="js/carspec.js?v=2"></script>
 <script src="js/scene-core.js?v=52"></script>
 <script src="js/scene-decor.js?v=55"></script>
 <script src="js/scene-car.js?v=52"></script>
 <script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=46"></script>
+<script src="js/game.js?v=50"></script>
 </body>
 </html>

@@ -10,6 +10,13 @@
     volumes: { engine: 0.7, sfx: 0.8, music: 0.5 }
   };
 
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    DD.debugAudio = params.has('debugAudio') && params.get('debugAudio') !== 'false';
+  } else {
+    DD.debugAudio = false;
+  }
+
   const GEARS = [0, 18, 32, 48, 66, 86, 200]; // upshift speeds (m/s) per gear 1..6
   const NGEARS = 6;
   let noiseBuf = null;
@@ -60,6 +67,13 @@
     const rmGain = A.nodes.rumbleGain = ctx.createGain(); rmGain.gain.value = 0;
     rm.connect(rmFilt).connect(rmGain).connect(master);
     rm.start();
+
+    // ---- wall scrape: grinding bandpass noise ----
+    const scr = ctx.createBufferSource(); scr.buffer = noiseBuf; scr.loop = true;
+    const scrFilt = A.nodes.scrapeFilt = ctx.createBiquadFilter(); scrFilt.type = 'bandpass'; scrFilt.frequency.value = 400; scrFilt.Q.value = 1.2;
+    const scrGain = A.nodes.scrapeGain = ctx.createGain(); scrGain.gain.value = 0;
+    scr.connect(scrFilt).connect(scrGain).connect(master);
+    scr.start();
 
     A.started = true;
   };
@@ -140,23 +154,34 @@
     n.windFilt.frequency.setTargetAtTime(300 + speed * 14, ctx.currentTime, 0.1);
   };
 
-  /* slide intensity 0..1, dirt flag — call each frame */
-  DD.updateSurfaceAudio = function (slide, speed, onDirt) {
+  /* slide intensity 0..1, dirt flag, hitWall flag — call each frame */
+  DD.updateSurfaceAudio = function (slide, speed, onDirt, hitWall) {
     if (!A.started) return;
     const ctx = A.ctx, n = A.nodes;
     const sc = DD.clamp(slide, 0, 1) * DD.clamp(speed / 30, 0, 1);
     n.screechGain.gain.setTargetAtTime(sc * 0.22 * A.volumes.sfx, ctx.currentTime, 0.04);
     n.screechFilt.frequency.setTargetAtTime(1100 + slide * 600 + speed * 3, ctx.currentTime, 0.06);
     n.rumbleGain.gain.setTargetAtTime((onDirt ? DD.clamp(speed / 35, 0, 1) * 0.3 : 0) * A.volumes.sfx, ctx.currentTime, 0.07);
+
+    // ---- wall scrape: grinding bandpass noise while hitWall & speed > 5 ----
+    const active = !!hitWall && speed > 5;
+    const targetScVol = active ? DD.clamp((speed - 5) / 35, 0, 1) * 0.25 * A.volumes.sfx : 0;
+    n.scrapeGain.gain.setTargetAtTime(targetScVol, ctx.currentTime, active ? 0.03 : 0.08);
+    if (active) {
+      const f = 200 + speed * 6 + Math.random() * 80;
+      n.scrapeFilt.frequency.setTargetAtTime(f, ctx.currentTime, 0.04);
+    }
   };
 
   DD.engineQuiet = function () {
     if (!A.started) return;
     A.nodes.engineGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.1);
     A.nodes.windGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.1);
+    if (A.nodes.scrapeGain) A.nodes.scrapeGain.gain.setTargetAtTime(0, A.ctx.currentTime, 0.1);
   };
 
   function blip(freq, dur, type, vol, when) {
+    if (!A.started || !A.ctx) return;
     const ctx = A.ctx;
     const o = ctx.createOscillator(); o.type = type || 'sine'; o.frequency.value = freq;
     const g = ctx.createGain();
@@ -209,6 +234,9 @@
 
   DD.sfxWallThud = function (speedScale) {
     const vol = DD.clamp(speedScale, 0, 1) * 0.7;
+    if (DD.debugAudio) {
+      console.log('[SFX] WallThud - speedScale:', speedScale.toFixed(3), 'vol:', vol.toFixed(3));
+    }
     if (vol > 0.02) {
       noiseSfx('lowpass', 150, 0.2, vol, 1.0);
     }
@@ -216,8 +244,12 @@
 
   DD.sfxLandingWhump = function (speedScale) {
     const vol = DD.clamp(speedScale, 0, 1) * 0.6;
+    if (DD.debugAudio) {
+      console.log('[SFX] LandingWhump - speedScale:', speedScale.toFixed(3), 'vol:', vol.toFixed(3));
+    }
     if (vol > 0.02) {
-      noiseSfx('lowpass', 90, 0.3, vol, 0.8);
+      noiseSfx('lowpass', 140, 0.3, vol, 0.8);
+      blip(70, 0.25, 'sine', vol * 0.8); // 70 Hz body tap
     }
   };
 

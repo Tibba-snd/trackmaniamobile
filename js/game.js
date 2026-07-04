@@ -6,12 +6,18 @@
 
   const $ = (id) => document.getElementById(id);
 
+  DD.trackCache = {};
+
   let cachedHudWarn = null;
   let cachedHudSpeed = null;
   let cachedHudGear = null;
   let cachedHudSpeedBox = null;
   let cachedRpmFill = null;
   let cachedHudDelta = null;
+  let cachedHudLeftBox = null;
+  let cachedHudMedals = null;
+
+  const drawPosScratch = [0, 0, 0];
 
   const scratchColor = new THREE.Color();
 
@@ -38,7 +44,7 @@
     CAMPAIGN.push(list);
   }
   const MEDAL_ORDER = ['bronze', 'silver', 'gold', 'author'];
-  const MEDAL_ICON = { author: '◆', gold: '●', silver: '●', bronze: '●', none: '○' };
+  const MEDAL_ICON = { author: '◆', gold: '★', silver: '●', bronze: '▲', none: '○' };
 
   function seedKey(seed, tier) { return seed + '|t' + tier; }
 
@@ -220,12 +226,22 @@
 
   /* ---------------- track lifecycle ---------------- */
   function startTrack(seed, tier) {
+    G.unlockedTiersBefore = [];
+    for (let t = 1; t <= 5; t++) {
+      if (tierUnlocked(t)) G.unlockedTiersBefore.push(t);
+    }
+
     G.state = 'loading';
     showScreen('loading');
     $('loadBiomeHeader').textContent = 'ACQUIRING SECTOR...';
     dialInText($('loadSeed'), seed + '  ·  TIER ' + tier);
     setTimeout(() => {
-      const track = DD.buildValidTrack(seed, tier);
+      const cacheKey = seed + '|' + tier;
+      let track = DD.trackCache[cacheKey];
+      if (!track) {
+        track = DD.buildValidTrack(seed, tier);
+        DD.trackCache[cacheKey] = track;
+      }
       G.track = track;
       applyCssTheme(track.theme);
       const biomeText = track.theme.biome.toUpperCase() + ' // ' + track.theme.weather.toUpperCase();
@@ -307,7 +323,7 @@
     G.recFrames = [];
     G.tickCount = 0;
     G.ghostPlayhead = 0;
-    G.prevPos = V.clone(G.car.pos);
+    G.prevPos = [G.car.pos[0], G.car.pos[1], G.car.pos[2]];
     G.prevYaw = G.car.yaw;
     G.camState = DD.makeCamState();
     const s0 = G.track.samples[G.track.startIdx];
@@ -576,11 +592,13 @@
     if (G.state === 'play') {
       G.acc += dtReal;
       let steps = 0;
+      let frameHitWall = false;
       while (G.acc >= DD.TICK && steps < 4) {
-        G.prevPos = V.clone(G.car.pos);
+        DD._ipSet(G.prevPos, G.car.pos[0], G.car.pos[1], G.car.pos[2]);
         G.prevYaw = G.car.yaw;
         DD.stepCar(G.car, input, G.track);
         DD.postWallClamp(G.car, G.track);
+        if (G.car.hitWall) frameHitWall = true;
         G.tickCount++;
         // ghost record
         if (G.tickCount % G.recEvery === 0) G.recFrames.push([G.car.pos[0], G.car.pos[1], G.car.pos[2], G.car.yaw]);
@@ -663,17 +681,31 @@
         G.acc -= DD.TICK;
         steps++;
       }
+      if (steps > 0) {
+        G.car.hitWall = frameHitWall;
+      }
       if (steps === 4) G.acc = 0; // spiral-of-death guard
       updateHudTime(G.car.time);
     }
 
     // ---- render (interp) ----
     const alpha = G.state === 'play' ? DD.clamp(G.acc / DD.TICK, 0, 1) : 1;
-    const drawPos = V.lerp(G.prevPos, G.car.pos, alpha);
+    const pP = G.prevPos, cP = G.car.pos;
+    drawPosScratch[0] = pP[0] + (cP[0] - pP[0]) * alpha;
+    drawPosScratch[1] = pP[1] + (cP[1] - pP[1]) * alpha;
+    drawPosScratch[2] = pP[2] + (cP[2] - pP[2]) * alpha;
+    const drawPos = drawPosScratch;
+
     const drawYaw = G.prevYaw + DD.angleDiff(G.prevYaw, G.car.yaw) * alpha;
     const s = G.track.samples[Math.min(G.car.idx, G.track.samples.length - 1)];
     const speed = V.len(G.car.vel);
     const speedNorm = DD.clamp(speed / DD.PHYS.vmax, 0, 1);
+
+    // O4: Speed-recede for HUD side panels (subtle opacity fade down to 0.5 at max speed)
+    const hudOpacity = 1.0 - speedNorm * 0.5;
+    if (cachedHudLeftBox) cachedHudLeftBox.style.opacity = hudOpacity;
+    if (cachedHudSpeedBox) cachedHudSpeedBox.style.opacity = hudOpacity;
+    if (cachedHudMedals) cachedHudMedals.style.opacity = hudOpacity;
 
     G.wheelSpin = speed * dtReal * 2.2;
     const carUp = G.car.onDirt && G.track.terrain ? DD.terrainNormal(G.track.terrain, drawPos[0], drawPos[2]) : s.u;
@@ -720,9 +752,9 @@
     if (G.sparks && DD.updateSparks) {
       const isDrifting = G.car.sliding && G.car.slideState && speed > 10;
       DD.updateSparks(G.sparks, G.car, G.track, dtReal, (G.car.hitWall && speed > 10) || isDrifting, isDrifting);
-      if (G.car.hitWall && speed > 10 && !G.prevHitWall) { DD.sfxWallThud(speedNorm); } G.prevHitWall = G.car.hitWall && speed > 10;
+      if (G.car.hitWall && speed > 5 && !G.prevHitWall) { DD.sfxWallThud(speedNorm); } G.prevHitWall = G.car.hitWall && speed > 5;
     }
-    DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt);
+    DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt, G.car.hitWall);
     // off-track / missed checkpoint warnings
     const warnEl = cachedHudWarn;
     if (G.car.missedCkpt) { warnEl.textContent = 'checkpoint missed — respawn (⚑)'; warnEl.style.opacity = 1; }
@@ -975,6 +1007,7 @@
     if (name === 'menu') {
       applyCssTheme(DEFAULT_THEME);
       $('menu').style.display = 'flex';
+      DD.trackCache = {}; // clear track cache when entering main menu
     }
     if (name === 'loading') $('loading').style.display = 'flex';
     if (name === 'finish') { $('finish').style.display = 'flex'; $('gameHud').style.display = 'block'; }
@@ -1063,31 +1096,60 @@
     });
   }
 
+  function formatTimeAgo(timestamp) {
+    if (!timestamp) return 'NEVER';
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'JUST NOW';
+    if (mins < 60) return mins + 'M AGO';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'H AGO';
+    return new Date(timestamp).toLocaleDateString();
+  }
+
   function selectCampaignTrack(seed, tier, btn) {
     document.querySelectorAll('.trackBtn').forEach(b => b.classList.remove('sel'));
     btn.classList.add('sel');
 
     selectedCampTrack = { seed, tier };
-    const track = DD.buildValidTrack(seed, tier);
+    const cacheKey = seed + '|' + tier;
+    let track = DD.trackCache[cacheKey];
+    if (!track) {
+      track = DD.buildValidTrack(seed, tier);
+      DD.trackCache[cacheKey] = track;
+    }
     applyCssTheme(track.theme);
 
     dialInText($('campTrackName'), 'TRACK ' + seed.split('-').pop());
-    $('campTrackInfo').textContent = track.archetype.toUpperCase() + '  ·  ' + Math.round(track.length) + 'M';
+    dialInText($('campTrackInfo'), track.archetype.toUpperCase() + '  ·  ' + Math.round(track.length) + 'M');
     dialInText($('campTrackTheme'), track.theme.biome.toUpperCase() + '  ·  ' + track.theme.weather.toUpperCase() + (track.theme.emotion ? '  ·  ' + track.theme.emotion.toUpperCase() + ' (' + track.theme.timeOfDream.toUpperCase() + ')' : ''));
 
-    $('campTimeAuthor').textContent = DD.formatTime(track.medals.author);
-    $('campTimeGold').textContent = DD.formatTime(track.medals.gold);
-    $('campTimeSilver').textContent = DD.formatTime(track.medals.silver);
-    $('campTimeBronze').textContent = DD.formatTime(track.medals.bronze);
+    dialInText($('campTimeAuthor'), DD.formatTime(track.medals.author));
+    dialInText($('campTimeGold'), DD.formatTime(track.medals.gold));
+    dialInText($('campTimeSilver'), DD.formatTime(track.medals.silver));
+    dialInText($('campTimeBronze'), DD.formatTime(track.medals.bronze));
 
     const key = seedKey(seed, tier);
     const rec = G.save.tracks[key];
     const pbBox = $('campTrackPB');
     if (rec && rec.pb) {
-      pbBox.innerHTML = 'PERSONAL BEST: <span class="pb-val">' + DD.formatTime(rec.pb) + '</span>';
+      pbBox.innerHTML = 'PERSONAL BEST: <span class="pb-val" id="campTrackPBVal">' + DD.formatTime(rec.pb) + '</span>';
       pbBox.style.display = 'block';
+      dialInText($('campTrackPBVal'), DD.formatTime(rec.pb));
     } else {
       pbBox.style.display = 'none';
+    }
+
+    const statsBox = $('campTrackStats');
+    if (statsBox) {
+      if (rec && rec.attempts) {
+        statsBox.style.display = 'flex';
+        dialInText($('campAttemptsVal'), String(rec.attempts));
+        const agoText = formatTimeAgo(rec.lastPlayed);
+        dialInText($('campLastPlayedVal'), 'LAST PLAYED: ' + agoText);
+      } else {
+        statsBox.style.display = 'none';
+      }
     }
 
     const canvas = $('campMapCanvas');
@@ -1102,30 +1164,164 @@
   function buildCampaignMenu() {
     const wrap = $('campList');
     wrap.innerHTML = '';
-    let firstUnlocked = null;
+
+    // Calculate total campaign medals
+    let totalMedals = 0;
+    for (let t = 1; t <= 5; t++) {
+      totalMedals += tierMedalCount(t);
+    }
+    const totalMedalsVal = $('campaign-total-medals-val');
+    if (totalMedalsVal) {
+      totalMedalsVal.textContent = totalMedals + ' / 50';
+    }
+
+    // Find last played track key
+    let lastPlayedKey = null;
+    let maxLastPlayed = 0;
+    for (const k of Object.keys(G.save.tracks)) {
+      const r = G.save.tracks[k];
+      if (r && r.lastPlayed && r.lastPlayed > maxLastPlayed) {
+        maxLastPlayed = r.lastPlayed;
+        lastPlayedKey = k;
+      }
+    }
+
+    // Determine target selection candidate
+    let targetSeed = selectedCampTrack ? selectedCampTrack.seed : null;
+    let targetTier = selectedCampTrack ? selectedCampTrack.tier : null;
+
+    if (!targetSeed) {
+      // Find first unlocked track without an author medal
+      for (let t = 1; t <= 5; t++) {
+        if (!tierUnlocked(t)) continue;
+        const list = CAMPAIGN[t - 1];
+        for (let i = 0; i < list.length; i++) {
+          const seed = list[i];
+          const rec = G.save.tracks[seedKey(seed, t)];
+          if (!rec || rec.medal !== 'author') {
+            targetSeed = seed;
+            targetTier = t;
+            break;
+          }
+        }
+        if (targetSeed) break;
+      }
+    }
+
+    let fallbackBtn = null;
+    let fallbackSeed = null;
+    let fallbackTier = null;
+    let selectedBtn = null;
+
     for (let t = 1; t <= 5; t++) {
       const unlocked = tierUnlocked(t);
-      const h = document.createElement('div');
-      h.className = 'tierHead' + (unlocked ? '' : ' locked');
-      h.textContent = 'TIER ' + t + (unlocked ? '' : '  🔒 ' + tierMedalCount(t - 1) + '/5 medals in tier ' + (t - 1));
-      wrap.appendChild(h);
-      if (!unlocked) continue;
-      const row = document.createElement('div');
-      row.className = 'tierRow';
-      CAMPAIGN[t - 1].forEach((seed, i) => {
-        const rec = G.save.tracks[seedKey(seed, t)];
-        const b = document.createElement('button');
-        b.className = 'trackBtn md ' + (rec && rec.medal ? rec.medal : 'none');
-        b.innerHTML = '<span class="num">' + (i + 1) + '</span><span class="ico">' + MEDAL_ICON[rec && rec.medal ? rec.medal : 'none'] + '</span>' +
-          (rec && rec.pb ? '<span class="pb">' + DD.formatTime(rec.pb) + '</span>' : '<span class="pb">—</span>');
-        b.onclick = () => { DD.sfxClick(); selectCampaignTrack(seed, t, b); };
-        row.appendChild(b);
-        if (!firstUnlocked) firstUnlocked = { seed, tier: t, btn: b };
-      });
-      wrap.appendChild(row);
+      
+      // Celebrate newly unlocked tier if it changed state
+      let celebrateUnlock = false;
+      if (unlocked && G.unlockedTiersBefore && !G.unlockedTiersBefore.includes(t)) {
+        celebrateUnlock = true;
+      }
+
+      const tierCard = document.createElement('div');
+      tierCard.className = 'tier-card' + (unlocked ? '' : ' locked') + (celebrateUnlock ? ' tier-unlock-flash' : '');
+
+      // 1. Tier Header
+      const tierHeader = document.createElement('div');
+      tierHeader.className = 'tier-header';
+
+      // Check for full clear in tier t
+      let allAuthor = unlocked;
+      if (unlocked) {
+        for (const seed of CAMPAIGN[t - 1]) {
+          const rec = G.save.tracks[seedKey(seed, t)];
+          if (!rec || rec.medal !== 'author') {
+            allAuthor = false;
+            break;
+          }
+        }
+      }
+
+      const tierTitle = document.createElement('span');
+      tierTitle.className = 'tier-title';
+      tierTitle.innerHTML = 'TIER ' + t + (!unlocked ? ' <span class="lock-icon">🔒</span>' : '');
+      
+      if (allAuthor) {
+        const clearBadge = document.createElement('span');
+        clearBadge.className = 'tier-author-badge';
+        clearBadge.textContent = '◆ FULL CLEAR';
+        tierTitle.appendChild(clearBadge);
+      }
+      
+      tierHeader.appendChild(tierTitle);
+
+      const mCount = tierMedalCount(t);
+      const tierComp = document.createElement('span');
+      tierComp.className = 'tier-completion';
+      tierComp.textContent = mCount + ' / 10 MEDALS';
+      tierHeader.appendChild(tierComp);
+
+      tierCard.appendChild(tierHeader);
+
+      // 2. Progress / Lock hint
+      const barContainer = document.createElement('div');
+      barContainer.className = 'tier-progress-container';
+
+      if (unlocked) {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'tier-progress-bar';
+        const progressFill = document.createElement('div');
+        progressFill.className = 'tier-progress-fill';
+        progressFill.style.width = (mCount * 10) + '%';
+        progressBar.appendChild(progressFill);
+        barContainer.appendChild(progressBar);
+      } else {
+        const lockHint = document.createElement('div');
+        lockHint.className = 'tier-lock-hint';
+        const prevTierMedals = tierMedalCount(t - 1);
+        const needed = 5 - prevTierMedals;
+        lockHint.textContent = needed + ' more medal' + (needed > 1 ? 's' : '') + ' in Tier ' + (t - 1) + ' to unlock';
+        barContainer.appendChild(lockHint);
+      }
+      tierCard.appendChild(barContainer);
+
+      // 3. Track list grid (only if unlocked)
+      if (unlocked) {
+        const row = document.createElement('div');
+        row.className = 'tierRow';
+        CAMPAIGN[t - 1].forEach((seed, i) => {
+          const rec = G.save.tracks[seedKey(seed, t)];
+          const key = seedKey(seed, t);
+          const isLastPlayed = key === lastPlayedKey;
+
+          const b = document.createElement('button');
+          b.className = 'trackBtn md ' + (rec && rec.medal ? rec.medal : 'none') + (isLastPlayed ? ' last-played' : '');
+          b.innerHTML = '<span class="num">' + (i + 1) + '</span><span class="ico">' + MEDAL_ICON[rec && rec.medal ? rec.medal : 'none'] + '</span>' +
+            (rec && rec.pb ? '<span class="pb">' + DD.formatTime(rec.pb) + '</span>' : '<span class="pb">—</span>');
+          b.onclick = () => { DD.sfxClick(); selectCampaignTrack(seed, t, b); };
+          row.appendChild(b);
+
+          if (!fallbackBtn) {
+            fallbackBtn = b;
+            fallbackSeed = seed;
+            fallbackTier = t;
+          }
+          if (seed === targetSeed && t === targetTier) {
+            selectedBtn = b;
+          }
+        });
+        tierCard.appendChild(row);
+      }
+
+      wrap.appendChild(tierCard);
     }
-    if (firstUnlocked) {
-      selectCampaignTrack(firstUnlocked.seed, firstUnlocked.tier, firstUnlocked.btn);
+
+    // Reset unlock celebration flag so it runs once
+    G.unlockedTiersBefore = null;
+
+    if (selectedBtn && targetSeed && targetTier) {
+      selectCampaignTrack(targetSeed, targetTier, selectedBtn);
+    } else if (fallbackBtn && fallbackSeed && fallbackTier) {
+      selectCampaignTrack(fallbackSeed, fallbackTier, fallbackBtn);
     }
   }
 
@@ -1229,6 +1425,8 @@
     cachedHudSpeedBox = $('hudSpeedBox');
     cachedRpmFill = document.querySelector('#hudRpmArc .rpm-fill');
     cachedHudDelta = $('hudDelta');
+    cachedHudLeftBox = $('hudLeftBox');
+    cachedHudMedals = $('hudMedals');
 
     const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     DD.testMode = params.get('testMode') === 'true';
@@ -1307,6 +1505,7 @@
 
     // finish buttons
     $('finRetry').onclick = () => { DD.sfxClick(); resetRun(true); };
+    $('finReplay').onclick = () => { DD.sfxClick(); startTrack(G.track.seed, G.track.tier); };
     $('finNext').onclick = () => {
       DD.sfxClick();
       if (G.track.seed.startsWith('CAMP-')) {

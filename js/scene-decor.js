@@ -1109,9 +1109,25 @@
       if (!s) { sIdx = rng.int(0, ss.length - 1); s = ss[sIdx]; }
 
       const inCorner = isNearCorner(sIdx);
+      let sign = rng.sign();
       let off = inCorner ? (s.w / 2 + 3.0 + rng.range(0.5, 10.0)) : (s.w / 2 + 9.0 + rng.range(6.0, 26.0));
-      const sign = rng.sign();
       let p = V.addS(V.clone(s.p), s.r, sign * off);
+
+      // O3: Bias placement to canyon walls and dune ridges by searching for slopes
+      if (T && (theme.biome === 'canyon' || theme.biome === 'dune')) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const testOff = inCorner ? (s.w / 2 + 3.0 + rng.range(0.5, 20.0)) : (s.w / 2 + 9.0 + rng.range(6.0, 45.0));
+          const testSign = rng.sign();
+          const testP = V.addS(V.clone(s.p), s.r, testSign * testOff);
+          const tn = DD.terrainNormal(T, testP[0], testP[2]);
+          if (1.0 - tn[1] > 0.06) {
+            off = testOff;
+            sign = testSign;
+            p = testP;
+            break;
+          }
+        }
+      }
 
       let cleared = true;
       for (let j = 0; j < ss.length; j += 6) {
