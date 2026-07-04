@@ -58,12 +58,15 @@
     powerOversteerV: 45,    // m/s above which throttle no longer destabilises the rear
     driftBtnRearMul: 0.42,
     driftYawAuthority: 5.5, // yaw acceleration factor when steering in drift (arcade authority)
-    // C4b: velocity-to-heading coupling while drift is HELD — speed-scaled so the velocity
-    // vector actually follows the nose (the old flat 2.2/s was ~5× slower than grip's 12/s,
-    // so the nose pointed in but the car plowed wide). Lo at low speed (tight corners tighten),
-    // Hi at high speed (keeps some slip for the visual + skill curve). Still < grip's 12.
-    driftCouplingLo: 7.0,   // coupling /s at low speed — velocity follows nose, drift tightens the line
-    driftCouplingHi: 3.5,   // coupling /s above ~40 m/s — some slip remains, drift stays a commitment
+    // C4b v2: velocity-to-heading coupling while drift is HELD. The v1 curve (Lo 7 -> Hi 3.5) made
+    // drift WEAKEST at race speed — exactly backwards. Real corner entry is 250-300+ km/h, and that's
+    // where drift must beat grip/coast/wall-riding. So the curve INVERTS: modest at low speed (grip
+    // still wins tight low-speed corners = honest skill curve), STRONG at high speed (drift is the
+    // fast-corner tool — coupling rises above grip's 12/s so the velocity vector actually follows
+    // the nose against high momentum). Combined with speed-capped scrub below, drift holds speed and
+    // tightens the line through fast corners.
+    driftCouplingLo: 4.5,   // coupling /s at low speed — grip stays the tighter line for slow hairpins
+    driftCouplingHi: 18.0,  // coupling /s at high speed (>= ~55 m/s / 200 km/h) — drift rotates through tight fast corners grip can't hold (yaw-capped)
     slideRearMul: 0.92,     // once sliding, rear stays a touch loose (drifts hold, weak feedback loop)
     slideYawDamp: 1.6,      // extra yaw damping while sliding — drifts recover, don't spin
     slideEnter: 0.15, slideExit: 0.07, // rad rear slip hysteresis
@@ -82,7 +85,10 @@
     shoulderScrub: 0.99,
     shoulderPush: 9,
     wallBounce: 0.22,
-    wallFriction: 0.986,
+    wallFriction: 0.94,      // C4b v2: 0.986 -> 0.94. Wall-riding was nearly free (kept 98.6% speed
+                             // per impact), so railing the fence beat drifting in every corner.
+                             // 0.94 makes a real scrape cost ~6% speed/contact — sparks stay cool,
+                             // but leaning on the wall every corner is no longer the fast line.
     launchVu: 2.5,          // upward speed rel. surface that releases the car (jumps!)
     outOfWorld: 60          // below terrain min -> respawn
   };
@@ -390,14 +396,14 @@
       vLat += (FyF + FyR - r * vLong) * dt;
 
       // velocity-follows-heading coupling while drift is held (arcade tightening).
-      // C4b: speed-scaled — driftCouplingLo at low speed (tightens the line), driftCouplingHi
-      // at high speed (keeps some slip angle = the drift look + a real speed commitment).
-      // Flat 2.2/s was the understeer root cause: nose rotated in fast (driftYawAuthority) but
-      // velocity took ~0.45s to follow, so the car plowed ~16m wide at 35 m/s.
+      // C4b v2: speed-scaled so drift DOMINATES fast corners (the curve inverts — modest at low
+      // speed where grip wins, strong at race speed where drift must win). Transition 20->55 m/s.
+      // v1's flat-ish curve made drift weakest at the speeds you actually corner at (250-300+ km/h),
+      // so the nose rotated in but velocity plowed wide against high momentum.
       if (input.drift) {
         const velSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
         if (velSpeed > 1) {
-          const coupling = DD.lerp(P.driftCouplingLo, P.driftCouplingHi, DD.clamp(speed / 40, 0, 1));
+          const coupling = DD.lerp(P.driftCouplingLo, P.driftCouplingHi, DD.clamp((speed - 20) / 35, 0, 1));
           let theta = Math.atan2(vLat, vLong);
           theta -= theta * coupling * dt;
           vLong = velSpeed * Math.cos(theta);
@@ -422,9 +428,19 @@
     drive = Math.min(drive, boost ? drive : rearLongCap);
     let longAcc = drive + r * vLat * 0.5;
     // scrubbing tires drag the car (slides cost speed — the drift tradeoff) — except on ice.
-    // C4b: coefficients trimmed 0.5/0.22 → 0.38/0.16 so mid-speed drift (30-42 m/s, below the
-    // sdBoost window) isn't purely punitive now that coupling genuinely tightens the line.
-    if (!glass) longAcc -= (Math.abs(Math.sin(alphaR)) * gR * 0.38 + Math.abs(Math.sin(alphaF)) * gF * 0.16) * Math.sign(vLong);
+    // C4b v2: scrub fades with speed above ~40 m/s so high-speed drift (the fast-corner regime)
+    // holds momentum. v1's flat coefficient bled catastrophic speed at race pace (335 m/s lost
+    // over 3s at 299 km/h) — drift was both looser AND slower than grip. The fade keeps a real
+    // low/mid-speed cost (drift is still a commitment below the crossover) without making it
+    // punitive at the speeds you actually corner at.
+    if (!glass) {
+      // Scrub fades PARTIALLY at high speed (1.0 -> 0.55) so high-speed drift is viable through
+      // tight corners but still pays a real cost — drift must NOT beat grip on long sweepers, only
+      // where grip is yaw-capped (tight fast corners). A near-zero fade (the v2 mistake) let drift
+      // win everywhere, including full-throttle sweepers where grip should dominate.
+      const scrubFade = DD.clamp(1 - (speed - 35) / 80, 0.55, 1);
+      longAcc -= (Math.abs(Math.sin(alphaR)) * gR * 0.38 + Math.abs(Math.sin(alphaF)) * gF * 0.16) * scrubFade * Math.sign(vLong);
+    }
     // brake: decelerates while moving forward; engages capped reverse only near standstill
     if (vLong > 0.5) longAcc -= brake * P.brakeDec;
     else if (vLong > -P.reverseMax) longAcc -= brake * 8;
