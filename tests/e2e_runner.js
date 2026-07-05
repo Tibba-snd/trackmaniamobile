@@ -232,7 +232,8 @@ const features = [
       if (idx === 0) {
         return {
           name: `drift_slip_t${tier}`,
-          query: `testMode=true&seed=${seed}&tier=${tier}&mockKeys=KeyW,KeyD,Space&duration=1200`,
+          // brake-tap (KeyS) initiates the slide now — no drift button. KeyD steers into it.
+          query: `testMode=true&seed=${seed}&tier=${tier}&mockKeys=KeyW,KeyD,KeyS&duration=1200`,
           expectedLogs: ['[TEST] TRACK_LOAD', '[TEST] RACE_START'],
           assertion: 'Math.abs(window.DD.game.car.slipR) >= 0',
           timeout: 5000
@@ -248,7 +249,8 @@ const features = [
       } else {
         return {
           name: `drift_flag_check_t${tier}`,
-          query: `testMode=true&seed=${seed}&tier=${tier}&mockKeys=KeyW,KeyD,Space&duration=1500`,
+          // brake-tap (KeyS) initiates the slide now — no drift button.
+          query: `testMode=true&seed=${seed}&tier=${tier}&mockKeys=KeyW,KeyD,KeyS&duration=1500`,
           expectedLogs: ['[TEST] TRACK_LOAD', '[TEST] RACE_START'],
           assertion: 'typeof window.DD.game.car.sliding === "boolean"',
           timeout: 5000

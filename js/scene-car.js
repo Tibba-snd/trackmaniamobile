@@ -124,13 +124,58 @@
       const a = m * K + i, b = m * K + (i + 1) % K, c = (m + 1) * K + i, d = (m + 1) * K + (i + 1) % K;
       idx.push(a, c, b, b, c, d);
     }
-    const cap = (m, rev) => {
+    // Cap styles (CAR.md): flat = centroid fan (default), pointed = cone tip offset along the spine,
+    // rounded = hemisphere bulge (centroid peak + tapered mid-ring, single pass), hollow = skip cap.
+    // Winding mirrors the flat fan (rev true/false) so every style faces the same way as the default.
+    const cap = (m, rev, style) => {
+      style = (style === 'pointed' || style === 'rounded' || style === 'hollow') ? style : 'flat';
+      if (style === 'hollow') return; // open intake/exhaust bay — emit no cap triangles
       let cx = 0, cy = 0, cz = 0;
-      for (let i = 0; i < K; i++) { cx += pos[(m * K + i) * 3]; cy += pos[(m * K + i) * 3 + 1]; cz += pos[(m * K + i) * 3 + 2]; }
-      const ci = pos.length / 3; pos.push(cx / K, cy / K, cz / K);
-      for (let i = 0; i < K; i++) { const a = m * K + i, b = m * K + (i + 1) % K; rev ? idx.push(ci, b, a) : idx.push(ci, a, b); }
+      for (let i = 0; i < K; i++) {
+        cx += pos[(m * K + i) * 3]; cy += pos[(m * K + i) * 3 + 1]; cz += pos[(m * K + i) * 3 + 2];
+      }
+      cx /= K; cy /= K; cz /= K;
+      const dir = rev ? 1 : -1; // front cap bulges +Z, rear cap bulges -Z
+      if (style === 'pointed') {
+        // cone tip: centroid offset ±0.3·L along the spine axis
+        const ci = pos.length / 3; pos.push(cx, cy, cz + dir * 0.3 * L);
+        for (let i = 0; i < K; i++) {
+          const a = m * K + i, b = m * K + (i + 1) % K;
+          rev ? idx.push(ci, b, a) : idx.push(ci, a, b);
+        }
+        return;
+      }
+      if (style === 'rounded') {
+        // hemisphere bulge: centroid peak ~0.5·avgRingRadius + a duplicated tapered mid-ring
+        // (single pass, no recursion) so the cap curves instead of forming a sharp cone.
+        let avgR = 0;
+        for (let i = 0; i < K; i++) {
+          const px = pos[(m * K + i) * 3] - cx, py = pos[(m * K + i) * 3 + 1] - cy;
+          avgR += Math.sqrt(px * px + py * py);
+        }
+        avgR /= K;
+        const peak = dir * 0.5 * avgR, taper = peak * 0.5;
+        const rim = pos.length / 3; // duplicated mid-ring (cap-exclusive; side strips stay intact)
+        for (let i = 0; i < K; i++) {
+          pos.push(pos[(m * K + i) * 3], pos[(m * K + i) * 3 + 1], pos[(m * K + i) * 3 + 2] + taper);
+        }
+        const ci = pos.length / 3; pos.push(cx, cy, cz + peak);
+        for (let i = 0; i < K; i++) {
+          const a = m * K + i, b = m * K + (i + 1) % K, da = rim + i, db = rim + (i + 1) % K;
+          if (rev) { idx.push(da, b, a, da, db, b, ci, db, da); }
+          else { idx.push(da, a, b, da, b, db, ci, da, db); }
+        }
+        return;
+      }
+      // flat (default): centroid fan — unchanged from original buildHull
+      const ci = pos.length / 3; pos.push(cx, cy, cz);
+      for (let i = 0; i < K; i++) {
+        const a = m * K + i, b = m * K + (i + 1) % K;
+        rev ? idx.push(ci, b, a) : idx.push(ci, a, b);
+      }
     };
-    cap(0, true); cap(M - 1, false);
+    cap(0, true, hull.capStyleFront);
+    cap(M - 1, false, hull.capStyleRear);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     geo.setIndex(idx);
@@ -159,43 +204,52 @@
     }
   }
 
-  // wheel-style registry — each adds its face elements to the spin group (tyre/disc/hub are common)
+  // wheel-style registry — each adds its face elements to the spin group (tyre/disc/hub are common).
+  // G2: every builder now reads opts { rimPct, spokeCount } so parametric wheels work; defaults preserve
+  // the original look when knobs are absent. No new THREE classes (all reuse _tor/_cyl/_box helpers).
   DD.CAR_WHEEL_BUILDERS = {
-    multiSpoke(spin, r, side, M, discMat) {
-      for (let k = 0; k < 5; k++) {
-        const sp = _mesh(_box(0.024, r * 1.55, 0.024), discMat);
-        sp.rotation.z = (k / 5) * Math.PI; sp.position.set(side * 0.06, 0, 0); spin.add(sp);
+    multiSpoke(spin, r, side, M, o) {
+      o = o || {};
+      const n = o.spokeCount || 5; // schema clamps 3-8
+      for (let k = 0; k < n; k++) {
+        const sp = _mesh(_box(0.024, r * 1.55, 0.024), o.discMat);
+        sp.rotation.z = (k / n) * Math.PI; sp.position.set(side * 0.06, 0, 0); spin.add(sp);
       }
       const blade = _mesh(_box(0.04, r * 1.3, 0.03), M.glowMat(M.grad.a, 0.95));
       blade.position.set(side * 0.12, r * 0.18, 0); spin.add(blade);
-      // glowing rim ring (concept sheet: "Rims: glowing / emissive accent color")
-      const rim = _mesh(_tor(r * 0.72, 0.018, 6, 24), M.glowMat(M.grad.b, 0.8));
+      // glowing rim ring (concept sheet: "Rims: glowing / emissive accent color") — sized by rimPct
+      const rim = _mesh(_tor(r * (o.rimPct || 0.82) * 0.88, 0.018, 6, 24), M.glowMat(M.grad.b, 0.8));
       rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.10, 0, 0); spin.add(rim);
     },
-    turbofan(spin, r, side, M) {
-      const ring = _mesh(_tor(r * 0.5, 0.02, 6, 24), M.glowMat(M.grad.b, 0.9));
+    turbofan(spin, r, side, M, o) {
+      o = o || {};
+      const ring = _mesh(_tor(r * (o.rimPct || 0.82) * 0.62, 0.02, 6, 24), M.glowMat(M.grad.b, 0.9));
       ring.rotation.y = Math.PI / 2; ring.position.set(side * 0.16, 0, 0); spin.add(ring);
       const blade = _mesh(_box(0.05, r * 1.1, 0.02), M.glowMat(M.grad.a, 0.7));
       blade.position.set(side * 0.14, r * 0.2, 0); spin.add(blade);
     },
-    glowDisc(spin, r, side, M) {
-      const core = _mesh(_cyl(r * 0.38, r * 0.38, 0.14, 16), M.glowMat(M.grad.a, 0.95));
+    glowDisc(spin, r, side, M, o) {
+      o = o || {};
+      const rr = o.rimPct || 0.82;
+      const core = _mesh(_cyl(r * rr * 0.46, r * rr * 0.46, 0.14, 16), M.glowMat(M.grad.a, 0.95));
       core.rotation.z = Math.PI / 2; core.position.set(side * 0.12, 0, 0); spin.add(core);
-      const ring = _mesh(_tor(r * 0.65, 0.03, 6, 24), M.glowMat(M.grad.b, 0.9));
+      const ring = _mesh(_tor(r * rr * 0.79, 0.03, 6, 24), M.glowMat(M.grad.b, 0.9));
       ring.rotation.y = Math.PI / 2; ring.position.set(side * 0.14, 0, 0); spin.add(ring);
       // O6: Asymmetric neon blade extending from core to ring to serve as a visible spin cue
       const blade = _mesh(_box(0.03, r * 0.45, 0.02), M.glowMat(M.grad.a, 0.95));
       blade.position.set(side * 0.13, r * 0.42, 0); spin.add(blade);
     },
-    classicSpoke(spin, r, side, M, discMat) {
-      for (let k = 0; k < 6; k++) {
+    classicSpoke(spin, r, side, M, o) {
+      o = o || {};
+      const n = o.spokeCount || 6; // schema clamps 3-8
+      for (let k = 0; k < n; k++) {
         const sp = _mesh(_box(0.016, r * 1.62, 0.016), M.chrome);
-        sp.rotation.z = (k / 6) * Math.PI; sp.position.set(side * 0.05, 0, 0); spin.add(sp);
+        sp.rotation.z = (k / n) * Math.PI; sp.position.set(side * 0.05, 0, 0); spin.add(sp);
       }
-      const cap = _mesh(_cyl(r * 0.18, r * 0.18, 0.1, 12), M.glowMat(M.grad.a, 0.85));
+      const cap = _mesh(_cyl(r * (o.rimPct || 0.82) * 0.22, r * (o.rimPct || 0.82) * 0.22, 0.1, 12), M.glowMat(M.grad.a, 0.85));
       cap.rotation.z = Math.PI / 2; cap.position.set(side * 0.1, 0, 0); spin.add(cap);
       // subtler vintage rim glow — keeps the chrome identity but reads at dusk
-      const rim = _mesh(_tor(r * 0.66, 0.014, 6, 24), M.glowMat(M.grad.b, 0.55));
+      const rim = _mesh(_tor(r * (o.rimPct || 0.82) * 0.80, 0.014, 6, 24), M.glowMat(M.grad.b, 0.55));
       rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.08, 0, 0); spin.add(rim);
     }
   };
@@ -204,15 +258,26 @@
     const tyreMat = new THREE.MeshStandardMaterial({ color: 0x0d0d12, metalness: 0.0, roughness: 0.85, transparent: ghost, opacity: ghost ? 0.3 : 1 });
     const discMat = new THREE.MeshStandardMaterial({ color: 0x2b2c36, metalness: 1.0, roughness: 0.28, envMapIntensity: ghost ? 0.3 : 1.0, transparent: ghost, opacity: ghost ? 0.3 : 1, envMap: envMap || null });
     const tw = hp.tyreW;
+    // G2: parametric wheel knobs (clamped by normalizeSpec in carspec.js). Defaults preserve original look.
+    const rimPct = (hp.rimRadiusPct != null && Number.isFinite(hp.rimRadiusPct)) ? hp.rimRadiusPct : 0.82;
+    const roundness = (hp.tyreRoundness != null && Number.isFinite(hp.tyreRoundness)) ? hp.tyreRoundness : 0;
+    const spokeCount = (typeof hp.spokeCount === 'number') ? hp.spokeCount : null; // null → builder default
     const defs = [[-hp.trackF, hp.frontZ * L, hp.frontR], [hp.trackF, hp.frontZ * L, hp.frontR], [-hp.trackR, hp.rearZ * L, hp.rearR], [hp.trackR, hp.rearZ * L, hp.rearR]];
     const styleFn = DD.CAR_WHEEL_BUILDERS[style] || DD.CAR_WHEEL_BUILDERS.multiSpoke;
     group.wheels = []; group.frontWheels = [];
     defs.forEach(([x, z, r], wi) => {
       const w = new THREE.Group(), spin = new THREE.Group(), side = Math.sign(x) || 1;
       const tyre = _mesh(_cyl(r, r, tw, 24), tyreMat); tyre.rotation.z = Math.PI / 2; spin.add(tyre);
-      const disc = _mesh(_cyl(r * 0.82, r * 0.82, tw * 0.88, 24), discMat); disc.rotation.z = Math.PI / 2; disc.position.set(side * 0.04, 0, 0); spin.add(disc);
+      // G2: tyreRoundness — add a torus bevel ring along the tread so higher roundness reads as a
+      // rounder (more pneumatic) tyre. tube=0 at roundness 0 (no extra mesh, original look).
+      if (roundness > 0.01) {
+        const tube = r * 0.18 * roundness;
+        const bevel = _mesh(_tor(r * (1 - 0.09 * roundness), tube, 8, 24), tyreMat);
+        bevel.rotation.y = Math.PI / 2; spin.add(bevel);
+      }
+      const disc = _mesh(_cyl(r * rimPct, r * rimPct, tw * 0.88, 24), discMat); disc.rotation.z = Math.PI / 2; disc.position.set(side * 0.04, 0, 0); spin.add(disc);
       const hub = _mesh(_cyl(r * 0.28, r * 0.40, tw * 1.18, 18), discMat); hub.rotation.z = Math.PI / 2; spin.add(hub);
-      styleFn(spin, r, side, mats, discMat);
+      styleFn(spin, r, side, mats, { discMat: discMat, rimPct: rimPct, spokeCount: spokeCount });
       w.add(spin); w.userData = { spinGroup: spin }; w.position.set(x, r, z);
       group.add(w); group.wheels.push(w);
       if (wi < 2) group.frontWheels.push(w);
@@ -232,32 +297,52 @@
      player-authored block-data part). ctx.mats exposes the material slots. */
   DD.CAR_PARTS = {
     frontWing(ctx) {
+      // G3 knobs: angle (pitch rad, clamp ±0.6, default 0.10), scale (clamp 0.5-2.0, default 1),
+      // width (span multiplier, clamp 0.5-1.5, default 1). Mirrors lightBar's defensive read pattern.
+      const k = ctx.knobs || {};
+      const angle = (k.angle != null && Number.isFinite(k.angle)) ? Math.max(-0.6, Math.min(0.6, k.angle)) : 0.10;
+      const scale = (k.scale != null && Number.isFinite(k.scale)) ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const width = (k.width != null && Number.isFinite(k.width)) ? Math.max(0.5, Math.min(1.5, k.width)) : 1;
       const g = ctx.group, L = ctx.L, M = ctx.mats, z = 2.4 * L;
-      const w1 = _mesh(_box(1.5, 0.03, 0.34), M.bodyMat(M.gradMix(1.0), 0)); w1.position.set(0, 0.13, z); w1.rotation.x = 0.10; g.add(w1);
-      const w2 = _mesh(_box(1.5, 0.02, 0.22), M.bodyMat(M.gradMix(0.85), 0)); w2.position.set(0, 0.20, z + 0.05); w2.rotation.x = 0.16; g.add(w2);
-      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.03, 0.18, 0.42), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * 0.75, 0.16, z); g.add(ep); }
+      const w1 = _mesh(_box(1.5 * width, 0.03 * scale, 0.34 * scale), M.bodyMat(M.gradMix(1.0), 0)); w1.position.set(0, 0.13, z); w1.rotation.x = angle; g.add(w1);
+      const w2 = _mesh(_box(1.5 * width, 0.02 * scale, 0.22 * scale), M.bodyMat(M.gradMix(0.85), 0)); w2.position.set(0, 0.20, z + 0.05); w2.rotation.x = angle + 0.06; g.add(w2);
+      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.03, 0.18 * scale, 0.42 * scale), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * 0.75 * width, 0.16, z); g.add(ep); }
     },
     rearWingBiplane(ctx) {
-      const g = ctx.group, L = ctx.L, M = ctx.mats, rwY = 0.9, rwZ = -2.15 * L, ww = 1.55;
-      const rw1 = _mesh(_box(ww, 0.03, 0.36), M.bodyMat(M.gradMix(1.0), 0)); rw1.position.set(0, rwY, rwZ); rw1.rotation.x = -0.12; g.add(rw1);
-      const rw2 = _mesh(_box(ww, 0.02, 0.24), M.bodyMat(M.gradMix(0.9), 0)); rw2.position.set(0, rwY + 0.12, rwZ - 0.05); rw2.rotation.x = -0.18; g.add(rw2);
-      const pylon = _mesh(_box(0.09, 0.82, 0.2), M.carbon); pylon.position.set(0, rwY - 0.42, rwZ + 0.05); g.add(pylon);
-      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.04, 0.36, 0.44), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * ww / 2, rwY - 0.04, rwZ); g.add(ep); }
+      // G3 knobs — same semantics as frontWing. Defaults reproduce the original look.
+      const k = ctx.knobs || {};
+      const angle = (k.angle != null && Number.isFinite(k.angle)) ? Math.max(-0.6, Math.min(0.6, k.angle)) : -0.12;
+      const scale = (k.scale != null && Number.isFinite(k.scale)) ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const width = (k.width != null && Number.isFinite(k.width)) ? Math.max(0.5, Math.min(1.5, k.width)) : 1;
+      const g = ctx.group, L = ctx.L, M = ctx.mats, rwY = 0.9, rwZ = -2.15 * L, ww = 1.55 * width;
+      const rw1 = _mesh(_box(ww, 0.03 * scale, 0.36 * scale), M.bodyMat(M.gradMix(1.0), 0)); rw1.position.set(0, rwY, rwZ); rw1.rotation.x = angle; g.add(rw1);
+      const rw2 = _mesh(_box(ww, 0.02 * scale, 0.24 * scale), M.bodyMat(M.gradMix(0.9), 0)); rw2.position.set(0, rwY + 0.12, rwZ - 0.05); rw2.rotation.x = angle - 0.06; g.add(rw2);
+      const pylon = _mesh(_box(0.09 * scale, 0.82 * scale, 0.2 * scale), M.carbon); pylon.position.set(0, rwY - 0.42, rwZ + 0.05); g.add(pylon);
+      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.04, 0.36 * scale, 0.44 * scale), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * ww / 2, rwY - 0.04, rwZ); g.add(ep); }
       const bar = _mesh(_box(ww * 0.8, 0.04, 0.04), M.glowMat(M.grad.a, 0.95)); bar.position.set(0, rwY - 0.03, rwZ - 0.2); g.add(bar);
     },
     rearSpoilerLow(ctx) {
-      const g = ctx.group, L = ctx.L, M = ctx.mats, rwZ = -2.15 * L, ww = 1.55;
-      const sp = _mesh(_box(ww, 0.04, 0.38), M.bodyMat(M.gradMix(1.0), 0)); sp.position.set(0, 0.55, rwZ); sp.rotation.x = -0.06; g.add(sp);
-      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.03, 0.28, 0.44), M.bodyMat(M.gradMix(0.15), 0)); ep.position.set(sx * ww / 2, 0.47, rwZ); g.add(ep); }
+      // G3 knobs — same semantics. Default angle -0.06 reproduces original.
+      const k = ctx.knobs || {};
+      const angle = (k.angle != null && Number.isFinite(k.angle)) ? Math.max(-0.6, Math.min(0.6, k.angle)) : -0.06;
+      const scale = (k.scale != null && Number.isFinite(k.scale)) ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const width = (k.width != null && Number.isFinite(k.width)) ? Math.max(0.5, Math.min(1.5, k.width)) : 1;
+      const g = ctx.group, L = ctx.L, M = ctx.mats, rwZ = -2.15 * L, ww = 1.55 * width;
+      const sp = _mesh(_box(ww, 0.04 * scale, 0.38 * scale), M.bodyMat(M.gradMix(1.0), 0)); sp.position.set(0, 0.55, rwZ); sp.rotation.x = angle; g.add(sp);
+      for (const sx of [-1, 1]) { const ep = _mesh(_box(0.03, 0.28 * scale, 0.44 * scale), M.bodyMat(M.gradMix(0.15), 0)); ep.position.set(sx * ww / 2, 0.47, rwZ); g.add(ep); }
       const bar = _mesh(_box(ww * 0.8, 0.04, 0.04), M.glowMat(M.grad.a, 0.95)); bar.position.set(0, 0.53, rwZ - 0.18); g.add(bar);
     },
     hoverFins(ctx) {
+      // G3 knobs — angle (splay rad, clamp ±0.6, default -0.15) + scale only (fins have no span knob).
+      const k = ctx.knobs || {};
+      const angle = (k.angle != null && Number.isFinite(k.angle)) ? Math.max(-0.6, Math.min(0.6, k.angle)) : -0.15;
+      const scale = (k.scale != null && Number.isFinite(k.scale)) ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
       const g = ctx.group, L = ctx.L, M = ctx.mats, rwZ = -2.0 * L;
       for (const sx of [-1, 1]) {
-        const wl = _mesh(_box(0.48, 0.04, 0.34), M.bodyMat(M.gradMix(0.95), 0)); wl.position.set(sx * 0.56, 0.70, rwZ); wl.rotation.x = -0.15; wl.rotation.y = sx * 0.1; g.add(wl);
-        const ep = _mesh(_box(0.03, 0.22, 0.38), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * 0.80, 0.64, rwZ); g.add(ep);
-        const py = _mesh(_box(0.04, 0.32, 0.12), M.carbon); py.position.set(sx * 0.56, 0.54, rwZ); g.add(py);
-        const bar = _mesh(_box(0.38, 0.03, 0.03), M.glowMat(M.grad.a, 0.95)); bar.position.set(sx * 0.56, 0.68, rwZ - 0.16); g.add(bar);
+        const wl = _mesh(_box(0.48 * scale, 0.04 * scale, 0.34 * scale), M.bodyMat(M.gradMix(0.95), 0)); wl.position.set(sx * 0.56, 0.70, rwZ); wl.rotation.x = angle; wl.rotation.y = sx * 0.1; g.add(wl);
+        const ep = _mesh(_box(0.03, 0.22 * scale, 0.38 * scale), M.bodyMat(M.gradMix(0.1), 0)); ep.position.set(sx * 0.80, 0.64, rwZ); g.add(ep);
+        const py = _mesh(_box(0.04 * scale, 0.32 * scale, 0.12 * scale), M.carbon); py.position.set(sx * 0.56, 0.54, rwZ); g.add(py);
+        const bar = _mesh(_box(0.38 * scale, 0.03, 0.03), M.glowMat(M.grad.a, 0.95)); bar.position.set(sx * 0.56, 0.68, rwZ - 0.16); g.add(bar);
       }
     },
     splitter(ctx) {
@@ -379,9 +464,10 @@
     return group;
   };
 
-  // thin wrapper: resolve the CarSpec for this garage selection, then render it
-  DD.buildCar = function (garage, ghost, envMap) {
-    return DD.buildCarFromSpec(DD.resolveSpec(garage), { ghost: ghost, envMap: envMap, garage: garage });
+  // thin wrapper: resolve the CarSpec for this garage selection, then render it.
+  // customDesigns is OPTIONAL and forwarded to resolveSpec so the active custom design (if any) drives.
+  DD.buildCar = function (garage, ghost, envMap, customDesigns) {
+    return DD.buildCarFromSpec(DD.resolveSpec(garage, customDesigns), { ghost: ghost, envMap: envMap, garage: garage });
   };
 
   /* garage editor — Length-rings mode (P2 slice A): one grabbable handle per hull station, at its

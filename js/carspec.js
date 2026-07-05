@@ -274,4 +274,52 @@
     return DD.normalizeSpec(spec);
   };
 
+  /* schemaVersion + migrate — forward-compat for old saves and imported share codes. Bumping
+     SCHEMA_VERSION + adding a branch below lets future changes (renames, new required fields, struct
+     shifts) keep old localStorage saves and foreign share codes working. migrate() is pure + sync +
+     THREE-free so it runs headless in Node tests. normalizeSpec is always called AFTER migrate, so
+     migrate only needs to upgrade the SHAPE of the spec, not validate ranges. */
+  DD.SCHEMA_VERSION = 1;
+  DD.migrate = function (spec) {
+    spec = JSON.parse(JSON.stringify(spec || {}));
+    const v = (typeof spec.schemaVersion === 'number') ? spec.schemaVersion : 0;
+    // future: if (v < 2) { ...rename fields / reshape mounts... }
+    spec.schemaVersion = DD.SCHEMA_VERSION;
+    return spec;
+  };
+
+  /* Share codes — base64(UTF-8(JSON(spec))). v1 uses raw base64 (no gzip) for simplicity; the
+     canonical form is "DD1:" + base64 so we can detect/share-version later. Pure + sync + portable:
+     Node uses Buffer, browsers use btoa/atob. encodeShareCode drops the id/name (those are player-
+     local) and stamps schemaVersion. decodeShareCode runs migrate → normalizeSpec so any foreign code
+     is always safe to render. Round-trips losslessly for the body/canopy/mounts/wheels/palette. */
+  const B64 = {
+    encode: (str) => {
+      if (typeof Buffer !== 'undefined') return Buffer.from(str, 'utf8').toString('base64');
+      // browser path: handle UTF-8 codepoints above 0xFF
+      return btoa(unescape(encodeURIComponent(str)));
+    },
+    decode: (b64) => {
+      if (typeof Buffer !== 'undefined') return Buffer.from(b64, 'base64').toString('utf8');
+      return decodeURIComponent(escape(atob(b64)));
+    }
+  };
+  const SHARE_PREFIX = 'DD1:';
+  DD.encodeShareCode = function (spec) {
+    const clean = DD.migrate(spec);
+    delete clean.id; delete clean.name; // player-local — never travel in a share code
+    const json = JSON.stringify(clean);
+    return SHARE_PREFIX + B64.encode(json);
+  };
+  DD.decodeShareCode = function (code) {
+    if (typeof code !== 'string') return null;
+    if (code.indexOf(SHARE_PREFIX) === 0) code = code.slice(SHARE_PREFIX.length);
+    try {
+      const spec = JSON.parse(B64.decode(code.trim()));
+      return DD.normalizeSpec(DD.migrate(spec));
+    } catch (e) {
+      return null; // malformed foreign code — caller shows "invalid code" UI
+    }
+  };
+
 })(typeof window !== 'undefined' ? window : globalThis);

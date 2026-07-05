@@ -95,5 +95,36 @@ eq(typeof save.meta.customSeq, 'number', 'loadSave: meta.customSeq is a number')
 eq(DD.normalizeSpec({ chassis: { hardpoints: { rimRadiusPct: 99 } } }).chassis.hardpoints.rimRadiusPct, 0.9,
   'load-path normalize clamps an out-of-range design');
 
+// 13. migrate() stamps schemaVersion and is idempotent + pure (does not mutate input).
+const migIn = { chassis: { hardpoints: {} } };
+const migOut = DD.migrate(migIn);
+eq(migOut.schemaVersion, DD.SCHEMA_VERSION, 'migrate stamps current schemaVersion');
+eq(migIn.schemaVersion, undefined, 'migrate is pure — input untouched');
+eq(DD.migrate(migOut).schemaVersion, DD.SCHEMA_VERSION, 'migrate idempotent');
+
+// 14. encodeShareCode / decodeShareCode round-trip — every preset survives the journey with its
+//     chassis/canopy/mounts/wheels intact and the player-local id/name stripped.
+DD.CAR_PRESETS.forEach((preset, i) => {
+  const code = DD.encodeShareCode(preset);
+  ok(typeof code === 'string' && code.indexOf('DD1:') === 0, 'preset ' + i + ' encodes with DD1: prefix');
+  const decoded = DD.decodeShareCode(code);
+  ok(decoded != null, 'preset ' + i + ' decodes to a valid spec');
+  eq(decoded.id, null, 'preset ' + i + ' share code strips id');
+  eq(decoded.wheelStyle, preset.wheelStyle, 'preset ' + i + ' wheelStyle survives round-trip');
+  eq(decoded.chassis.hull.station.length, preset.chassis.hull.station.length,
+    'preset ' + i + ' hull station count survives round-trip');
+});
+
+// 15. decodeShareCode rejects malformed codes gracefully (returns null, never throws).
+eq(DD.decodeShareCode('not-a-real-code!!!'), null, 'malformed share code returns null');
+eq(DD.decodeShareCode('DD1:' + '!!!garbage'), null, 'garbage after prefix returns null');
+eq(DD.decodeShareCode(null), null, 'null input returns null');
+eq(DD.decodeShareCode(123), null, 'non-string input returns null');
+
+// 16. decodeShareCode re-normalizes, so an out-of-range value embedded in a foreign code is clamped.
+const foreignCode = DD.encodeShareCode({ chassis: { hardpoints: { frontR: 99 } }, schemaVersion: 1 });
+eq(DD.decodeShareCode(foreignCode).chassis.hardpoints.frontR, DD.CAR_SCHEMA.frontR[1],
+  'foreign share code with out-of-range frontR is clamped on decode');
+
 console.log(`\ncarspec: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

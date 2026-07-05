@@ -19,3 +19,11 @@ tests/screenshots/diff/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# graphify: machine-local scratch + regenerable snapshots.
+# The canonical graph layer (graph.json, GRAPH_REPORT.md, graph.html, manifest.json,
+# .graphify_labels.json) stays tracked; these are rebuilt by `graphify update .`.
+graphify-out/cache/
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+graphify-out/.graphify_root
+graphify-out/.graphify_python

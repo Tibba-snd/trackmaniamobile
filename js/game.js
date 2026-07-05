@@ -29,6 +29,7 @@
     car: null, carMesh: null, trail: null, speedLines: null,
     ghostMesh: null, ghostData: null, ghostPlayhead: 0,
     recFrames: [], recEvery: 2, tickCount: 0,
+    lastAttemptFrames: [],
     camState: null,
     countdownT: 0, finishShownAt: 0,
     acc: 0, lastT: 0,
@@ -136,7 +137,7 @@
     G.ghostTimes = precomputeGhostTimes(track, G.ghostData);
 
     if (G.ghostData) {
-      G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
+      G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment, G.save.customDesigns);
       G.scene.add(G.ghostMesh);
     }
     
@@ -255,7 +256,7 @@
       DD.captureEnvironment(G.renderer, G.scene, track); // reflections for PBR car
       // car
       if (G.carMesh) DD.disposeGroup(G.scene, G.carMesh);
-      G.carMesh = DD.buildCar(G.save.garage, false, G.scene.environment);
+      G.carMesh = DD.buildCar(G.save.garage, false, G.scene.environment, G.save.customDesigns);
       G.scene.add(G.carMesh);
       if (G.trail) DD.disposeGroup(G.scene, G.trail);
       G.trail = DD.buildTrail(G.carMesh.userData.grad);
@@ -337,9 +338,159 @@
     if (speedBox) { speedBox.classList.remove('streak-in'); void speedBox.offsetWidth; speedBox.classList.add('streak-in'); }
   }
 
+  function startReplay() {
+    if (G.recFrames && G.recFrames.length > 0) {
+      G.lastAttemptFrames = [...G.recFrames];
+    }
+    if (!G.lastAttemptFrames || G.lastAttemptFrames.length === 0) return;
+    G.state = 'replay';
+    showScreen('replay');
+    
+    G.replayPlayhead = 0;
+    G.replayPlaying = true;
+    
+    const slider = $('repSlider');
+    if (slider) {
+      slider.max = G.lastAttemptFrames.length - 1;
+      slider.value = 0;
+    }
+    
+    const pp = $('repPlayPause');
+    if (pp) pp.textContent = '⏸';
+    
+    const warnEl = cachedHudWarn;
+    if (warnEl) warnEl.style.opacity = 0;
+  }
+
+  function updateReplay(dtReal, t) {
+    if (!G.lastAttemptFrames || G.lastAttemptFrames.length === 0) return;
+    if (!G.car || !G.carMesh) return;
+
+    const framesPerSec = 1 / (G.recEvery * DD.TICK);
+    if (G.replayPlaying) {
+      G.replayPlayhead += dtReal * framesPerSec;
+      if (G.replayPlayhead >= G.lastAttemptFrames.length - 1) {
+        G.replayPlayhead = G.lastAttemptFrames.length - 1;
+        G.replayPlaying = false;
+        const pp = $('repPlayPause');
+        if (pp) pp.textContent = '▶';
+      }
+    }
+
+    const slider = $('repSlider');
+    if (slider) {
+      slider.value = Math.floor(G.replayPlayhead);
+    }
+
+    const currentTimeMs = G.replayPlayhead * G.recEvery * DD.TICK * 1000;
+    const totalTimeMs = (G.lastAttemptFrames.length - 1) * G.recEvery * DD.TICK * 1000;
+    const timeEl = $('repTime');
+    if (timeEl) {
+      timeEl.textContent = DD.formatTime(currentTimeMs) + ' / ' + DD.formatTime(totalTimeMs);
+    }
+
+    const fi = Math.min(Math.floor(G.replayPlayhead), G.lastAttemptFrames.length - 2);
+    if (fi >= 0) {
+      const a = fi, b = fi + 1;
+      const tt = G.replayPlayhead - fi;
+      
+      const frameA = G.lastAttemptFrames[a];
+      const frameB = G.lastAttemptFrames[b];
+
+      const gp = [
+        DD.lerp(frameA[0], frameB[0], tt),
+        DD.lerp(frameA[1], frameB[1], tt),
+        DD.lerp(frameA[2], frameB[2], tt)
+      ];
+      const gy = frameA[3] + DD.angleDiff(frameA[3], frameB[3]) * tt;
+
+      G.car.pos = gp;
+      G.car.yaw = gy;
+
+      const dx = frameB[0] - frameA[0];
+      const dy = frameB[1] - frameA[1];
+      const dz = frameB[2] - frameA[2];
+      G.car.vel = [dx / (G.recEvery * DD.TICK), dy / (G.recEvery * DD.TICK), dz / (G.recEvery * DD.TICK)];
+      const speed = V.len(G.car.vel);
+      const speedNorm = DD.clamp(speed / DD.PHYS.vmax, 0, 1);
+
+      G.car.idx = DD.trackQuery(G.track, gp, G.car.idx);
+      G.car.grounded = true;
+      G.car.onDirt = false;
+      G.car.sliding = false;
+      G.car.rollVis = 0;
+      G.car.pitchVis = 0;
+      G.car.wheelAngle = 0;
+      G.car.suspY = 0;
+      G.car.suspV = 0;
+
+      const s = G.track.samples[Math.min(G.car.idx, G.track.samples.length - 1)];
+      const carUp = s.u;
+      G.wheelSpin = speed * dtReal * 2.2;
+      DD.poseCar(G.carMesh, gp, gy, carUp, 0, 0, G.wheelSpin, 0, 0);
+      DD.updateShadow(G.shadow, gp, carUp, gy, G.car, G.track);
+
+      if (G.track && G.track.sunLight) {
+        const theme = G.track.theme;
+        G.track.sunLight.position.set(
+          gp[0] + Math.sin(theme.lightAngle) * 120,
+          gp[1] + 48.0,
+          gp[2] + Math.cos(theme.lightAngle) * 120
+        );
+        if (G.track.sunLight.target) {
+          G.track.sunLight.target.position.set(gp[0], gp[1], gp[2]);
+        }
+      }
+
+      if (G.replayPlaying) {
+        let gear = 1;
+        while (gear < DD.PHYS.gearV.length - 1 && speed > DD.PHYS.gearV[gear]) gear++;
+        const lo = DD.PHYS.gearV[gear - 1], hi = DD.PHYS.gearV[gear];
+        const rpm01 = DD.clamp((speed - lo) / Math.max(hi - lo, 1), 0, 1.05);
+        DD.updateEngine(speed, 0.5, true, 'road', dtReal, gear, rpm01);
+      } else {
+        DD.engineQuiet();
+      }
+    } else {
+      DD.engineQuiet();
+    }
+
+    if (G.track) {
+      if (G.track.nebulaeMesh) { G.track.nebulaeMesh.rotation.y = t * 0.000015; G.track.nebulaeMesh.position.copy(G.camera.position); }
+      if (G.track.planetMesh) { G.track.planetMesh.rotation.y = -t * 0.00003; G.track.planetMesh.position.copy(G.camera.position); }
+      if (G.track.starsMesh) { G.track.starsMesh.rotation.y = t * 0.000007; const _sm = G.track.starsMesh.material; if (_sm.uniforms && _sm.uniforms.time) _sm.uniforms.time.value = t * 0.001; }
+      const breath = Math.sin(t * 0.001 * Math.PI * 2 * DD.GLOW.breathHz);
+      if (G.track.gateMeshes) {
+        for (const m of G.track.gateMeshes) m.material.opacity = DD.GLOW.gate.base + DD.GLOW.gate.amp * breath;
+      }
+      if (G.track.emissiveDecorMesh) {
+        const mat = G.track.emissiveDecorMesh.userData.mat;
+        if (mat) mat.emissiveIntensity = (DD.GLOW.decor.base + DD.GLOW.decor.amp * breath) * DD.glowMul(G.save.settings, G.track.theme);
+      }
+    }
+    if (G.weather && DD.updateWeather) {
+      DD.updateWeather(G.weather, G.camera, dtReal, t * 0.001);
+    }
+    if (G.track && DD.updateLightPool) DD.updateLightPool(G.track, G.camera.position.x, G.camera.position.y, G.camera.position.z);
+
+    const speed = V.len(G.car.vel);
+    DD.updateCamera(G.camera, G.camState, G.car, G.track, dtReal, speed);
+
+    if (G.ghostMesh) G.ghostMesh.visible = false;
+
+    if (G.composer && G.composer._bloom) {
+      G.composer._bloom.strength = Math.min(
+        DD.GLOW.bloom.base * DD.glowMul(G.save.settings, G.track && G.track.theme), DD.GLOW.bloom.cap);
+    }
+    if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
+  }
+
   // fast=true for retries (restart key / two-finger tap / retry button): time-attack is a
   // retry-spam genre, so skip most of the countdown. Full 3.2s only on the first load of a track.
   function resetRun(fast) {
+    if (G.recFrames && G.recFrames.length > 0) {
+      G.lastAttemptFrames = [...G.recFrames];
+    }
     G.car = DD.createCar(G.track);
     G.car.lapSplits = [];
     const finLaps = $('finLaps');
@@ -424,7 +575,7 @@
         G.racedGhostType = 'pb';
         G.racedGhostTime = ms;
         if (!G.ghostMesh) {
-          G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment);
+          G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment, G.save.customDesigns);
           G.scene.add(G.ghostMesh);
         }
       }
@@ -505,6 +656,11 @@
     G.lastT = t;
     if (G.state === 'loading') return;
 
+    if (G.state === 'replay') {
+      updateReplay(dtReal, t);
+      return;
+    }
+
     if (G.state === 'menu' || G.state === 'garage') {
       const orbitSpeed = G.state === 'garage' ? 0.00018 : 0.00008;
       // Freeze the ambient auto-spin while customizing — a moving target makes precision ring-dragging
@@ -512,7 +668,9 @@
       const autoSpin = (G.state === 'garage' && G.workingSpec) ? 0 : t * orbitSpeed;
       const dragAngle = G.garageDragYaw || 0;
       const angle = autoSpin + dragAngle;
-      const radius = G.state === 'garage' ? 7.5 : 12.0;
+      // T6: pinch-zoom adjusts the orbit radius (zoom > 1 = closer). Default 1 = original framing.
+      const zoom = G.state === 'garage' ? (G.garageZoom || 1) : 1;
+      const radius = (G.state === 'garage' ? 7.5 : 12.0) / zoom;
       const height = G.state === 'garage' ? 2.4 : 3.8;
       
       const carPos = G.car ? G.car.pos : [0, 4, 0];
@@ -1041,7 +1199,7 @@
 
   /* ---------------- screens & menus ---------------- */
   function showScreen(name) {
-    for (const id of ['menu', 'loading', 'finish', 'gameHud', 'campaign', 'settings', 'garage']) {
+    for (const id of ['menu', 'loading', 'finish', 'gameHud', 'campaign', 'settings', 'garage', 'replayHud']) {
       const el = $(id === 'gameHud' ? 'gameHud' : id);
       if (el) el.style.display = 'none';
     }
@@ -1053,6 +1211,10 @@
     if (name === 'loading') $('loading').style.display = 'flex';
     if (name === 'finish') { $('finish').style.display = 'flex'; $('gameHud').style.display = 'block'; }
     if (name === 'game') $('gameHud').style.display = 'block';
+    if (name === 'replay') {
+      const el = $('replayHud');
+      if (el) el.style.display = 'flex';
+    }
     if (name === 'campaign') $('campaign').style.display = 'flex';
     if (name === 'settings') $('settings').style.display = 'flex';
     if (name === 'garage') $('garage').style.display = 'flex';
@@ -1370,14 +1532,14 @@
   // happens from the pointermove listener bound once in DD.boot, not from a menu rebuild.
   function updateEditHandles() {
     if (G.editHandles) { DD.disposeGroup(G.carMesh, G.editHandles); G.editHandles = null; }
-    if (G.workingSpec && G.editMode === 'length' && G.carMesh) {
+    if (G.workingSpec && (G.editMode === 'length' || G.editMode === 'move') && G.carMesh) {
       G.editHandles = DD.buildEditHandles(G.workingSpec);
       G.carMesh.add(G.editHandles);
     }
   }
   function updateShowcaseCar() {
     if (G.carMesh) DD.disposeGroup(G.scene, G.carMesh);
-    const spec = G.workingSpec || DD.resolveSpec(G.save.garage);
+    const spec = G.workingSpec || DD.resolveSpec(G.save.garage, G.save.customDesigns);
     G.carMesh = DD.buildCarFromSpec(spec, { ghost: false, envMap: G.scene.environment, garage: G.save.garage });
     G.scene.add(G.carMesh);
     updateEditHandles();
@@ -1404,12 +1566,15 @@
     mk('gFinish', GA.finishes, g.finish, (it) => it, (i) => g.finish = i);
     mk('gForms', GA.forms, g.form, (it) => it, (i) => g.form = i);
 
-    // Tab switching wiring
+    // Tab switching wiring (G4: 6 tabs now — paint/finish/chassis/body/wheels/wings)
     $('tabBtnPaint').onclick = () => showTab('Paint');
     $('tabBtnFinish').onclick = () => showTab('Finish');
     $('tabBtnForm').onclick = () => showTab('Form');
+    $('tabBtnBody').onclick = () => showTab('Body');
+    $('tabBtnWheels').onclick = () => showTab('Wheels');
+    $('tabBtnWings').onclick = () => showTab('Wings');
     function showTab(name) {
-      ['Paint', 'Finish', 'Form'].forEach(t => {
+      ['Paint', 'Finish', 'Form', 'Body', 'Wheels', 'Wings'].forEach(t => {
         $('tabBtn' + t).classList.toggle('active', t === name);
         $('tab' + t).style.display = t === name ? 'block' : 'none';
       });
@@ -1417,27 +1582,251 @@
 
     // Customize / Reset / edit-mode toolbar (P2 slice A — Length-rings editing). A working spec
     // forks away from the locked-preset selector, so the chassis tab (which just re-resolves a
-    // preset) would silently discard the fork — hide it while customizing instead.
-    if (G.workingSpec && $('tabBtnForm').classList.contains('active')) showTab('Paint');
+    // preset) would silently discard the fork — hide it while customizing instead. G4 body/wheels/
+    // wings tabs are customize-only too.
+    if (G.workingSpec && ['Form','Body','Wheels','Wings'].indexOf(currentTab()) >= 0) showTab('Paint');
     $('tabBtnForm').style.display = G.workingSpec ? 'none' : '';
+    ['tabBtnBody','tabBtnWheels','tabBtnWings'].forEach(id => { $(id).style.display = G.workingSpec ? '' : 'none'; });
     $('btnCustomize').style.display = G.workingSpec ? 'none' : '';
     $('btnEditReset').style.display = G.workingSpec ? '' : 'none';
     $('editModeBar').style.display = G.workingSpec ? 'flex' : 'none';
+    function currentTab() {
+      const tabs = ['Paint','Finish','Form','Body','Wheels','Wings'];
+      for (const t of tabs) if ($('tabBtn' + t).classList.contains('active')) return t;
+      return 'Paint';
+    }
+
+    // G4 slider builder — binds a numeric knob in G.workingSpec to a range input. No transitions on
+    // pseudo-elements (WebView freeze). On `input` it mutates the spec in place (the captured ws/hp/
+    // hull/st refs must stay live across drags, so we NEVER reassign G.workingSpec here — normalizeSpec
+    // returns a fresh object that would orphan the closures). Slider min/max already enforce schema
+    // bounds, so no extra clamp is needed. Renders into containerId, returns nothing.
+    if (G.workingSpec) {
+      const SC = DD.CAR_SCHEMA;
+      const mkSlider = (containerId, label, get, set, lo, hi, step, fmt) => {
+        const c = $(containerId);
+        const wrap = document.createElement('div'); wrap.className = 'gSlider';
+        const cur = get();
+        const row = document.createElement('div'); row.className = 'gSlider-row';
+        const lab = document.createElement('span'); lab.textContent = label;
+        const val = document.createElement('span'); val.className = 'gSlider-val'; val.textContent = fmt ? fmt(cur) : cur.toFixed(2);
+        row.appendChild(lab); row.appendChild(val);
+        const inp = document.createElement('input'); inp.type = 'range'; inp.min = lo; inp.max = hi; inp.step = step; inp.value = cur;
+        inp.oninput = () => {
+          const v = parseFloat(inp.value);
+          set(v);
+          val.textContent = fmt ? fmt(v) : v.toFixed(2);
+          updateShowcaseCar();
+        };
+        wrap.appendChild(row); wrap.appendChild(inp); c.appendChild(wrap);
+      };
+      // Hull caps (G1) — segmented buttons (enum, not a slider)
+      const mkSeg = (containerId, label, opts, get, set) => {
+        const c = $(containerId);
+        const lab = document.createElement('p'); lab.className = 'section-title'; lab.textContent = label; lab.style.marginTop = '0';
+        const seg = document.createElement('div'); seg.className = 'gSeg';
+        opts.forEach(opt => {
+          const b = document.createElement('button'); b.className = 'gSegBtn' + (get() === opt ? ' sel' : ''); b.textContent = opt;
+          b.onclick = () => { DD.sfxClick(); set(opt); G.workingSpec = DD.normalizeSpec(G.workingSpec); buildGarageMenu(); updateShowcaseCar(); };
+          seg.appendChild(b);
+        });
+        c.appendChild(lab); c.appendChild(seg);
+      };
+
+      const ws = G.workingSpec;
+      const hp = ws.chassis.hardpoints;
+      const hull = ws.chassis.hull;
+
+      // Body tab — cap styles + station w/h/y for the active station index (first station for now)
+      $('gBody').innerHTML = ''; $('gBodyStations').innerHTML = '';
+      mkSeg('gBody', 'front cap', DD.CAP_STYLES || ['flat','pointed','rounded','hollow'],
+        () => hull.capStyleFront || 'flat', (v) => hull.capStyleFront = v);
+      mkSeg('gBody', 'rear cap', DD.CAP_STYLES || ['flat','pointed','rounded','hollow'],
+        () => hull.capStyleRear || 'flat', (v) => hull.capStyleRear = v);
+      // active-station editor: pick the mid station (most visible). Stations are arrays [z,w,h,y]
+      // (see carspec.js normalizeSpec). T6 will add per-station selection + z/y drag handles.
+      const si = Math.floor(hull.station.length / 2);
+      const st = hull.station[si] || hull.station[0];
+      if (st) {
+        mkSlider('gBodyStations', 'station ' + si + ' width', () => st[1], (v) => st[1] = v, SC.stW[0], SC.stW[1], 0.01);
+        mkSlider('gBodyStations', 'station ' + si + ' height', () => st[2], (v) => st[2] = v, SC.stH[0], SC.stH[1], 0.01);
+        mkSlider('gBodyStations', 'station ' + si + ' rise', () => st[3], (v) => st[3] = v, SC.stY[0], SC.stY[1], 0.01);
+      }
+
+      // Wheels tab — wheel size/width/rim/roundness/spokes
+      $('gWheels').innerHTML = '';
+      mkSlider('gWheels', 'front radius', () => hp.frontR, (v) => hp.frontR = v, SC.frontR[0], SC.frontR[1], 0.01);
+      mkSlider('gWheels', 'rear radius', () => hp.rearR, (v) => hp.rearR = v, SC.rearR[0], SC.rearR[1], 0.01);
+      mkSlider('gWheels', 'tyre width', () => hp.tyreW, (v) => hp.tyreW = v, SC.tyreW[0], SC.tyreW[1], 0.01);
+      mkSlider('gWheels', 'rim size %', () => hp.rimRadiusPct, (v) => hp.rimRadiusPct = v, SC.rimRadiusPct[0], SC.rimRadiusPct[1], 0.01,
+        (v) => Math.round(v * 100) + '%');
+      mkSlider('gWheels', 'tyre roundness', () => hp.tyreRoundness, (v) => hp.tyreRoundness = v, SC.tyreRoundness[0], SC.tyreRoundness[1], 0.01);
+      mkSlider('gWheels', 'spoke count', () => hp.spokeCount || 5, (v) => hp.spokeCount = Math.round(v), 3, 8, 1, (v) => Math.round(v));
+      // Wheel style segmented buttons (enum)
+      $('gWheelStyles').innerHTML = '';
+      const wStyles = DD.CAR_WHEEL_STYLES || ['multiSpoke','turbofan','glowDisc','classicSpoke'];
+      mkSeg('gWheelStyles', 'style', wStyles, () => ws.wheelStyle, (v) => ws.wheelStyle = v);
+
+      // Wings tab — find first wing mount and expose its knobs. Falls back to "no wing" hint.
+      $('gWings').innerHTML = '';
+      const wingPart = ws.mounts.find(m => m && ['frontWing','rearWingBiplane','rearSpoilerLow','hoverFins'].indexOf(m.part) >= 0);
+      if (wingPart) {
+        wingPart.knobs = wingPart.knobs || {};
+        const k = wingPart.knobs;
+        mkSeg('gWings', 'part', [wingPart.part], () => wingPart.part, () => {}); // label-only
+        mkSlider('gWings', 'angle', () => (k.angle != null ? k.angle : 0.1), (v) => k.angle = v, -0.6, 0.6, 0.01);
+        mkSlider('gWings', 'scale', () => (k.scale != null ? k.scale : 1), (v) => k.scale = v, 0.5, 2.0, 0.01);
+        mkSlider('gWings', 'width', () => (k.width != null ? k.width : 1), (v) => k.width = v, 0.5, 1.5, 0.01);
+      } else {
+        const hint = document.createElement('p'); hint.className = 'section-title';
+        hint.textContent = 'no wing part on this chassis'; $('gWings').appendChild(hint);
+      }
+    }
+    // T5: custom-designs list in the chassis tab. Lets the player create/select/rename/delete named
+    // designs persisted to localStorage (save.customDesigns[]). "customize" now forks from the active
+    // custom design if one is selected, otherwise from the locked preset — and "save" writes back.
+    const renderDesigns = () => {
+      const c = $('gDesigns'); if (!c) return;
+      c.innerHTML = '';
+      const cds = G.save.customDesigns || [];
+      g.activeCustom = g.activeCustom || null;
+      // "+" create button — forks the currently-selected preset (g.form) into a fresh named design
+      const create = document.createElement('button'); create.className = 'gItem'; create.style.fontWeight = '600';
+      create.innerHTML = '<span style="font-size:18px;color:var(--warm);">+</span> new design from current chassis';
+      create.onclick = () => {
+        DD.sfxClick();
+        const seq = (G.save.meta.customSeq = (G.save.meta.customSeq || 0) + 1);
+        const d = DD.createCustomDesign(g.form | 0, seq);
+        G.save.customDesigns.push(d);
+        g.activeCustom = d.id;
+        DD.persistSave(G.save);
+        buildGarageMenu(); updateShowcaseCar();
+      };
+      c.appendChild(create);
+      // list each saved design — select / edit / rename / delete
+      cds.forEach((d, i) => {
+        const row = document.createElement('div'); row.className = 'gItem' + (g.activeCustom === d.id ? ' sel' : '');
+        row.style.flexDirection = 'column'; row.style.alignItems = 'stretch'; row.style.gap = '6px';
+        const top = document.createElement('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%;';
+        const nm = document.createElement('span'); nm.textContent = d.name; nm.style.fontWeight = '600';
+        const acts = document.createElement('div'); acts.style.cssText = 'display:flex;gap:4px;';
+        const mkAct = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.className = 'gSegBtn'; b.style.flex = '0 0 auto'; b.onclick = (e) => { e.stopPropagation(); DD.sfxClick(); fn(); }; acts.appendChild(b); return b; };
+        mkAct('select', () => { g.activeCustom = (g.activeCustom === d.id) ? null : d.id; DD.persistSave(G.save); buildGarageMenu(); updateShowcaseCar(); });
+        mkAct('edit', () => {
+          // fork the saved design into the working spec for live editing
+          G.workingSpec = DD.normalizeSpec(JSON.parse(JSON.stringify(d)));
+          G._editingDesignId = d.id; G.editMode = 'orbit';
+          buildGarageMenu(); updateShowcaseCar();
+        });
+        mkAct('rename', () => {
+          const nv = prompt('Rename design:', d.name);
+          if (nv != null && nv.trim()) { d.name = nv.trim().slice(0, 40); DD.persistSave(G.save); buildGarageMenu(); }
+        });
+        mkAct('delete', () => {
+          if (!confirm('Delete "' + d.name + '"?')) return;
+          G.save.customDesigns.splice(i, 1);
+          if (g.activeCustom === d.id) g.activeCustom = null;
+          if (G._editingDesignId === d.id) G._editingDesignId = null;
+          DD.persistSave(G.save); buildGarageMenu(); updateShowcaseCar();
+        });
+        top.appendChild(nm); top.appendChild(acts); row.appendChild(top);
+        c.appendChild(row);
+      });
+    };
+    renderDesigns();
+
+    // G7 share codes — export the current working spec (or active design) and import a foreign code.
+    // Decode runs migrate → normalizeSpec so any imported code is always safe to render.
+    const renderShare = () => {
+      let bar = $('gShare');
+      if (!bar) { bar = document.createElement('div'); bar.id = 'gShare'; bar.className = 'gGroup'; $('gDesigns').parentElement.appendChild(bar); }
+      bar.innerHTML = '';
+      const exp = document.createElement('button'); exp.className = 'gItem';
+      exp.innerHTML = '<span style="color:var(--warm);">↗</span> export share code';
+      exp.onclick = () => {
+        DD.sfxClick();
+        const src = G.workingSpec || (g.activeCustom && (G.save.customDesigns || []).find(d => d.id === g.activeCustom));
+        if (!src) { alert('Customize a design first, then export.'); return; }
+        const code = DD.encodeShareCode(src);
+        prompt('Copy this share code:', code); // prompt() lets the user select-all+copy on mobile + desktop
+      };
+      const imp = document.createElement('button'); imp.className = 'gItem';
+      imp.innerHTML = '<span style="color:var(--warm);">↙</span> import share code';
+      imp.onclick = () => {
+        DD.sfxClick();
+        const code = prompt('Paste a share code:');
+        if (!code || !code.trim()) return;
+        const spec = DD.decodeShareCode(code);
+        if (!spec) { alert('Invalid share code.'); return; }
+        const seq = (G.save.meta.customSeq = (G.save.meta.customSeq || 0) + 1);
+        const d = DD.createCustomDesign(spec, seq, 'Imported ' + seq);
+        G.save.customDesigns.push(d);
+        g.activeCustom = d.id;
+        DD.persistSave(G.save);
+        buildGarageMenu(); updateShowcaseCar();
+      };
+      bar.appendChild(exp); bar.appendChild(imp);
+    };
+    renderShare();
     $('btnCustomize').onclick = () => {
       DD.sfxClick();
-      G.workingSpec = DD.normalizeSpec(JSON.parse(JSON.stringify(DD.CAR_PRESETS[g.form % DD.CAR_PRESETS.length])));
+      // fork from active custom design if any, else from the locked preset (g.form)
+      let src;
+      if (g.activeCustom) {
+        src = (G.save.customDesigns || []).find(d => d.id === g.activeCustom) || DD.CAR_PRESETS[g.form % DD.CAR_PRESETS.length];
+      } else {
+        src = DD.CAR_PRESETS[g.form % DD.CAR_PRESETS.length];
+      }
+      G.workingSpec = DD.normalizeSpec(JSON.parse(JSON.stringify(src)));
+      G._editingDesignId = g.activeCustom || null;
       G.editMode = 'orbit';
       buildGarageMenu();
       updateShowcaseCar();
     };
-    $('btnEditReset').onclick = () => {
-      DD.sfxClick();
-      G.workingSpec = null;
-      G.editMode = 'orbit';
-      buildGarageMenu();
-      updateShowcaseCar();
-    };
-    ['orbit', 'length'].forEach((mode) => {
+    // when customizing, change the reset button into "save design" if editing an existing design
+    const editId = G._editingDesignId;
+    if (G.workingSpec && editId) {
+      $('btnEditReset').textContent = 'save design';
+      $('btnEditReset').onclick = () => {
+        DD.sfxClick();
+        const idx = (G.save.customDesigns || []).findIndex(d => d.id === editId);
+        if (idx >= 0) {
+          const saved = G.save.customDesigns[idx];
+          saved.chassis = G.workingSpec.chassis; saved.canopy = G.workingSpec.canopy;
+          saved.mounts = G.workingSpec.mounts; saved.wheelStyle = G.workingSpec.wheelStyle;
+          saved.palette = G.workingSpec.palette;
+          DD.normalizeSpec(saved);
+          DD.persistSave(G.save);
+        }
+        G.workingSpec = null; G._editingDesignId = null; G.editMode = 'orbit';
+        buildGarageMenu(); updateShowcaseCar();
+      };
+    } else {
+      $('btnEditReset').textContent = 'reset to preset';
+      $('btnEditReset').onclick = () => {
+        DD.sfxClick();
+        G.workingSpec = null; G._editingDesignId = null; G.editMode = 'orbit';
+        buildGarageMenu(); updateShowcaseCar();
+      };
+    }
+    // also offer "save as new" when customizing a fresh fork (no editId)
+    if (G.workingSpec && !editId) {
+      const saveAs = document.createElement('button'); saveAs.className = 'tab-btn'; saveAs.textContent = 'save as new';
+      saveAs.onclick = () => {
+        DD.sfxClick();
+        const seq = (G.save.meta.customSeq = (G.save.meta.customSeq || 0) + 1);
+        const d = DD.createCustomDesign(G.workingSpec, seq);
+        G.save.customDesigns.push(d);
+        g.activeCustom = d.id;
+        DD.persistSave(G.save);
+        G.workingSpec = null; G._editingDesignId = null; G.editMode = 'orbit';
+        buildGarageMenu(); updateShowcaseCar();
+      };
+      // insert next to btnEditReset
+      const bar = $('btnEditReset').parentElement;
+      if (bar && !bar.querySelector('button[data-saveas]')) { saveAs.setAttribute('data-saveas', '1'); bar.appendChild(saveAs); }
+    }
+    ['orbit', 'length', 'move'].forEach((mode) => {
       const b = $('editMode_' + mode);
       b.classList.toggle('sel', G.editMode === mode);
       b.onclick = () => { DD.sfxClick(); G.editMode = mode; buildGarageMenu(); updateEditHandles(); };
@@ -1549,7 +1938,7 @@
 
     // finish buttons
     $('finRetry').onclick = () => { DD.sfxClick(); resetRun(true); };
-    $('finReplay').onclick = () => { DD.sfxClick(); startTrack(G.track.seed, G.track.tier); };
+    $('finReplay').onclick = () => { DD.sfxClick(); startReplay(); };
     $('finNext').onclick = () => {
       DD.sfxClick();
       if (G.track.seed.startsWith('CAMP-')) {
@@ -1572,6 +1961,31 @@
     $('btnRespawn').onclick = () => { DD.input.respawnReq = true; };
     $('btnExit').onclick = () => { DD.sfxClick(); DD.engineQuiet(); DD.stopPads(); G.state = 'menu'; showScreen('menu'); };
 
+    // replay HUD buttons
+    $('repPlayPause').onclick = () => {
+      DD.sfxClick();
+      G.replayPlaying = !G.replayPlaying;
+      $('repPlayPause').textContent = G.replayPlaying ? '⏸' : '▶';
+    };
+    $('repSlider').oninput = (e) => {
+      G.replayPlaying = false;
+      const pp = $('repPlayPause');
+      if (pp) pp.textContent = '▶';
+      G.replayPlayhead = parseFloat(e.target.value);
+    };
+    $('repRetry').onclick = () => {
+      DD.sfxClick();
+      DD.engineQuiet();
+      showScreen('game');
+      resetRun(true);
+    };
+    $('repExit').onclick = () => {
+      DD.sfxClick();
+      DD.engineQuiet();
+      G.state = 'finish';
+      showScreen('finish');
+    };
+
     // settings wiring
     $('setTilt').onchange = (e) => { G.save.settings.controlMode = e.target.checked ? 'tilt' : 'touch'; saveSet(); };
     $('setSens').oninput = (e) => { G.save.settings.tiltSens = parseFloat(e.target.value); saveSet(); };
@@ -1592,14 +2006,20 @@
 
     // Pointer drag for orbit camera manual rotation in garage, PLUS (P2 slice A) ring-handle
     // picking/dragging in Length-rings edit mode. A hit on a handle starts a handle-drag instead of
-    // the orbit-drag; the two are mutually exclusive per gesture.
+    // the orbit-drag; the two are mutually exclusive per gesture. T6 adds a third mode "move" which
+    // drags a station's fore-aft (z, horizontal screen delta) and raise-lower (y, vertical delta),
+    // plus pinch-zoom for the turntable (two-finger gesture).
     let isDragging = false;
     let prevX = 0;
-    let handleDrag = null; // { stationIndex, startX, startY, startW, startH }
+    let handleDrag = null; // { stationIndex, mode, startX, startY, startZ, startY0, startW, startH }
     const raycaster = new THREE.Raycaster();
     const pickNdc = new THREE.Vector2();
     const R_STW = DD.CAR_SCHEMA.stW, R_STH = DD.CAR_SCHEMA.stH;
-    const HANDLE_SENS = 0.003; // screen px -> station w/h units
+    const HANDLE_SENS = 0.003; // screen px -> station w/h/y units
+    const Z_SENS = 0.0025;     // screen px -> station z units (z ∈ [-1,1] along the spine)
+    // multi-pointer registry for pinch-zoom (mobile + trackpad). keyed by pointerId.
+    const pointers = new Map();
+    let pinchStartDist = 0, pinchStartZoom = 1;
     function pickHandle(clientX, clientY) {
       if (!G.editHandles) return null;
       const rect = canvas.getBoundingClientRect();
@@ -1609,12 +2029,23 @@
       const hits = raycaster.intersectObjects(G.editHandles.children);
       return hits.length ? hits[0].object.userData.stationIndex : null;
     }
+    const isEditPickMode = () => G.editMode === 'length' || G.editMode === 'move';
     window.addEventListener('pointerdown', (e) => {
       if (G.state !== 'garage' || e.clientX <= 370) return;
-      const si = (G.editMode === 'length') ? pickHandle(e.clientX, e.clientY) : null;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // pinch-zoom takes over once two fingers are down
+      if (pointers.size === 2) {
+        const pts = Array.from(pointers.values());
+        pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        pinchStartZoom = G.garageZoom || 1;
+        handleDrag = null; isDragging = false;
+        return;
+      }
+      const si = isEditPickMode() ? pickHandle(e.clientX, e.clientY) : null;
       if (si != null) {
         const st = G.workingSpec.chassis.hull.station[si];
-        handleDrag = { stationIndex: si, startX: e.clientX, startY: e.clientY, startW: st[1], startH: st[2] };
+        handleDrag = { stationIndex: si, mode: G.editMode, startX: e.clientX, startY: e.clientY,
+                       startZ: st[0], startY0: st[3], startW: st[1], startH: st[2] };
       } else {
         isDragging = true;
         prevX = e.clientX;
@@ -1622,12 +2053,26 @@
     });
     window.addEventListener('pointermove', (e) => {
       if (G.state !== 'garage') return;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // pinch-zoom: adjust garageZoom (consumed by the orbit camera in the loop)
+      if (pointers.size === 2 && pinchStartDist > 0) {
+        const pts = Array.from(pointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        G.garageZoom = Math.max(0.5, Math.min(2.5, pinchStartZoom * (dist / pinchStartDist)));
+        return;
+      }
       if (handleDrag) {
         const st = G.workingSpec.chassis.hull.station[handleDrag.stationIndex];
-        st[1] = DD.clamp(handleDrag.startW + (e.clientX - handleDrag.startX) * HANDLE_SENS, R_STW[0], R_STW[1]);
-        st[2] = DD.clamp(handleDrag.startH - (e.clientY - handleDrag.startY) * HANDLE_SENS, R_STH[0], R_STH[1]);
+        if (handleDrag.mode === 'length') {
+          // shape: horizontal=w, vertical=h (original session-15 behaviour)
+          st[1] = DD.clamp(handleDrag.startW + (e.clientX - handleDrag.startX) * HANDLE_SENS, R_STW[0], R_STW[1]);
+          st[2] = DD.clamp(handleDrag.startH - (e.clientY - handleDrag.startY) * HANDLE_SENS, R_STH[0], R_STH[1]);
+        } else { // 'move' — horizontal=fore-aft (z), vertical=raise-lower (y)
+          st[0] = DD.clamp(handleDrag.startZ + (e.clientX - handleDrag.startX) * Z_SENS, -1, 1);
+          st[3] = DD.clamp(handleDrag.startY0 - (e.clientY - handleDrag.startY) * HANDLE_SENS, 0, DD.CAR_SCHEMA.stY[1]);
+        }
         // cheap live preview: only the hull's geometry + handle positions need updating for a
-        // width/height edit (wheels/canopy/wings/parts don't depend on station data) — a full
+        // width/height/z/y edit (wheels/canopy/wings/parts don't depend on station data) — a full
         // updateShowcaseCar() rebuild here was the source of the unbearable per-pixel drag lag.
         DD.updateHullGeometry(G.carMesh, G.workingSpec);
         DD.updateEditHandlePositions(G.editHandles, G.workingSpec);
@@ -1637,10 +2082,13 @@
         prevX = e.clientX;
       }
     });
-    window.addEventListener('pointerup', () => {
-      isDragging = false;
-      handleDrag = null;
-    });
+    const endPointer = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinchStartDist = 0;
+      if (pointers.size === 0) { isDragging = false; handleDrag = null; }
+    };
+    window.addEventListener('pointerup', endPointer);
+    window.addEventListener('pointercancel', endPointer);
 
     if (DD.testMode) {
       const startSeed = DD.seed || 'DREAM-12345';

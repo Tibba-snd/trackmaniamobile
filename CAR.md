@@ -1,8 +1,19 @@
-# DRIFTDREAM — Car Design System (cars-as-data)
+# DRIFTDREAM — Car (design system · engine contract · physics)
 
-_Ground truth for the parametric car system. Pairs with `CAR_PROJECT.md` (engine/contract/physics
-knowledge) and `CAR_REBUILD_PLAN.md` (the lofting math + aesthetic acceptance rubric). Supersedes the
-old "4 hardcoded `if (form===…)` branches" approach in `DD.buildCar`._
+_The single root reference for the player car — the cars-as-data design system the garage G-series
+briefs build on. Supersedes the old "4 hardcoded `if (form===…)` branches" approach in `DD.buildCar`._
+
+> **Code is source of truth** (docs drift — grep before trusting a detail):
+> - car **render** → `js/scene-car.js` (`DD.buildCarFromSpec`, `buildHull`, `buildWheels`,
+>   `CAR_WHEEL_BUILDERS`, `CAR_PARTS`, `poseCar`, `buildShadow`)
+> - car **sim** → `js/physics.js` (`DD.createCar`, `DD.stepCar`, `DD.PHYS`) — THREE-free, Node-tested
+> - **spec/schema** → `js/carspec.js` (`CAR_SCHEMA`, `normalizeSpec`, `CAR_PRESETS`, `resolveSpec`) — THREE-free
+> - sim→render glue + garage UI → `js/game.js`
+>
+> **Deep engine/physics reference** (poseCar wheel specifics, the full `DD.PHYS` constant tables, the
+> glTF-vs-loft lessons) is archived in [`docs/archive/CAR_PROJECT.md`](docs/archive/CAR_PROJECT.md);
+> the from-scratch loft rebuild spec + aesthetic acceptance rubric in
+> [`docs/archive/CAR_REBUILD_PLAN.md`](docs/archive/CAR_REBUILD_PLAN.md)._
 
 ## Goal
 
@@ -113,7 +124,7 @@ Mapping of the requested capabilities → mechanism:
 | add movable points to a mesh | split an edge, or lattice-warp a solid | inserted `pts`, `deform.lattice.offsets[]` |
 
 **Out of scope (by design):** free-form per-vertex sculpting and boolean/CSG cutting. Bespoke shapes use
-the glTF import escape hatch (`prim:'mesh'`, baked at import; `CAR_PROJECT.md` §6). All control-point
+the glTF import escape hatch (`prim:'mesh'`, baked at import; [`docs/archive/CAR_PROJECT.md`](docs/archive/CAR_PROJECT.md) §6). All control-point
 data is bounded by `normalizeSpec` (count caps + range clamps) so any authored/shared part stays safe.
 
 `PRIMS` therefore grows by two beyond the solids: `loft` (already used by the hull) and `profile`
@@ -125,7 +136,7 @@ data is bounded by `normalizeSpec` (count caps + range clamps) so any authored/s
 ## 2. The renderer — `DD.buildCarFromSpec(spec, ctx)`
 
 `ctx = { ghost, envMap, garage }`. Pure, deterministic, returns a `THREE.Group` honoring the **full
-existing contract** (see `CAR_PROJECT.md` §1a):
+existing contract** (see [`docs/archive/CAR_PROJECT.md`](docs/archive/CAR_PROJECT.md) §1a):
 1. `spec = normalizeSpec(spec)` (§4) — always safe after this.
 2. Build slot materials from `palette` + garage `paint(gradient)/finish` (§3).
 3. Loft `chassis.hull` → the hull mesh; this material is `body` slot → wire `userData.boostShell`,
@@ -239,7 +250,7 @@ Sculpted hull station tables `[z_pct, halfWidth, height, yOffset]` (× WIDTH/HEI
 ## 9. Build phases
 
 - **P0 — foundation (no visible change): ✅ DONE.** `js/carspec.js` (THREE-free: schema ranges,
-  `normalizeSpec`, 4 locked `DD.CAR_PRESETS`, `resolveSpec`) + scene.js renderer (`buildHull`,
+  `normalizeSpec`, 4 locked `DD.CAR_PRESETS`, `resolveSpec`) + scene-car.js renderer (`buildHull`,
   `buildCanopy`, `buildWheels`, `DD.CAR_WHEEL_BUILDERS`, `DD.CAR_PARTS`, `DD.buildCarFromSpec`);
   `buildCar` → wrapper. Shadow left baked (see §5). All node tests green; carspec.js wired into
   index.html + apk-build/www. (`profile`/`lattice` prims deferred to P2 — not needed by presets.)
@@ -279,10 +290,10 @@ Sculpted hull station tables `[z_pct, halfWidth, height, yOffset]` (× WIDTH/HEI
   base64, `migrate()`).
 
 ## 10. File touchpoints
-- New: `js/carspec.js` (PRIMS, catalog, normalize, builder, presets). Load before `scene.js` in
-  `index.html` (bump `?v=`, copy to `apk-build/www/`).
-- `js/scene.js`: `DD.buildCar` → wrapper; `DD.buildShadow`/`updateShadow` read hardpoints; `poseCar`
-  unchanged (already generic).
+- `js/carspec.js` (schema, normalize, presets, resolveSpec). Loads before `scene-car.js` in
+  `index.html` (bump `?v=`, `node dd.js sync` to `apk-build/www/`).
+- `js/scene-car.js`: `DD.buildCar` → wrapper over `buildCarFromSpec`; `DD.buildShadow`/`updateShadow`
+  read hardpoints; `poseCar` unchanged (already generic).
 - `js/theme.js`: `DD.GARAGE.forms` → preset selector labels.
 - `js/game.js`: garage menu (P2 editor), `updateShowcaseCar`, save schema (P3).
 - `tests/verify_m2_features.js`: rewrite car asserts + add prim mocks.

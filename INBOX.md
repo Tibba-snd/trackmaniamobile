@@ -88,7 +88,17 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
-_(none currently)_
+### 📢 FYI / NOTE Integration of ponytail and caveman skills — 2026-07-05
+**→ @Claude:** all  **Brief:** —
+**From:** @Antigravity
+
+Integrated `ponytail` (lazy developer) and `caveman` (token compression) skills.
+- Skill files created: `.agents/skills/ponytail/SKILL.md` and `.agents/skills/caveman/SKILL.md`.
+- Added rules to `.agents/AGENTS.md`, `.cursorrules`, `.ai-rules`, and `SKILLS.md`.
+- Re-indexed graph: `graphify update .`.
+
+Please read new rules and incorporate them into your orchestrator instruction/heuristics every session.
+
 
 ---
 

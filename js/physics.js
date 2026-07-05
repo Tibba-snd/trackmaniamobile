@@ -24,6 +24,7 @@
     brakeDec: 34,
     dragK: 0.00052,
     rollDrag: 0.2,
+    engineBrakeK: 5.0,       // closed-throttle engine braking at peak rpm (~5 m/s² on top of aero+roll)
     slopeFactor: 0.55,
     boostAccel: 30,
     boostMaxV: 126,
@@ -52,23 +53,12 @@
     downforceV: 30,
     downforceK: 0.085,     // total grip rises ~3.2g→4.1g with speed — fast corners stay planted
     // weight transfer-ish grip modifiers
-    brakeFrontGripMul: 0.85,
-    brakeRearGripMul: 0.5,  // brake-tap = rear washes out = drift entry
+    brakeFrontGripMul: 0.80, // brake-light front grip (trail-brake: nose tucks, less push)
+    brakeRearGripMul: 0.45,  // brake-tap = rear washes out = slide entry (looser than 0.5 = more rotation)
     driveRearGripMul: 0.45, // throttle cuts rear grip — but only at low speed (donuts), fades by powerOversteerV
     powerOversteerV: 45,    // m/s above which throttle no longer destabilises the rear
-    driftBtnRearMul: 0.42,
-    driftYawAuthority: 5.5, // yaw acceleration factor when steering in drift (arcade authority)
-    // C4b v2: velocity-to-heading coupling while drift is HELD. The v1 curve (Lo 7 -> Hi 3.5) made
-    // drift WEAKEST at race speed — exactly backwards. Real corner entry is 250-300+ km/h, and that's
-    // where drift must beat grip/coast/wall-riding. So the curve INVERTS: modest at low speed (grip
-    // still wins tight low-speed corners = honest skill curve), STRONG at high speed (drift is the
-    // fast-corner tool — coupling rises above grip's 12/s so the velocity vector actually follows
-    // the nose against high momentum). Combined with speed-capped scrub below, drift holds speed and
-    // tightens the line through fast corners.
-    driftCouplingLo: 4.5,   // coupling /s at low speed — grip stays the tighter line for slow hairpins
-    driftCouplingHi: 18.0,  // coupling /s at high speed (>= ~55 m/s / 200 km/h) — drift rotates through tight fast corners grip can't hold (yaw-capped)
     slideRearMul: 0.92,     // once sliding, rear stays a touch loose (drifts hold, weak feedback loop)
-    slideYawDamp: 1.6,      // extra yaw damping while sliding — drifts recover, don't spin
+    slideYawDamp: 1.6,      // extra yaw damping while sliding — slides recover, don't spin
     slideEnter: 0.15, slideExit: 0.07, // rad rear slip hysteresis
     sdBoost: 1.4,           // speed-drift exploit: small accel while sliding shallow at speed
     // surfaces
@@ -109,7 +99,6 @@
       grounded: true, onDirt: false,
       idx: track.startIdx,
       slideState: false, sliding: false, slipR: 0, slipF: 0,
-      driftHold: false, // brake-commanded drift latch: set on a braked slide, held until it ends
       airTime: 0,
       surf: 0,
       finished: false,
@@ -141,7 +130,7 @@
     car.nextCkpt = c ? c.nextCkpt : 0;
     car.lap = c ? (c.lap || 0) : 0;
     car.awaitSeam = c ? !!c.awaitSeam : false;
-    car.grounded = true; car.onDirt = false; car.slideState = false; car.driftHold = false;
+    car.grounded = true; car.onDirt = false; car.slideState = false;
     car.yawRate = 0; car.steerPos = 0; car.airTime = 0; car.missedCkpt = false;
     car.shiftCut = 0; car.suspY = 0; car.suspV = 0;
     car.gear = 1;
@@ -167,8 +156,8 @@
     return V.norm(V.addS(f0, u, -d));
   }
 
-  /* input: { throttle 0..1, brake 0..1, steer -1..1 } — a brake-tap commands the drift (no dedicated
-     drift button; input.drift is still honored as an equivalent trigger for the headless drift tests) */
+  /* input: { throttle 0..1, brake 0..1, steer -1..1 } — a brake-tap breaks the rear loose and
+     enters the slide regime; no dedicated drift button exists. */
   DD.stepCar = function (car, input, track) {
     if (car.finished) return;
     car.hitWall = false;
@@ -324,23 +313,9 @@
     gR *= DD.lerp(1, P.brakeRearGripMul, brake);
     gR *= DD.lerp(1, P.driveRearGripMul, throttle * Math.max(0, 1 - speed / P.powerOversteerV)); // power oversteer only at low speed
 
-    // ---- brake-commanded drift ----
-    // No dedicated drift button: a brake-tap breaks the rear loose, and the arcade rotation (yaw
-    // authority + velocity coupling, further below) then HOLDS while you keep steering into it — so
-    // you tap brake to initiate, carry it on the wheel, and STRAIGHTEN to exit. The line TIGHTENS
-    // instead of understeering. Sustain is gated on STEERING INTENT, not on slip: the coupling
-    // actively reduces slip, so a slip-based latch would unlatch itself and spin. The set of
-    // slide-ENTERING conditions is unchanged (see wantSlide) — this only routes the arcade assist
-    // onto braked slides. `input.drift` stays a valid trigger for the headless drift tests.
-    // Deterministic latch (steerPos/vLong only; no time/random).
-    const brakeSlide = input.drift || (brake > 0.4 && vLong > 3);
-    if (brakeSlide) car.driftHold = true;
-    else if (Math.abs(car.steerPos) < 0.15 || vLong < 3) car.driftHold = false; // straighten / slow / reverse = exit
-    const drifting = car.driftHold;
-
+    // once sliding, rear stays a touch loose (holds the slide, weak self-recover)
     const prevSlip = Math.abs(car.slipR || 0);
     if (prevSlip < 0.5) { // beyond ~30° the rear "catches" — slides stay shapely, no spinouts
-      if (drifting) gR *= P.driftBtnRearMul;
       if (car.slideState) gR *= P.slideRearMul;
     }
     // wheelspin: dumping full power at low speed lights up the rears (burnouts, donuts)
@@ -353,7 +328,7 @@
     // Disabled whenever the player is ASKING for a slide (brake-tap, wheelspin, ice).
     const vRef = Math.max(speed, 2.5);
     const dir = vLong >= 0 ? 1 : -1;
-    const wantSlide = drifting || (throttle > 0.85 && speed < 24) || glass;
+    const wantSlide = (brake > 0.4 && vLong > 3) || (throttle > 0.85 && speed < 24) || glass;
     if (!wantSlide && speed > 8) {
       // soft overdrive: light inputs stay fully proportional (you can FEEL the modulation);
       // only steering past the useful band gives diminishing return — no hard clamp, no dead zone.
@@ -386,9 +361,10 @@
     car.slipMax = Math.max(Math.abs(alphaF), Math.abs(alphaR)); // either axle sliding = visible/audible slide
 
     // ---- yaw + lateral: TWO REGIMES ----
-    // The grip regime is what you feel 95% of the time: stick position maps to a
-    // proportional fraction of the corner (half stick = half the turn), grip-capped so
-    // pure throttle can NEVER spin. Full slip dynamics only when you ASK for a slide.
+    // Grip regime (95% of driving): steer maps to a grip-capped yaw target, predictable + planted.
+    // Slide regime: real bicycle-model yaw moment + damped recovery. No arcade yaw authority, no
+    // velocity-heading coupling — a braked slide rotates the nose via tire-force torque and the
+    // auto-countersteer catches the exit. The player initiates with a brake-tap, holds on the wheel.
     const aGrip = gF + gR; // total lateral capability (sum of both axles)
     const slideRegime = wantSlide || car.slideState;
     if (!slideRegime) {
@@ -399,35 +375,14 @@
       const vLatTarget = -r * speed * 0.06;
       vLat = DD.dampTo(vLat, vLatTarget, 12, dt);
     } else {
-      r += ((P.cgF * FyF - P.cgR * FyR) / P.yawInertia) * dt;
-      if (drifting) {
-        // steer-proportional yaw authority when the drift is held (arcade authority)
-        r += -car.steerPos * P.driftYawAuthority * dt;
-      }
-      if (!wantSlide) { // catching an unwanted breakaway: continuous auto-countersteer
-        const ramp = DD.smoothstep(DD.clamp((Math.abs(alphaR) - 0.04) / 0.10, 0, 1));
-        r += DD.clamp(alphaR * dir * P.counterAssist * ramp, -2.6, 2.6) * dt;
-      }
-      // drop slideYawDamp for player-held drifts
-      const yawDamp = drifting ? 0 : DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1));
+      r += ((P.cgF * FyF - P.cgR * FyR) / P.yawInertia) * dt; // bicycle-model yaw moment
+      // continuous auto-countersteer: catches runaway spin on any slide (brake-tap, wheelspin,
+      // ice). Ramp-gated above 0.04 rad slip so it never blocks initiation, only the over-rotation.
+      const ramp = DD.smoothstep(DD.clamp((Math.abs(alphaR) - 0.04) / 0.10, 0, 1));
+      r += DD.clamp(alphaR * dir * P.counterAssist * ramp, -2.6, 2.6) * dt;
+      const yawDamp = DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1)); // always damped
       r *= Math.exp(-dt * yawDamp);
       vLat += (FyF + FyR - r * vLong) * dt;
-
-      // velocity-follows-heading coupling while drift is held (arcade tightening).
-      // C4b v2: speed-scaled so drift DOMINATES fast corners (the curve inverts — modest at low
-      // speed where grip wins, strong at race speed where drift must win). Transition 20->55 m/s.
-      // v1's flat-ish curve made drift weakest at the speeds you actually corner at (250-300+ km/h),
-      // so the nose rotated in but velocity plowed wide against high momentum.
-      if (drifting) {
-        const velSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
-        if (velSpeed > 1) {
-          const coupling = DD.lerp(P.driftCouplingLo, P.driftCouplingHi, DD.clamp((speed - 20) / 35, 0, 1));
-          let theta = Math.atan2(vLat, vLong);
-          theta -= theta * coupling * dt;
-          vLong = velSpeed * Math.cos(theta);
-          vLat = velSpeed * Math.sin(theta);
-        }
-      }
     }
     r = DD.clamp(r, -3.4, 3.4);
 
@@ -464,6 +419,13 @@
     else if (vLong > -P.reverseMax) longAcc -= brake * 8;
     if (vLong < -0.5) longAcc += Math.min(-vLong, 6) * 1.2; // reverse self-slows; throttle always recovers
     longAcc -= P.dragK * vLong * Math.abs(vLong) + P.rollDrag * Math.sign(vLong);
+    // engine braking: lifting the throttle adds compression drag, scaled by rpm (lower gears / post-
+    // downshift bite harder). Gated to near-zero throttle — the bot's 0.15 lift and any partial
+    // throttle modulation pass through untouched; only a true lift triggers it.
+    if (vLong > 0.5) {
+      const liftGate = DD.smoothstep(DD.clamp((0.10 - throttle) / 0.10, 0, 1)); // 0 at throttle>=0.10, 1 at 0
+      longAcc -= P.engineBrakeK * Math.min(car.rpm01, 1) * liftGate;
+    }
     if (dirt) longAcc -= P.dirtDragK * vLong * Math.abs(vLong);
     longAcc -= Math.sin(gf.pitch) * P.gravity * P.slopeFactor; // climbs cost speed, drops give it back
     vLong += longAcc * dt;
@@ -707,9 +669,8 @@
 
     let throttle = speed < vT * 1.02 ? 1 : 0.15;
     let brake = speed > vT * 1.02 ? 1 : 0;
-    let drift = false; // Grip corner-cutting is more stable and faster for the bot than drift initiation
 
-    return { steer, throttle, brake, drift };
+    return { steer, throttle, brake };
   };
 
   /* ---------- headless bot (medals + validation) ---------- */

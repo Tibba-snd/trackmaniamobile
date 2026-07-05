@@ -538,6 +538,17 @@
   .finRow button:hover { background:rgba(var(--accent-rgb),0.22); border-color:rgba(var(--accent-rgb),0.45); }
   .finRow button:active { transform:scale(0.96); }
 
+  /* replay HUD */
+  #replayHud { display:none; position:fixed; left:50%; transform:translateX(-50%); bottom:max(24px, env(safe-area-inset-bottom)); width:90%; max-width:650px; background:rgba(10,7,22,0.85); border:1px solid rgba(var(--accent-rgb),0.25); padding:14px 20px; align-items:center; justify-content:space-between; gap:14px; z-index:100; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 15px 40px rgba(0,0,0,0.5); clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%); }
+  #replayHud button { padding:8px 16px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.3); background:rgba(var(--accent-rgb),0.1); color:#e8e4f5; font-size:12px; letter-spacing:0.08em; cursor:pointer; font-weight:600; transition:all .2s; clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); text-transform:uppercase; }
+  #replayHud button:hover { background:rgba(var(--accent-rgb),0.25); border-color:rgba(var(--accent-rgb),0.45); }
+  #replayHud button:active { transform:scale(0.96); }
+  #repPlayPause { min-width: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px !important; }
+  #repSlider { flex-grow:1; -webkit-appearance:none; appearance:none; background:rgba(255,255,255,0.1); height:6px; outline:none; border:none; transition:background 0.2s; cursor:pointer; }
+  #repSlider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; background:var(--accent); cursor:pointer; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.5); transition:transform 0.1s; }
+  #repSlider::-webkit-slider-thumb:hover { transform:scale(1.2); background:var(--accent2); }
+  #repTime { font-family:'Azeret Mono',monospace; font-size:11px; color:rgba(232,228,245,0.8); white-space:nowrap; font-variant-numeric:tabular-nums; }
+
   /* campaign */
   #campList { max-height:68vh; overflow-y:auto; width:100%; padding:4px; }
   .campaign-header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
@@ -606,6 +617,22 @@
   .gItem:hover { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); }
   .gItem.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); box-shadow:0 0 15px rgba(var(--warm-rgb),0.15); }
   .gItem .sw { width:20px; height:20px; border-radius:6px; display:inline-block; border:1px solid rgba(255,255,255,0.15); }
+  /* G4 garage sliders — finger-friendly range inputs. NO ::before/::after transitions (WebView freeze). */
+  .gSlider { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border:1px solid rgba(var(--accent-rgb),0.16);
+    background:rgba(var(--accent-rgb),0.05); clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .gSlider-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:500; color:#e8e4f5; letter-spacing:0.04em; }
+  .gSlider-val { font-family:'Chakra Petch',monospace; font-size:12px; color:var(--warm); opacity:0.85; min-width:42px; text-align:right; }
+  .gSlider input[type=range] { width:100%; height:28px; background:transparent; cursor:pointer; appearance:none; -webkit-appearance:none; margin:0; }
+  .gSlider input[type=range]::-webkit-slider-runnable-track { height:4px; background:rgba(var(--accent-rgb),0.25); border-radius:2px; }
+  .gSlider input[type=range]::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--warm); margin-top:-9px; border:2px solid rgba(0,0,0,0.4); box-shadow:0 0 8px rgba(var(--warm-rgb),0.4); }
+  .gSlider input[type=range]::-moz-range-track { height:4px; background:rgba(var(--accent-rgb),0.25); border-radius:2px; }
+  .gSlider input[type=range]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:var(--warm); border:2px solid rgba(0,0,0,0.4); }
+  .gSeg { display:flex; gap:4px; flex-wrap:wrap; }
+  .gSegBtn { flex:1; min-width:60px; padding:8px 6px; border:1px solid rgba(var(--accent-rgb),0.16); background:rgba(var(--accent-rgb),0.05);
+    color:#e8e4f5; font-size:11px; font-weight:600; letter-spacing:0.04em; cursor:pointer; font-family:inherit; text-transform:uppercase;
+    clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+  .gSegBtn.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); color:#fff; }
   .editModeBar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
   .editModeBtn { flex:1 1 auto; padding:8px 10px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.16);
     background:rgba(var(--accent-rgb),0.05); color:#e8e4f5; font-size:12px; cursor:pointer; font-family:inherit;
@@ -881,6 +908,9 @@
       <button class="tab-btn active" id="tabBtnPaint">paint</button>
       <button class="tab-btn" id="tabBtnFinish">finish</button>
       <button class="tab-btn" id="tabBtnForm">chassis</button>
+      <button class="tab-btn" id="tabBtnBody">body</button>
+      <button class="tab-btn" id="tabBtnWheels">wheels</button>
+      <button class="tab-btn" id="tabBtnWings">wings</button>
     </div>
 
     <div class="garage-tabs">
@@ -889,7 +919,8 @@
     </div>
     <div class="editModeBar" id="editModeBar" style="display:none;">
       <button class="editModeBtn" id="editMode_orbit">orbit</button>
-      <button class="editModeBtn" id="editMode_length">length</button>
+      <button class="editModeBtn" id="editMode_length">shape</button>
+      <button class="editModeBtn" id="editMode_move">move</button>
       <button class="editModeBtn" id="editMode_cross" disabled title="coming soon">cross-section</button>
       <button class="editModeBtn" id="editMode_addrm" disabled title="coming soon">add/remove</button>
     </div>
@@ -905,6 +936,24 @@
     <div class="tab-content" id="tabForm" style="display:none;">
       <h3 class="section-title">body design</h3>
       <div class="gGroup" id="gForms"></div>
+      <h3 class="section-title" style="margin-top:18px;">my designs</h3>
+      <div class="gGroup" id="gDesigns"></div>
+    </div>
+    <div class="tab-content" id="tabBody" style="display:none;">
+      <h3 class="section-title">hull caps</h3>
+      <div class="gGroup" id="gBody"></div>
+      <p class="section-title" style="margin-top:14px;">station shape</p>
+      <div class="gGroup" id="gBodyStations"></div>
+    </div>
+    <div class="tab-content" id="tabWheels" style="display:none;">
+      <h3 class="section-title">wheel specs</h3>
+      <div class="gGroup" id="gWheels"></div>
+      <p class="section-title" style="margin-top:14px;">style</p>
+      <div class="gGroup" id="gWheelStyles"></div>
+    </div>
+    <div class="tab-content" id="tabWings" style="display:none;">
+      <h3 class="section-title">wing & aero parts</h3>
+      <div class="gGroup" id="gWings"></div>
     </div>
     
     <button class="backBtn garage-back">back</button>
@@ -1008,6 +1057,15 @@
   </div>
 </div>
 
+<!-- REPLAY HUD -->
+<div id="replayHud">
+  <button id="repPlayPause">⏸</button>
+  <input type="range" id="repSlider" min="0" max="100" value="0">
+  <div id="repTime">00:00.000 / 00:00.000</div>
+  <button id="repRetry">retry</button>
+  <button id="repExit">exit</button>
+</div>
+
 <script src="js/lib/three.min.js?v=15"></script>
 <script src="js/lib/CopyShader.js?v=15"></script>
 <script src="js/lib/LuminosityHighPassShader.js?v=15"></script>
@@ -1020,14 +1078,15 @@
 <script src="js/core.js?v=19"></script>
 <script src="js/theme.js?v=22"></script>
 <script src="js/trackgen.js?v=23"></script>
-<script src="js/physics.js?v=25"></script>
+<script src="js/physics.js?v=26"></script>
 <script src="js/audio.js?v=17"></script>
 <script src="js/input.js?v=16"></script>
-<script src="js/carspec.js?v=3"></script>
+<script src="js/carspec.js?v=4"></script>
 <script src="js/scene-core.js?v=53"></script>
 <script src="js/scene-decor.js?v=56"></script>
-<script src="js/scene-car.js?v=52"></script>
+<script src="js/scene-car.js?v=55"></script>
 <script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=55"></script>
+<script src="js/game.js?v=61"></script>
+<script src="js/physdev.js?v=1"></script>
 </body>
 </html>
