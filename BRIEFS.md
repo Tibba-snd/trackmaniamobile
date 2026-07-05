@@ -185,7 +185,7 @@ wider jumps, wallride rework, better boost pads, better start line, better check
 - **Wallride** is narrower than normal track (0.7–0.85× width) — backwards for a piece that needs
   commitment room.
 
-## T1 — Widen all tracks (Claude-owned, physics-adjacent)  🔴
+## T1 — Widen all tracks (Claude-owned, physics-adjacent)  🟢 LANDED (session 24)
 
 **Scope (touch ONLY `js/trackgen.js` `makePieces` + the `wBase` line):**
 - `wBase`: `lerp(13.5, 9, t01)` → `lerp(20, 14, t01)` (T1 ~20m, T5 ~14m — both wide enough to drift
@@ -202,7 +202,7 @@ wider jumps, wallride rework, better boost pads, better start line, better check
 "all generated tracks bot-completable" and confirm). The campaign re-roll means existing campaign
 PBs are gone — that's intended. **Touch nothing in physics or scene.**
 
-## T2 — Boost pad visuals (vision)  🔴
+## T2 — Boost pad visuals  🟢 LANDED (session 24)
 **Parallel-safe: touch ONLY `js/scene-decor.js` (new `buildBoostPads` + call in `buildTrackScene`).**
 
 Boost pads are invisible today (`SURF.BOOST` flag only). Build a clear, readable pad:
@@ -216,7 +216,7 @@ Boost pads are invisible today (`SURF.BOOST` flag only). Build a clear, readable
 **DoD:** field notes 1–3 + screenshot of a boost pad approached at speed (reads clearly), draw calls
 within ±2 (`DD.debugGL()`).
 
-## T3 — Dedicated start line + finish gantry (vision)  🔴
+## T3 — Dedicated start line + finish gantry  🟢 LANDED (session 24, integrated into buildGates)
 **Parallel-safe: touch ONLY `js/scene-decor.js` (`buildGates` or a new `buildStartLine`).**
 
 The start line reuses the finish torus — no sense of "this is the start." Build a proper gantry:
@@ -229,7 +229,7 @@ The start line reuses the finish torus — no sense of "this is the start." Buil
 **DoD:** field notes 1–3 + screenshot of the start gantry (reads as a start line, not a checkpoint),
 draw calls within ±3.
 
-## T4 — Checkpoint rework (vision)  🔴
+## T4 — Checkpoint rework  🟢 LANDED (session 24, integrated into buildGates)
 **Parallel-safe: touch ONLY `js/scene-decor.js` (`buildGates`).**
 
 Tibba: "better looking and more evident checkpoints." Current = thin additive torus rings, easy to
@@ -245,7 +245,7 @@ miss at speed. Rework:
 **DoD:** field notes 1–3 + screenshot of a checkpoint approached at speed (number reads, gate is
 unmistakable), draw calls within ±3.
 
-## T5 — Tunnels (vision)  🔴
+## T5 — Tunnels  🟢 LANDED (session 24)
 **Parallel-safe: touch ONLY `js/scene-decor.js` (new `buildTunnels`).**
 
 Nothing overhead exists today. Add tunnel gates at chosen sample ranges (e.g. on long straights or
@@ -261,7 +261,7 @@ crest pieces, biased by biome — neon gets more tunnels, frozen/dune fewer):
 **DoD:** field notes 1–3 + screenshot of entering a tunnel (reads as enclosed, frame edges glow),
 draw calls within ±4.
 
-## T6 — Big ramp jumps (vision)  🔴
+## T6 — Big ramp jumps  🟢 LANDED (session 24)
 **Parallel-safe: touch ONLY `js/trackgen.js` (the `kicker` and `jumpgap` piece builders) AND
 `js/scene-decor.js` (landing-pad visual).**
 
@@ -298,7 +298,7 @@ guard rails so you can't fall off the side while inverted, + a glowing loop-fram
 per track (signature piece, high-tier only).
 **DoD:** field notes 1–3 + screenshot of a loop. **Do NOT start until T7a design note is in.**
 
-## T8 — Wallride rework (vision)  🔴
+## T8 — Wallride rework  🟢 LANDED (session 24, banking in trackgen)
 **Parallel-safe: touch ONLY `js/trackgen.js` (the `wallride` piece) + `js/scene-decor.js` (visual).**
 
 - Widen (covered by T1's `wBase` change + wallride-specific `1.05–1.2×` here).
