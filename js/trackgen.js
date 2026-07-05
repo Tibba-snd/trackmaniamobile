@@ -294,19 +294,19 @@
   };
 
   /* ---------------- main generator (incremental, collision-aware) ---------------- */
-  DD.generateTrack = function (seedStr, tier, attempt) {
+  DD.generateTrack = function (seedStr, tier, attempt, isMenu = false) {
     tier = DD.clamp(tier | 0, 1, 5);
     const rng = DD.makeRng(seedStr + '::track::t' + tier + '::a' + (attempt || 0));
     const archetype = rng.pick(ARCHETYPES);
     const weights = WEIGHTS[archetype];
     const builders = makePieces(rng, tier, seedStr);
-    let targetLen = 1300 + tier * 230 + rng.range(-150, 200);
+    let targetLen = isMenu ? 100 : (1300 + tier * 230 + rng.range(-150, 200));
     const theme = DD.makeTheme(seedStr);
 
     // Closed-circuit decision on an ISOLATED rng stream: the main rng's draw sequence is
     // untouched, so seeds that stay point-to-point generate exactly the track they always did.
     // Loop tracks get a shorter per-lap budget (raced 2-3 times, total ≈ a sprint's length).
-    const wantLoop = DD.makeRng(seedStr + '::loop::t' + tier + '::a' + (attempt || 0)).chance(0.55);
+    const wantLoop = isMenu ? false : DD.makeRng(seedStr + '::loop::t' + tier + '::a' + (attempt || 0)).chance(0.55);
     if (wantLoop) targetLen *= 0.62;
 
     // occupancy grid for self-intersection avoidance

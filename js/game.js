@@ -225,7 +225,7 @@
   }
 
   /* ---------------- track lifecycle ---------------- */
-  function startTrack(seed, tier) {
+  function startTrack(seed, tier, isMenu = false) {
     G.unlockedTiersBefore = [];
     for (let t = 1; t <= 5; t++) {
       if (tierUnlocked(t)) G.unlockedTiersBefore.push(t);
@@ -236,10 +236,10 @@
     $('loadBiomeHeader').textContent = 'ACQUIRING SECTOR...';
     dialInText($('loadSeed'), seed + '  ·  TIER ' + tier);
     setTimeout(() => {
-      const cacheKey = seed + '|' + tier;
+      const cacheKey = seed + '|' + tier + (isMenu ? '|menu' : '');
       let track = DD.trackCache[cacheKey];
       if (!track) {
-        track = DD.buildValidTrack(seed, tier);
+        track = DD.buildValidTrack(seed, tier, isMenu);
         DD.trackCache[cacheKey] = track;
       }
       G.track = track;
@@ -296,8 +296,35 @@
       $('hudLap').textContent = 'LAP 1/' + (track.laps || 1);
       $('hudArch').textContent = track.archetype + ' · ' + track.theme.name;
 
-      DD.startPads(track.theme);
-      resetRun();
+      if (isMenu) {
+        G.state = 'menu';
+        G.car = DD.createCar(G.track);
+        G.prevPos = [G.car.pos[0], G.car.pos[1], G.car.pos[2]];
+        G.prevYaw = G.car.yaw;
+        G.camState = DD.makeCamState();
+
+        // Pre-position camera, car and shadow for the menu state first render frame,
+        // so WebGL compiles all shaders for the correct assets and viewport
+        const radius = 12.0;
+        const height = 3.8;
+        const carPos = G.car.pos;
+        G.camera.position.set(carPos[0], carPos[1] + height, carPos[2] - radius);
+        G.camera.lookAt(carPos[0], carPos[1] + 0.4, carPos[2]);
+
+        const s0 = G.track.samples[G.track.startIdx];
+        DD.poseCar(G.carMesh, G.car.pos, G.car.yaw, s0.u, 0, 0, 0, 0, 0);
+        if (G.shadow) {
+          DD.updateShadow(G.shadow, G.car.pos, s0.u, G.car.yaw, G.car, G.track);
+        }
+
+        // Force synchronous WebGL shader compilation behind the loading screen via a pre-render pass
+        if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
+
+        showScreen('menu');
+      } else {
+        DD.startPads(track.theme);
+        resetRun();
+      }
     }, 30);
   }
 
@@ -1429,6 +1456,7 @@
     $('setGlow').value = s.glow || 'standard';
     $('setCamera').value = s.camera || 'close';
     $('setGhost').value = s.ghost || 'pb';
+    $('setCrt').checked = !!s.crt;
   }
 
   /* ---------------- boot ---------------- */
@@ -1451,6 +1479,8 @@
     DD.mockKeys = params.get('mockKeys');
 
     G.save = DD.loadSave();
+    if (G.save.settings.crt === undefined) G.save.settings.crt = false;
+    document.body.classList.toggle('no-crt', !G.save.settings.crt);
     if (DD.testMode) {
       G.save.settings.controlMode = 'keys';
       G.save.settings.quality = 'low';
@@ -1553,10 +1583,11 @@
     $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
     $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
     $('setGhost').onchange = (e) => { G.save.settings.ghost = e.target.value; saveSet(); updateActiveGhost(); };
+    $('setCrt').onchange = (e) => { G.save.settings.crt = e.target.checked; document.body.classList.toggle('no-crt', !e.target.checked); saveSet(); };
     function saveSet() { DD.persistSave(G.save); }
 
     // touch controls
-    DD.bindTouch({ gas: $('padGas'), brake: $('padBrake'), drift: $('padDrift'), steerL: $('padL'), steerR: $('padR') });
+    DD.bindTouch({ gas: $('padGas'), brake: $('padBrake'), steerL: $('padL'), steerR: $('padR') });
     updateSteerPadsVisibility();
 
     // Pointer drag for orbit camera manual rotation in garage, PLUS (P2 slice A) ring-handle
@@ -1617,11 +1648,7 @@
       startTrack(startSeed, startTier);
     } else {
       const startSeed = DD.dailySeedString() || 'DREAM-12345';
-      startTrack(startSeed, 1);
-      setTimeout(() => {
-        G.state = 'menu';
-        showScreen('menu');
-      }, 50);
+      startTrack(startSeed, 1, true);
     }
     G.lastT = performance.now();
     requestAnimationFrame(loop);

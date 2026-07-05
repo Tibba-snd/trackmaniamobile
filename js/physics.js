@@ -109,6 +109,7 @@
       grounded: true, onDirt: false,
       idx: track.startIdx,
       slideState: false, sliding: false, slipR: 0, slipF: 0,
+      driftHold: false, // brake-commanded drift latch: set on a braked slide, held until it ends
       airTime: 0,
       surf: 0,
       finished: false,
@@ -140,7 +141,7 @@
     car.nextCkpt = c ? c.nextCkpt : 0;
     car.lap = c ? (c.lap || 0) : 0;
     car.awaitSeam = c ? !!c.awaitSeam : false;
-    car.grounded = true; car.onDirt = false; car.slideState = false;
+    car.grounded = true; car.onDirt = false; car.slideState = false; car.driftHold = false;
     car.yawRate = 0; car.steerPos = 0; car.airTime = 0; car.missedCkpt = false;
     car.shiftCut = 0; car.suspY = 0; car.suspV = 0;
     car.gear = 1;
@@ -166,7 +167,8 @@
     return V.norm(V.addS(f0, u, -d));
   }
 
-  /* input: { throttle 0..1, brake 0..1, steer -1..1, drift bool } */
+  /* input: { throttle 0..1, brake 0..1, steer -1..1 } — a brake-tap commands the drift (no dedicated
+     drift button; input.drift is still honored as an equivalent trigger for the headless drift tests) */
   DD.stepCar = function (car, input, track) {
     if (car.finished) return;
     car.hitWall = false;
@@ -321,9 +323,24 @@
     gF *= DD.lerp(1, P.brakeFrontGripMul, brake);
     gR *= DD.lerp(1, P.brakeRearGripMul, brake);
     gR *= DD.lerp(1, P.driveRearGripMul, throttle * Math.max(0, 1 - speed / P.powerOversteerV)); // power oversteer only at low speed
+
+    // ---- brake-commanded drift ----
+    // No dedicated drift button: a brake-tap breaks the rear loose, and the arcade rotation (yaw
+    // authority + velocity coupling, further below) then HOLDS while you keep steering into it — so
+    // you tap brake to initiate, carry it on the wheel, and STRAIGHTEN to exit. The line TIGHTENS
+    // instead of understeering. Sustain is gated on STEERING INTENT, not on slip: the coupling
+    // actively reduces slip, so a slip-based latch would unlatch itself and spin. The set of
+    // slide-ENTERING conditions is unchanged (see wantSlide) — this only routes the arcade assist
+    // onto braked slides. `input.drift` stays a valid trigger for the headless drift tests.
+    // Deterministic latch (steerPos/vLong only; no time/random).
+    const brakeSlide = input.drift || (brake > 0.4 && vLong > 3);
+    if (brakeSlide) car.driftHold = true;
+    else if (Math.abs(car.steerPos) < 0.15 || vLong < 3) car.driftHold = false; // straighten / slow / reverse = exit
+    const drifting = car.driftHold;
+
     const prevSlip = Math.abs(car.slipR || 0);
     if (prevSlip < 0.5) { // beyond ~30° the rear "catches" — slides stay shapely, no spinouts
-      if (input.drift) gR *= P.driftBtnRearMul;
+      if (drifting) gR *= P.driftBtnRearMul;
       if (car.slideState) gR *= P.slideRearMul;
     }
     // wheelspin: dumping full power at low speed lights up the rears (burnouts, donuts)
@@ -333,10 +350,10 @@
 
     // ---- invisible assist #1: traction-limited steering ----
     // Full lock means "max useful lock" — the front can't be accidentally overdriven.
-    // Disabled whenever the player is ASKING for a slide (drift btn, brake-tap, wheelspin, ice).
+    // Disabled whenever the player is ASKING for a slide (brake-tap, wheelspin, ice).
     const vRef = Math.max(speed, 2.5);
     const dir = vLong >= 0 ? 1 : -1;
-    const wantSlide = input.drift || (brake > 0.4 && vLong > 3) || (throttle > 0.85 && speed < 24) || glass;
+    const wantSlide = drifting || (throttle > 0.85 && speed < 24) || glass;
     if (!wantSlide && speed > 8) {
       // soft overdrive: light inputs stay fully proportional (you can FEEL the modulation);
       // only steering past the useful band gives diminishing return — no hard clamp, no dead zone.
@@ -383,8 +400,8 @@
       vLat = DD.dampTo(vLat, vLatTarget, 12, dt);
     } else {
       r += ((P.cgF * FyF - P.cgR * FyR) / P.yawInertia) * dt;
-      if (input.drift) {
-        // steer-proportional yaw authority when drift is held (arcade authority)
+      if (drifting) {
+        // steer-proportional yaw authority when the drift is held (arcade authority)
         r += -car.steerPos * P.driftYawAuthority * dt;
       }
       if (!wantSlide) { // catching an unwanted breakaway: continuous auto-countersteer
@@ -392,7 +409,7 @@
         r += DD.clamp(alphaR * dir * P.counterAssist * ramp, -2.6, 2.6) * dt;
       }
       // drop slideYawDamp for player-held drifts
-      const yawDamp = input.drift ? 0 : DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1));
+      const yawDamp = drifting ? 0 : DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1));
       r *= Math.exp(-dt * yawDamp);
       vLat += (FyF + FyR - r * vLong) * dt;
 
@@ -401,7 +418,7 @@
       // speed where grip wins, strong at race speed where drift must win). Transition 20->55 m/s.
       // v1's flat-ish curve made drift weakest at the speeds you actually corner at (250-300+ km/h),
       // so the nose rotated in but velocity plowed wide against high momentum.
-      if (input.drift) {
+      if (drifting) {
         const velSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
         if (velSpeed > 1) {
           const coupling = DD.lerp(P.driftCouplingLo, P.driftCouplingHi, DD.clamp((speed - 20) / 35, 0, 1));
@@ -736,7 +753,15 @@
     return { ok: false, reason: 'timeout', frames: null };
   };
 
-  DD.buildValidTrack = function (seedStr, tier) {
+  DD.buildValidTrack = function (seedStr, tier, isMenu = false) {
+    if (isMenu) {
+      const track = DD.generateTrack(seedStr, tier, 0, true);
+      track.medals = { author: 10000, gold: 11000, silver: 12000, bronze: 13000 };
+      track.attempt = 0;
+      track.authorGhost = null;
+      track.authorSplits = null;
+      return track;
+    }
     for (let attempt = 0; attempt < 6; attempt++) {
       const track = DD.generateTrack(seedStr, tier, attempt);
       if (track.overlapForced > 0) continue; // self-intersecting layout: regenerate

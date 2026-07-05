@@ -4,11 +4,11 @@
   const DD = global.DD;
 
   const state = {
-    steer: 0, throttle: 0, brake: 0, drift: false,
+    steer: 0, throttle: 0, brake: 0,
     restartReq: false, respawnReq: false,
     keys: {},
     tiltNeutral: null, tiltRaw: 0,
-    touchSteer: 0, touchGas: false, touchBrake: false, touchDrift: false,
+    touchSteer: 0, touchGas: false, touchBrake: false,
     leftSteerTouch: null,
     mode: 'auto' // resolved from settings: 'tilt' | 'touch' | 'keys'
   };
@@ -22,7 +22,7 @@
       state.keys[e.code] = true;
       if (e.code === 'KeyR') state.restartReq = true;
       if (e.code === 'KeyE') state.respawnReq = true;
-      if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+      if (['ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => { state.keys[e.code] = false; });
 
@@ -67,7 +67,7 @@
   DD.calibrateTilt = function () { state.tiltNeutral = state.tiltRaw; };
 
   DD.bindTouch = function (els) {
-    // els: { gas, brake, drift, steerL, steerR }
+    // els: { gas, brake, steerL, steerR }
     const hold = (el, on, off) => {
       if (!el) return;
       el.addEventListener('touchstart', (e) => { e.preventDefault(); on(); }, { passive: false });
@@ -79,7 +79,6 @@
     };
     hold(els.gas, () => state.touchGas = true, () => state.touchGas = false);
     hold(els.brake, () => state.touchBrake = true, () => state.touchBrake = false);
-    hold(els.drift, () => state.touchDrift = true, () => state.touchDrift = false);
     hold(els.steerL, () => state.touchSteer = -1, () => { if (state.touchSteer < 0) state.touchSteer = 0; });
     hold(els.steerR, () => state.touchSteer = 1, () => { if (state.touchSteer > 0) state.touchSteer = 0; });
   };
@@ -98,22 +97,20 @@
     }, { passive: true });
   };
 
-  /* called each frame; returns {steer, throttle, brake, drift} */
+  /* called each frame; returns {steer, throttle, brake} */
   DD.pollInput = function (settings) {
     const k = state.keys;
-    let steer = 0, throttle = 0, brake = 0, drift = false;
+    let steer = 0, throttle = 0, brake = 0;
 
     // keyboard (always active — desktop dev)
     if (k['ArrowLeft'] || k['KeyA']) steer -= 1;
     if (k['ArrowRight'] || k['KeyD']) steer += 1;
     if (k['ArrowUp'] || k['KeyW']) throttle = 1;
     if (k['ArrowDown'] || k['KeyS']) brake = 1;
-    if (k['Space']) drift = true;
 
-    // touch gas/brake/drift
+    // touch gas/brake
     if (state.touchGas) throttle = 1;
     if (state.touchBrake) brake = 1;
-    if (state.touchDrift) drift = true;
 
     // steering source
     if (settings.controlMode === 'tilt' && state.tiltNeutral !== null) {
@@ -123,7 +120,7 @@
     }
     if (state.touchSteer !== 0) steer = state.touchSteer;
 
-    return { steer: DD.clamp(steer, -1, 1), throttle, brake, drift };
+    return { steer: DD.clamp(steer, -1, 1), throttle, brake };
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);

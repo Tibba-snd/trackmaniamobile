@@ -36,6 +36,7 @@
   .screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10;
     background:radial-gradient(120% 120% at 50% 110%, rgba(var(--accent-rgb), 0.15) 0%, rgba(5, 3, 10, 0.95) 55%, #05030a 100%);
     animation: screen-boot 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both, boot-flicker 0.3s linear both; }
+  .no-crt .screen { animation: none !important; }
   
   @keyframes screen-boot {
     0% { transform: scaleY(0.005) scaleX(0); }
@@ -512,13 +513,10 @@
     display:flex; align-items:center; justify-content:center; font-size:12px; letter-spacing:0.18em; font-weight:700; color:rgba(232,228,245,0.9); box-shadow:0 6px 20px rgba(0,0,0,0.3);
     clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
   .pad:active { background:radial-gradient(circle at 35% 30%, rgba(var(--accent2-rgb),0.35), rgba(15,10,32,0.6)); transform:scale(0.96); }
-  /* Split layout: steering on the LEFT thumb, gas/brake/drift on the RIGHT thumb,
-     so you can brake-tap or drift mid-corner while still steering. */
+  /* Split layout: steering on the LEFT thumb, gas/brake on the RIGHT thumb,
+     so you can brake-tap mid-corner while still steering. */
   #padGas { right:max(24px,env(safe-area-inset-right)); bottom:max(24px,env(safe-area-inset-bottom)); width:104px; height:104px; }
   #padBrake { right:max(140px,calc(env(safe-area-inset-right) + 140px)); bottom:max(24px,env(safe-area-inset-bottom)); width:84px; height:84px; }
-  #padDrift { right:max(44px,calc(env(safe-area-inset-right) + 44px)); bottom:max(150px,calc(env(safe-area-inset-bottom) + 150px)); width:78px; height:78px;
-    border-color:rgba(var(--warm-rgb),0.4); background:radial-gradient(circle at 35% 30%, rgba(var(--warm-rgb),0.22), rgba(15,10,32,0.65)); color:rgba(255,224,196,0.9); }
-  #padDrift:active { background:radial-gradient(circle at 35% 30%, rgba(var(--warm-rgb),0.5), rgba(20,10,32,0.65)); }
   #padL { left:max(24px,env(safe-area-inset-left)); bottom:max(28px,env(safe-area-inset-bottom)); width:84px; height:84px; display:none; }
   #padR { left:max(120px,calc(env(safe-area-inset-left) + 120px)); bottom:max(28px,env(safe-area-inset-bottom)); width:84px; height:84px; display:none; }
 
@@ -795,7 +793,7 @@
   <button class="mbtn" id="btnCampaign">campaign</button>
   <button class="mbtn" id="btnGarage">garage</button>
   <button class="mbtn" id="btnSettings">settings</button>
-  <div class="hint">desktop: WASD / arrows · space = drift · R = restart · E = respawn</div>
+  <div class="hint">desktop: WASD / arrows · brake = skid · R = restart · E = respawn</div>
 </div>
 
 <!-- LOADING -->
@@ -806,7 +804,7 @@
     <div class="load-bar-container"><div id="loadBar"></div></div>
     <div class="load-footer">DREAM TELEMETRY ENGINE V1.0</div>
   </div>
-  <div class="hint">desktop: WASD / arrows · space = drift · R = restart · E = respawn</div>
+  <div class="hint">desktop: WASD / arrows · brake = skid · R = restart · E = respawn</div>
 </div>
 
 <!-- CAMPAIGN -->
@@ -868,6 +866,7 @@
     <div class="setRow"><span>glow</span><select id="setGlow"><option value="subtle">subtle</option><option value="standard">standard</option><option value="vivid">vivid</option></select></div>
     <div class="setRow"><span>camera</span><select id="setCamera"><option value="close">close</option><option value="classic">classic</option></select></div>
     <div class="setRow"><span>ghost</span><select id="setGhost"><option value="pb">personal best</option><option value="author">author</option><option value="off">off</option></select></div>
+    <div class="setRow"><span>crt boot animation</span><input type="checkbox" id="setCrt"></div>
   </div>
   <button class="backBtn">back</button>
 </div>
@@ -986,7 +985,6 @@
 <div id="touchControls">
   <div class="pad" id="padBrake">BRAKE</div>
   <div class="pad" id="padGas">GAS</div>
-  <div class="pad" id="padDrift">DRIFT</div>
   <div class="pad" id="padL">◀</div>
   <div class="pad" id="padR">▶</div>
 </div>
@@ -1019,17 +1017,17 @@
 <script src="js/lib/RenderPass.js?v=15"></script>
 <script src="js/lib/UnrealBloomPass.js?v=15"></script>
 <script src="js/lib/FXAAShader.js?v=16"></script>
-<script src="js/core.js?v=18"></script>
+<script src="js/core.js?v=19"></script>
 <script src="js/theme.js?v=22"></script>
-<script src="js/trackgen.js?v=22"></script>
-<script src="js/physics.js?v=23"></script>
+<script src="js/trackgen.js?v=23"></script>
+<script src="js/physics.js?v=25"></script>
 <script src="js/audio.js?v=17"></script>
 <script src="js/input.js?v=16"></script>
-<script src="js/carspec.js?v=2"></script>
+<script src="js/carspec.js?v=3"></script>
 <script src="js/scene-core.js?v=53"></script>
 <script src="js/scene-decor.js?v=56"></script>
 <script src="js/scene-car.js?v=52"></script>
 <script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=51"></script>
+<script src="js/game.js?v=55"></script>
 </body>
 </html>

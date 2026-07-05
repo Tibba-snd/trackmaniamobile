@@ -336,6 +336,24 @@ console.log('[15] drift tightens the racing line (steady-state radius)');
   const carSpin = spawn(Vcross);
   for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(carSpin, { steer: 1.0, throttle: thr, brake, drift: t >= 8 }, FT); }
   check('drift did not spin out', Math.abs(carSpin.slipR) < 1.0, 'final slipR ' + (carSpin.slipR * 57.3).toFixed(1) + ' deg');
+
+  // --- brake-commanded drift (the ACTUAL player control: no drift button) ---
+  // Tap brake to break the rear loose, then throttle through it — drift:false the whole time. The
+  // driftHold latch must SUSTAIN the arcade rotation off the braked slide, so the line is no wider
+  // than grip at race speed: braking to skid TIGHTENS instead of understeering worse than a plain
+  // grip turn (the exact feel complaint this rewire fixes).
+  function brakeDriftRad(V0) {
+    const c = spawn(V0); const tr = [];
+    for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(c, { steer: 1.0, throttle: thr, brake, drift: false }, FT); if (t >= SETTLE) tr.push(c.pos.slice()); }
+    return settledRadius(tr);
+  }
+  const rBrake = brakeDriftRad(Vcross);
+  check('brake-commanded drift sustains without a drift button', rBrake > 10 && rBrake < 120, 'brake-drift ' + rBrake.toFixed(1) + 'm');
+  check('brake-commanded drift not wider than grip (race speed)', rBrake <= rGx * 1.02, 'brake-drift ' + rBrake.toFixed(1) + 'm vs grip ' + rGx.toFixed(1) + 'm');
+
+  const carBrakeSpin = spawn(Vcross);
+  for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(carBrakeSpin, { steer: 1.0, throttle: thr, brake, drift: false }, FT); }
+  check('brake-commanded drift did not spin out', Math.abs(carBrakeSpin.slipR) < 1.0, 'final slipR ' + (carBrakeSpin.slipR * 57.3).toFixed(1) + ' deg');
 }
 
 /* ---- [16] closed circuits: loop closure geometry + multilap completion ---- */
