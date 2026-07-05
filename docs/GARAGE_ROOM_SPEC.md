@@ -1,6 +1,7 @@
 # G-ROOM — Garage Room Art Direction (Wave 4 item 12)
 
-> **Status:** design spec, **BLOCKED on antigravity mood image**. The visual reference shapes the art direction; do not finalize until image reviewed.
+> **Status:** design spec, **LOCKED** (antigravity brief received 2026-07-05). Ready for T14 build.
+> **Register:** minimalist studio with high-end gallery finish. Focus entirely on car curves.
 > **Replaces:** Wave-1 interim garage stage (session 17 — `buildGarageStage` platform + `garageHide` registry).
 
 ## Goal
@@ -15,31 +16,36 @@ Per IMPROVEMENT_PLAN item 12: "Dedicated environment (not the raceway): dark ref
 - A controlled lighting rig makes the car read consistently across biomes (no neon-canyon red bleed, no frozen-blue tint). The car is the hero; the room serves it.
 - Built once = no per-biome garage cost. The track world never loads behind it.
 
-## Art direction — pending mood image
+## Art direction — LOCKED (antigravity brief 2026-07-05)
 
-The following is a **strawman** pending the antigravity mood image. The image may revise palette, light rig, backdrop style. Treat these as defaults to react against, not decisions.
+**Register:** minimalist studio with high-end gallery finish. Focus entirely on car curves.
 
 ### Floor
-- Dark, highly reflective (mirror-clear wet asphalt / polished obsidian). The car's underside reflects; the contact shadow (SDF `sdBox`) still reads on top.
-- Subtle accent-colored hairline grid (the `--accent` CSS var of the current biome, dimmed to 15%) — ties the room to the biome without bleeding color.
+- **Mirror-polished obsidian black.** Solid — no grid lines (cleaner; antigravity confirmed exclusion).
+- Under-car reflection clear; contact shadow (SDF `sdBox`) reads crisp on top via depth-fade, not a second surface.
 - Single plane, no track geometry. Cheap.
 
 ### Backdrop
-- Biome-neutral dusk: deep indigo → near-black vertical gradient. No sky dome, no mountains, no stars.
-- Optional: very faint volumetric haze behind the car (one sprite, emissive, billboarded). Adds depth without geometry.
+- **Biome-neutral deep indigo → pitch-black vertical gradient.** No sky dome, no mountains, no stars, no architectural elements.
+- Pure shader/CSS gradient behind the car — no extra geometry.
 
 ### Light rig
-- **Key light:** soft top-down spotlight, warm white (~4500K), aimed at the car's roof/hood. The hero light.
-- **Rim lights:** two narrow accent-colored strips behind the car, left + right, slightly above. Creates the "car floating in a showroom" rim halo. Accent color = current biome `--accent`.
-- **Fill:** low ambient hemisphere light (sky = indigo, ground = black, intensity ~0.15) so shadows aren't pure black.
-- Total: 1 spot + 2 strip emissives (NOT real lights — bloom-only) + 1 hemisphere. Well under the 12-PointLight cap; actually uses 1 real light + hemisphere.
+- **One soft overhead rectangular softbox keylight.** No side point lights. This is the hero light.
+- **Accent:** single horizontal neon wire on the back wall **at car-roof height** (antigravity confirmation: roof height, not ground level).
+- **Accent color:** biome-tied cyan/magenta/gold, **15% opacity emissive bloom** (NO real light — bloom post-process only, per the §3 glow discipline).
+- **Fill:** low ambient so shadows aren't pure black, but the softbox does the heavy lifting.
+- Total real lights: 1 (the softbox). Accent wire = emissive material. Well under every cap.
+
+### Accent color binding
+- Biome-tied: reads current track theme's `--accent` (cyan=neon, gold=dune, magenta=canyon, white=frozen).
+- Single source of truth: the room's accent wire + the car's under-car reflection tint both pull the same value, so the room always belongs to the biome without theming the whole space.
 
 ### Camera
+- FOV narrowed to **60°** (vs race 68°) — premium, distortion-free product shot (antigravity).
 - Slow auto-orbit continues (existing). Pinch-zoom (T6) works.
-- Slight FOV narrowing (60° vs the race 68°) for a more "product shot" framing. Confirm in build.
 
 ### Environment map (reflections)
-- A dedicated garage env map (CubeCamera size 16, per the §3 cap) captured ONCE from the room's center. The car's PBR shell reflects the room, not the raceway.
+- A dedicated garage env map (CubeCamera size 16, per the §3 cap) captured ONCE from the room's center. The car's PBR shell reflects the room (obsidian floor + softbox + accent wire), not the raceway.
 - Currently `G.scene.environment` is the raceway capture. The room build captures a new one and swaps it in for the showcase car only; race car keeps the raceway env.
 
 ## Implementation surface (post-image)
@@ -51,28 +57,30 @@ The following is a **strawman** pending the antigravity mood image. The image ma
 | `js/game.js` | Garage state: hide `G.track` meshes entirely while `state === 'garage'` (room is self-contained). Swap env map on car build. |
 | `tests/verify_m2_features.js` | No new assertions (room is decorative). |
 
-## Antigravity pause — required input
+## Antigravity brief — received + locked
 
-Before the build (Wave 6 T14), I need a **mood image** from antigravity showing the desired look. The image should communicate:
+All four open questions resolved by antigravity's 2026-07-05 brief:
+- **Register:** minimalist studio (confirmed over cyberpunk bay).
+- **Floor:** solid mirror-polished obsidian, NO grid lines (cleaner).
+- **Accent line:** horizontal neon wire on back wall at **car-roof height** (not ground level).
+- **FOV:** 60° (narrowed from race 68°).
 
-1. **Floor material + reflectivity** (mirror / matte / wet)
-2. **Light rig character** (hard spotlight / soft box / neon strips)
-3. **Backdrop mood** (pure black / gradient / architectural)
-4. **Overall register** (luxury showroom / cyberpunk bay / minimalist studio / industrial garage)
-
-Without this, the build risks shipping a generic "dark room" that doesn't match the vision. The image locks the palette and the light rig in one pass.
+No further art-direction input needed before build. The build (T14) is unblocked.
 
 ## Definition of done (post-build)
 
 1. `node dd.js test` green.
 2. `node dd.js sync`.
-3. **Visual spot-check (required, not optional):** screenshot the showcase car in the new room. Headless can't judge aesthetics — this is art direction. Compare against the mood image.
-4. Car reflections show the room, not the raceway.
+3. **Visual spot-check (required, not optional):** screenshot the showcase car in the new room. Headless can't judge aesthetics — this is art direction. Compare against antigravity's brief + iterate via the back-and-forth loop below.
+4. Car reflections show the room (obsidian + softbox + accent wire), not the raceway.
 5. No perf regression: room render cost ≤ current interim stage cost.
 
-## Open questions (resolve with the mood image)
+## Back-and-forth loop with antigravity (post-build polish)
 
-1. Register: showroom / cyberpunk / studio / industrial?
-2. Accent-grid on floor: yes/no?
-3. Volumetric haze: yes/no?
-4. FOV: narrow (60°) or keep race (68°)?
+Per Tibba 2026-07-05: once the build is code-complete, run a visual-iteration loop:
+1. Build agent ships T14, screenshots the garage.
+2. Antigravity receives the screenshot + describes what differs from the brief + what reads well.
+3. Lead (this agent) applies the deltas, re-syncs, re-screenshots.
+4. Repeat until the screenshot matches the brief's intent.
+
+This loop is art-direction polish only — code is done before the loop starts.
