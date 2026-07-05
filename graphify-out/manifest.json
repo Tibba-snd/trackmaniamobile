@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783264024.6425972,
+    "mtime": 1783270110.8317924,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,22 +20,22 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783264024.596464,
+    "mtime": 1783270110.804378,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783264024.6107953,
+    "mtime": 1783270110.812378,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783264024.6385958,
+    "mtime": 1783270110.8293927,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783264024.6385958,
+    "mtime": 1783270110.8293927,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/carspec.js": {
-    "mtime": 1783241025.3011386,
-    "ast_hash": "c3c81ddbb26b1c3673763c81002d47b6",
+    "mtime": 1783269904.7020242,
+    "ast_hash": "9e4eb4dfd80ca8db44bf864da288f01e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/core.js": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/game.js": {
-    "mtime": 1783264016.4880066,
-    "ast_hash": "2adf441fec028c5c9e76236fa47a1aad",
+    "mtime": 1783270042.3561642,
+    "ast_hash": "778129c87d667a66f313d768d030e7bc",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/input.js": {
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783264024.6425972,
+    "mtime": 1783270110.8317924,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },
@@ -205,8 +205,8 @@
     "semantic_hash": ""
   },
   "js/carspec.js": {
-    "mtime": 1783241025.3011386,
-    "ast_hash": "c3c81ddbb26b1c3673763c81002d47b6",
+    "mtime": 1783269904.7020242,
+    "ast_hash": "9e4eb4dfd80ca8db44bf864da288f01e",
     "semantic_hash": ""
   },
   "js/core.js": {
@@ -215,8 +215,8 @@
     "semantic_hash": ""
   },
   "js/game.js": {
-    "mtime": 1783264016.4880066,
-    "ast_hash": "2adf441fec028c5c9e76236fa47a1aad",
+    "mtime": 1783270042.3561642,
+    "ast_hash": "778129c87d667a66f313d768d030e7bc",
     "semantic_hash": ""
   },
   "js/input.js": {
@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "tests/verify_carspec.js": {
-    "mtime": 1783241116.9564295,
-    "ast_hash": "566c07d00306ad0c0541bab5b46f6d5f",
+    "mtime": 1783269933.2724733,
+    "ast_hash": "54740cab696d36796bee0285c502fd2e",
     "semantic_hash": ""
   },
   "tests/verify_colors.js": {
@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/index.html": {
-    "mtime": 1783263895.8595989,
-    "ast_hash": "7da3771ee9680d96640b7195d73db67f",
+    "mtime": 1783270105.0827057,
+    "ast_hash": "9eb16284cebc4cdea8b5ba525bafb381",
     "semantic_hash": ""
   },
   "docs/DESIGN_PROMPT.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1783263895.8595989,
-    "ast_hash": "7da3771ee9680d96640b7195d73db67f",
+    "mtime": 1783270624.059565,
+    "ast_hash": "13f356bf395183888e4b0dcd94d3c63d",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/res/drawable-land-hdpi/splash.png": {
@@ -1217,6 +1217,26 @@
   ".agents/rules/ponytail.md": {
     "mtime": 1783256067.8562,
     "ast_hash": "2217c85fed34e644737c7a06f3d60960",
+    "semantic_hash": ""
+  },
+  "docs/GARAGE_ADD_REMOVE_PARTS_SPEC.md": {
+    "mtime": 1783270310.383572,
+    "ast_hash": "bbf28a7ee27970fbb3d66a3773140e21",
+    "semantic_hash": ""
+  },
+  "docs/GARAGE_CROSS_SECTION_SPEC.md": {
+    "mtime": 1783270255.3939145,
+    "ast_hash": "fde6b3952ccb9ece3d57a7782c4f4234",
+    "semantic_hash": ""
+  },
+  "docs/GARAGE_LATTICE_SPEC.md": {
+    "mtime": 1783270386.6293788,
+    "ast_hash": "a13442115f46e8e5b7db0a3d58e9aac3",
+    "semantic_hash": ""
+  },
+  "docs/GARAGE_ROOM_SPEC.md": {
+    "mtime": 1783270356.8092096,
+    "ast_hash": "cfa7ac4320eefe5357249dc894fe00d1",
     "semantic_hash": ""
   }
 }
