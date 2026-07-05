@@ -115,7 +115,7 @@
     } catch (e) { /* corrupted */ }
     if (!save) {
       // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
-      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb' }, garage: { grad: 0, finish: 1, form: 2 }, tracks: {}, meta: { created: Date.now(), ver: SAVE_VER } };
+      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb', crt: false }, garage: { grad: 0, finish: 1, form: 2, activeCustom: null }, customDesigns: [], tracks: {}, meta: { created: Date.now(), ver: SAVE_VER, customSeq: 0 } };
     }
     // Migration: if the save predates this SAVE_VER, clear campaign track records (PBs/medals/
     // ghosts/author) so they re-derive against the new tracks. Daily/random PBs are keyed by their
@@ -130,6 +130,14 @@
       save.meta.ver = SAVE_VER;
       DD.persistSave(save);
     }
+    // Garage custom-designs layer (additive; NO SAVE_VER bump — pure new fields, so campaign progress
+    // is preserved). Ensures older saves gain the fields, and re-normalizes any saved/imported design
+    // on load so a hand-edited or out-of-date localStorage can never brick the garage/renderer.
+    if (!Array.isArray(save.customDesigns)) save.customDesigns = [];
+    if (!save.garage) save.garage = { grad: 0, finish: 1, form: 2 };
+    if (save.garage.activeCustom === undefined) save.garage.activeCustom = null;
+    if (typeof save.meta.customSeq !== 'number') save.meta.customSeq = 0;
+    if (DD.normalizeSpec) save.customDesigns = save.customDesigns.map((d) => DD.normalizeSpec(d));
     return save;
   };
   DD.persistSave = function (save) {

@@ -23,8 +23,11 @@
     fenderClamp:[0.30, 1.20, 0.70],
     glowI:      [0.00, 2.00, 0.9],
     metalBias:  [-0.30, 0.30, 0.0],
-    sectionExp: [0.30, 1.50, 1.0]
+    sectionExp: [0.30, 1.50, 1.0],
+    rimRadiusPct:  [0.40, 0.90, 0.82],   // inner rim/disc radius as a fraction of tyre radius (was hardcoded 0.82)
+    tyreRoundness: [0.00, 1.00, 0.00]    // 0 = flat cylinder tread, 1 = rounded/torus-like cross-section
   };
+  const CAP_STYLES = ['flat', 'pointed', 'rounded', 'hollow']; // hull nose/tail cap treatments
   const MAX_STATIONS = 24, MAX_PARTS = 16, MAX_MOUNT_BLOCKS = 64;
   DD.CAR_SCHEMA = R;
 
@@ -33,6 +36,27 @@
     return v < lo ? lo : (v > hi ? hi : v);
   };
   const cl = (v, key) => clamp(v, R[key][0], R[key][1], R[key][2]);
+  const capStyle = (v) => (CAP_STYLES.indexOf(v) >= 0 ? v : 'flat');
+  const clampIntOrNull = (v, lo, hi) => {
+    if (v == null) return null;               // null = "use the wheel style's native count"
+    v = Math.round(Number(v));
+    if (!isFinite(v)) return null;
+    return v < lo ? lo : (v > hi ? hi : v);
+  };
+  /* knobs are freeform per-part (each part's builder interprets + clamps its own semantics). Here we
+     only guarantee SAFETY: finite numbers pass, non-finite are dropped, strings/bools are kept —
+     so a hand-edited/shared knob can never push a NaN/Infinity into geometry. */
+  const sanitizeKnobs = (k) => {
+    if (!k || typeof k !== 'object') return {};
+    const out = {};
+    for (const key of Object.keys(k)) {
+      const val = k[key];
+      if (typeof val === 'number') { if (isFinite(val)) out[key] = val; }
+      else if (typeof val === 'string') out[key] = val.slice(0, 24);
+      else if (typeof val === 'boolean') out[key] = val;
+    }
+    return out;
+  };
 
   // Known part + wheel-style names (unknown ones are dropped by normalize → forward-compat).
   const PARTS = ['frontWing', 'rearWingBiplane', 'rearSpoilerLow', 'hoverFins', 'splitter',
@@ -66,6 +90,7 @@
 
     const out = {
       schemaVersion: 1,
+      id: (typeof spec.id === 'string') ? spec.id.slice(0, 40) : null,  // custom-design id (null for presets)
       name: typeof spec.name === 'string' ? spec.name.slice(0, 40) : 'Custom',
       basePreset: spec.basePreset || null,
       chassis: {
@@ -74,11 +99,16 @@
           frontZ: cl(hp.frontZ, 'frontZ'), rearZ: cl(hp.rearZ, 'rearZ'),
           trackF: cl(hp.trackF, 'trackF'), trackR: cl(hp.trackR, 'trackR'),
           frontR: cl(hp.frontR, 'frontR'), rearR: cl(hp.rearR, 'rearR'),
-          tyreW: cl(hp.tyreW, 'tyreW')
+          tyreW: cl(hp.tyreW, 'tyreW'),
+          rimRadiusPct: cl(hp.rimRadiusPct, 'rimRadiusPct'),
+          tyreRoundness: cl(hp.tyreRoundness, 'tyreRoundness'),
+          spokeCount: clampIntOrNull(hp.spokeCount, 3, 8)
         },
         hull: {
           station: station,
           section: { kind: kind, exp: cl(section.exp, 'sectionExp') },
+          capStyleFront: capStyle(hull.capStyleFront),
+          capStyleRear: capStyle(hull.capStyleRear),
           fenderClamp: cl(hull.fenderClamp, 'fenderClamp')
         },
         floor: ch.floor === null ? null : {
@@ -101,7 +131,7 @@
         return m;
       }).filter((m) => PARTS.indexOf(m.part) >= 0).slice(0, MAX_PARTS).map((m) => ({
         part: m.part,
-        knobs: (m.knobs && typeof m.knobs === 'object') ? m.knobs : {},
+        knobs: sanitizeKnobs(m.knobs),
         at: m.at || null
       })),
       palette: {
@@ -200,16 +230,46 @@
     }
   ];
 
-  /* resolveSpec — which CarSpec to build for a given garage selection. P0: the locked preset for
-     garage.form. (P3 will return a player's custom working spec when one is selected.) Always
-     normalized so the renderer can trust it. */
-  DD.resolveSpec = function (garage) {
-    const presets = DD.CAR_PRESETS;
-    const idx = ((garage && garage.form) | 0) % presets.length;
-    const preset = presets[(idx + presets.length) % presets.length];
-    // deep clone so the locked preset is never mutated, then normalize
-    const spec = JSON.parse(JSON.stringify(preset));
-    // honor the live garage paint/finish over the preset's gallery defaults
+  /* createCustomDesign — fork a locked preset (by index) or an existing spec into a new editable
+     custom design. `seq` is a monotonic integer (from save.meta.customSeq) that makes the id stable
+     and deterministic — NO Math.random / Date.now in this pure path (the caller may stamp a
+     `created` timestamp on the returned object separately if it wants one). Always normalized, so
+     the result is immediately safe to render, save, and share. */
+  DD.createCustomDesign = function (source, seq, name) {
+    let base;
+    if (typeof source === 'number') {
+      const presets = DD.CAR_PRESETS;
+      const i = (((source | 0) % presets.length) + presets.length) % presets.length;
+      base = presets[i];
+    } else {
+      base = source || {};
+    }
+    const spec = JSON.parse(JSON.stringify(base));
+    spec.id = 'cd' + (seq | 0);
+    spec.name = (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 40) : ('My Design ' + (seq | 0));
+    return DD.normalizeSpec(spec);
+  };
+
+  /* resolveSpec — which CarSpec to build for a given garage selection.
+     - If `garage.activeCustom` names a design present in `customDesigns`, THAT custom design drives.
+     - Otherwise the locked preset for `garage.form` (unchanged default behavior).
+     `customDesigns` is OPTIONAL: omitting it preserves the original preset-only behavior, so every
+     existing call site (DD.resolveSpec(garage)) keeps working untouched. Live garage paint/finish
+     always layers on top. Always normalized so the renderer can trust the result. */
+  DD.resolveSpec = function (garage, customDesigns) {
+    let spec = null;
+    if (garage && garage.activeCustom && Array.isArray(customDesigns)) {
+      for (let i = 0; i < customDesigns.length; i++) {
+        const d = customDesigns[i];
+        if (d && d.id === garage.activeCustom) { spec = JSON.parse(JSON.stringify(d)); break; }
+      }
+    }
+    if (!spec) {
+      const presets = DD.CAR_PRESETS;
+      const idx = ((garage && garage.form) | 0) % presets.length;
+      spec = JSON.parse(JSON.stringify(presets[(idx + presets.length) % presets.length]));
+    }
+    // honor the live garage paint/finish over the resolved spec's gallery defaults
     if (garage) { spec.gallery = { grad: garage.grad | 0, finish: garage.finish | 0 }; }
     return DD.normalizeSpec(spec);
   };
