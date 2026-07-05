@@ -336,7 +336,7 @@
     // Disabled whenever the player is ASKING for a slide (drift btn, brake-tap, wheelspin, ice).
     const vRef = Math.max(speed, 2.5);
     const dir = vLong >= 0 ? 1 : -1;
-    const wantSlide = input.drift || brake > 0.4 || (throttle > 0.85 && speed < 24) || glass;
+    const wantSlide = input.drift || (brake > 0.4 && vLong > 3) || (throttle > 0.85 && speed < 24) || glass;
     if (!wantSlide && speed > 8) {
       // soft overdrive: light inputs stay fully proportional (you can FEEL the modulation);
       // only steering past the useful band gives diminishing return — no hard clamp, no dead zone.
@@ -364,6 +364,7 @@
     // slide hysteresis (drift state)
     const slip = Math.abs(alphaR);
     car.slideState = car.slideState ? slip > P.slideExit : slip > P.slideEnter;
+    if (vLong < -0.5) car.slideState = false; // no meaningful drift in reverse — clear residual slide
     car.slipF = alphaF; car.slipR = alphaR;
     car.slipMax = Math.max(Math.abs(alphaF), Math.abs(alphaR)); // either axle sliding = visible/audible slide
 
@@ -375,7 +376,7 @@
     const slideRegime = wantSlide || car.slideState;
     if (!slideRegime) {
       const yawCap = Math.min(P.yawMax, 0.95 * aGrip / Math.max(speed, 6));
-      const rTarget = -car.steerPos * yawCap;       // screen-right = -yaw
+      const rTarget = -car.steerPos * yawCap * dir;  // screen-right = -yaw; dir flips in reverse so steering matches travel direction
       r = DD.dampTo(r, rTarget, P.yawTrack, dt);     // predictable, proportional, planted
       // velocity tracks heading (car GOES where it points) with a hair of slip for feel
       const vLatTarget = -r * speed * 0.06;

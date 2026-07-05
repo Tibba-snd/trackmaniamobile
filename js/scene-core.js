@@ -350,10 +350,8 @@
       }, V.lerp(theme.accent2, [1, 1, 1], 0.45), 0.42, THREE.AdditiveBlending);
     if (centre) root.add(centre);
 
-    // boost overlay
-    const boost = DD._sceneShared.buildStrip(track, theme,
-      (s) => s.surf === DD.SURF.BOOST ? [V.addS(V.addS(s.p, s.u, 0.09), s.r, -s.w * 0.3), V.addS(V.addS(s.p, s.u, 0.09), s.r, s.w * 0.3)] : null,
-      theme.boostColor, 0.55, THREE.AdditiveBlending);
+    // boost overlay (T2 - instanced glowing pads + chevrons)
+    const boost = DD._sceneShared.buildBoostPads(track, theme);
     if (boost) { root.add(boost); track.boostMesh = boost; }
 
     // glass shine overlay
@@ -372,12 +370,26 @@
         const c = V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85);
         return [V.addS(c, s.r, -0.1 * side), V.addS(c, s.r, 0.1 * side)];
       }, theme.accent2, 0.85, THREE.AdditiveBlending);
+    // T8: Extra glowing middle rails for wallrides to emphasize banking
+    const wallrideMidRail = (side, heightFrac) => DD._sceneShared.buildStrip(track, theme,
+      (s) => {
+        if (!s.wall || s.gap || s.pieceName !== 'wallride') return null;
+        const c = V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85 * heightFrac);
+        return [V.addS(c, s.r, -0.08 * side), V.addS(c, s.r, 0.08 * side)];
+      }, theme.accent, 0.9, THREE.AdditiveBlending);
     for (const side of [1, -1]) {
       const w = railWall(side), tline = railTop(side);
       if (w) root.add(w); if (tline) root.add(tline);
+      const mr1 = wallrideMidRail(side, 0.33), mr2 = wallrideMidRail(side, 0.66);
+      if (mr1) root.add(mr1); if (mr2) root.add(mr2);
     }
 
+    // T3 + T4: gantry-style start/finish + numbered checkpoint gates
     root.add(DD._sceneShared.buildGates(track, theme, quality));
+    // T5: tunnels (overheaded tubes on straight segments)
+    root.add(DD._sceneShared.buildTunnels(track, theme, quality));
+    // T6: landing target pads for big jumps
+    root.add(DD._sceneShared.buildLandingPads(track, theme));
     root.add(DD._sceneShared.buildCornerSigns(track, theme));
     root.add(DD._sceneShared.buildDecor(track, theme, rng, quality));
     

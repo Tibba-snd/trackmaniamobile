@@ -15,21 +15,21 @@
   const WEIGHTS = {
     speedway:  { straight: 3.0, sweeper: 2.5, banked: 2.0, boost: 2.0, kicker: 0.6, chicane: 0.5, hairpin: 0.2, glass: 0.4, weave: 0.5, crest: 1.0, wallride: 0.6, dip: 1.0, jumpgap: 0.8, tighten: 0.4 },
     technical: { straight: 0.8, sweeper: 1.0, banked: 0.6, boost: 0.5, kicker: 0.4, chicane: 2.2, hairpin: 2.0, glass: 1.0, weave: 2.0, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.4 },
-    rhythm:    { straight: 1.0, sweeper: 1.0, banked: 0.8, boost: 1.0, kicker: 2.0, chicane: 0.8, hairpin: 0.4, glass: 0.6, weave: 1.8, crest: 1.8, wallride: 0.6, dip: 1.5, jumpgap: 1.4, tighten: 0.5 },
+    rhythm:    { straight: 1.0, sweeper: 1.0, banked: 0.8, boost: 1.0, kicker: 2.0, chicane: 0.8, hairpin: 0.4, glass: 0.6, weave: 1.8, crest: 1.8, wallride: 0.6, dip: 1.5, jumpgap: 1.4, tighten: 0.5, bigjump: 0.2 },
     drift:     { straight: 1.0, sweeper: 2.6, banked: 1.4, boost: 0.8, kicker: 0.4, chicane: 0.8, hairpin: 1.5, glass: 0.8, weave: 1.2, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.2 },
-    vertical:  { straight: 0.8, sweeper: 1.2, banked: 1.4, boost: 1.0, kicker: 1.6, chicane: 0.6, hairpin: 0.5, glass: 0.5, weave: 0.8, crest: 2.0, wallride: 0.8, dip: 2.0, jumpgap: 1.2, tighten: 0.4 },
-    mixed:     { straight: 1.2, sweeper: 1.2, banked: 1.0, boost: 0.8, kicker: 0.9, chicane: 1.0, hairpin: 0.8, glass: 0.8, weave: 1.0, crest: 1.0, wallride: 0.8, dip: 1.0, jumpgap: 0.7, tighten: 0.7 }
+    vertical:  { straight: 0.8, sweeper: 1.2, banked: 1.4, boost: 1.0, kicker: 1.6, chicane: 0.6, hairpin: 0.5, glass: 0.5, weave: 0.8, crest: 2.0, wallride: 0.8, dip: 2.0, jumpgap: 1.2, tighten: 0.4, bigjump: 0.3 },
+    mixed:     { straight: 1.2, sweeper: 1.2, banked: 1.0, boost: 0.8, kicker: 0.9, chicane: 1.0, hairpin: 0.8, glass: 0.8, weave: 1.0, crest: 1.0, wallride: 0.8, dip: 1.0, jumpgap: 0.7, tighten: 0.7, bigjump: 0.15 }
   };
 
   const RAIL_CHANCE = {
     straight: 0.65, sweeper: 0.8, banked: 0.7, boost: 0.7, kicker: 0, chicane: 0.85, hairpin: 0.9,
-    glass: 0.9, weave: 0.8, crest: 0.45, wallride: 1, dip: 0.6, jumpgap: 0, tighten: 0.85
+    glass: 0.9, weave: 0.8, crest: 0.45, wallride: 1, dip: 0.6, jumpgap: 0, bigjump: 0, tighten: 0.85
   };
 
   // expected corner speeds (m/s) — for braking-straight insertion
   const CORNER_V = { hairpin: 26, tighten: 30, chicane: 46, weave: 50, wallride: 44, glass: 34 };
 
-  function makePieces(rng, tier) {
+  function makePieces(rng, tier, seedStr) {
     const t01 = (tier - 1) / 4;
     // T1: wider tracks for creative driving. Old 13.5->9 left tight T5 corners as narrow as
     // 7.2m (9*0.8) — drifting a rear-end-out at 250 km/h hit the fence almost every corner.
@@ -91,7 +91,7 @@
       kicker: () => {
         const up = rng.range(0.18, 0.28);
         const lip = rng.range(10, 16), drop = rng.range(26, 40), out = rng.range(30, 50);
-        const len = lip + drop + out, w = wVar() * 1.15;
+        const len = lip + drop + out, w = wVar() * 1.5;
         return { name: 'kicker', len, fn: (d) => {
           let pitchT;
           if (d < lip) pitchT = up;
@@ -103,11 +103,27 @@
       jumpgap: () => {
         const up = rng.range(0.17, 0.24);
         const lip = 14, gapLen = rng.range(16, 26 + 8 * t01), land = 38;
-        const len = lip + gapLen + land, w = wVar() * 1.1;
+        const len = lip + gapLen + land, w = wVar() * 1.5;
         return { name: 'jumpgap', len, fn: (d) => {
           if (d < lip) return { curv: 0, pitchT: up, bankT: 0, widthT: w, snapPitch: d > lip - 6 };
           if (d < lip + gapLen) return { curv: 0, pitchT: -0.13, bankT: 0, widthT: w * 1.3, gap: 1, snapPitch: d < lip + 8 };
           return { curv: 0, pitchT: 0, bankT: 0, widthT: w * 1.35, snapPitch: d < lip + gapLen + 6 };
+        } };
+      },
+      bigjump: () => {
+        const jRng = DD.makeRng(seedStr + '::bigjump');
+        const up = 0.22;
+        const lip = jRng.range(25, 35);
+        const gapLen = jRng.range(40, 70 + 15 * t01);
+        const land = 48;
+        const len = lip + gapLen + land;
+        const w = wBase;
+        return { name: 'bigjump', len, fn: (d) => {
+          if (d < lip) return { curv: 0, pitchT: up, bankT: 0, widthT: w, snapPitch: d > lip - 8 };
+          if (d < lip + gapLen) return { curv: 0, pitchT: -0.15, bankT: 0, widthT: w * 1.6, gap: 1, snapPitch: d < lip + 8 };
+          const landD = d - (lip + gapLen);
+          const pitch = -0.15 * (1.0 - DD.clamp(landD / land, 0, 1));
+          return { curv: 0, pitchT: pitch, bankT: 0, widthT: w * 1.6, snapPitch: landD < 12, landing: 1 };
         } };
       },
       glass: () => {
@@ -124,7 +140,7 @@
         // T1: wallride was NARROWER than normal (0.7-0.85x) — backwards for a commitment piece.
         // Wider (1.05-1.2x) so you have room. (T8 adds real banking on top of this width.)
         const len = ang * rad, w = wBase * rng.range(1.05, 1.2);
-        return { name: 'wallride', len, fn: () => ({ curv: dir / rad, pitchT: 0, bankT: 0, widthT: w, wall: 1 }) };
+        return { name: 'wallride', len, fn: () => ({ curv: dir / rad, pitchT: 0, bankT: dir * rng.range(0.4, 0.7), widthT: w, wall: 1 }) };
       },
       weave: () => {
         const dir = rng.sign(), rad = rng.range(80, 135) / sharp, seg = rng.range(36, 50), n = rng.int(3, 5);
@@ -283,7 +299,7 @@
     const rng = DD.makeRng(seedStr + '::track::t' + tier + '::a' + (attempt || 0));
     const archetype = rng.pick(ARCHETYPES);
     const weights = WEIGHTS[archetype];
-    const builders = makePieces(rng, tier);
+    const builders = makePieces(rng, tier, seedStr);
     let targetLen = 1300 + tier * 230 + rng.range(-150, 200);
     const theme = DD.makeTheme(seedStr);
 
@@ -338,7 +354,7 @@
         const cosP = Math.cos(pitchEff);
         const f = [Math.sin(s1.yaw) * cosP, Math.sin(pitchEff), Math.cos(s1.yaw) * cosP];
         s1.pos = V.addS(s1.pos, f, DS);
-        arr.push({ p: V.clone(s1.pos), yaw: s1.yaw, pitch: pitchEff, bank: s1.bank, w: s1.width, surf: c.surf || 0, wall: c.wall ? 1 : (piece.rail && !c.gap ? 1 : 0), gap: c.gap ? 1 : 0, pieceName: piece.name });
+        arr.push({ p: V.clone(s1.pos), yaw: s1.yaw, pitch: pitchEff, bank: s1.bank, w: s1.width, surf: c.surf || 0, wall: c.wall ? 1 : (piece.rail && !c.gap ? 1 : 0), gap: c.gap ? 1 : 0, pieceName: piece.name, landing: c.landing ? 1 : 0 });
       }
       return { arr, st: s1 };
     }
@@ -469,9 +485,9 @@
         }
       }
 
-      if (lastName === 'glass' || lastName === 'kicker' || lastName === 'jumpgap') name = 'straight';
-      if (name === lastName && (name === 'hairpin' || name === 'glass' || name === 'kicker' || name === 'boost' || name === 'jumpgap' || name === 'tighten')) name = 'straight';
-      if ((name === 'glass' || name === 'boost' || name === 'wallride' || name === 'jumpgap') && total - lastSpecial < 180) name = 'sweeper';
+      if (lastName === 'glass' || lastName === 'kicker' || lastName === 'jumpgap' || lastName === 'bigjump') name = 'straight';
+      if (name === lastName && (name === 'hairpin' || name === 'glass' || name === 'kicker' || name === 'boost' || name === 'jumpgap' || name === 'bigjump' || name === 'tighten')) name = 'straight';
+      if ((name === 'glass' || name === 'boost' || name === 'wallride' || name === 'jumpgap' || name === 'bigjump') && total - lastSpecial < 180) name = 'sweeper';
       if ((lastName === 'crest' || lastName === 'dip') && (name === 'hairpin' || name === 'tighten')) name = 'sweeper';
 
       // anticipation: braking straight before sharp stuff arriving fast
@@ -486,7 +502,7 @@
       }
 
       const p = decorate(builders[name](), name);
-      if (name === 'glass' || name === 'boost' || name === 'wallride' || name === 'kicker' || name === 'jumpgap') lastSpecial = total;
+      if (name === 'glass' || name === 'boost' || name === 'wallride' || name === 'kicker' || name === 'jumpgap' || name === 'bigjump') lastSpecial = total;
       const placed = appendPiece(p, name, true);
       lastName = placed;
 

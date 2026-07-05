@@ -793,27 +793,340 @@
     return group;
   }
 
+  let _checkeredTexCache = null;
+  function getCheckeredTexture() {
+    if (_checkeredTexCache) return _checkeredTexCache;
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 32;
+    const cx = cv.getContext('2d');
+    const rows = 2;
+    const cols = 8;
+    const w = 128 / cols;
+    const h = 32 / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        cx.fillStyle = ((r + c) % 2 === 0) ? '#ffffff' : '#0a0518';
+        cx.fillRect(c * w, r * h, w, h);
+      }
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    _checkeredTexCache = tex;
+    return tex;
+  }
+
+  let _startGridTexCache = {};
+  function getStartGridTexture(theme) {
+    const key = theme.accent.join(',');
+    if (_startGridTexCache[key]) return _startGridTexCache[key];
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      if (ctx.fillRect) {
+        ctx.fillStyle = '#08050e';
+        ctx.fillRect(0, 0, 128, 256);
+      }
+      if (ctx.strokeRect) {
+        ctx.strokeStyle = 'rgba(' + Math.round(theme.accent[0] * 255) + ',' + Math.round(theme.accent[1] * 255) + ',' + Math.round(theme.accent[2] * 255) + ', 0.9)';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(3, 3, 122, 250);
+      }
+      if (ctx.beginPath && ctx.moveTo && ctx.lineTo && ctx.stroke) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 3;
+        for (let y = 30; y < 250; y += 50) {
+          ctx.beginPath();
+          ctx.moveTo(15, y); ctx.lineTo(45, y);
+          ctx.moveTo(83, y + 25); ctx.lineTo(113, y + 25);
+          ctx.stroke();
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    _startGridTexCache[key] = tex;
+    return tex;
+  }
+
   function buildGates(track, theme, quality) {
     const group = new THREE.Group();
-    const mk = (i, radius, tube, c, op) => {
-      const s = track.samples[i];
-      const geo = new THREE.TorusGeometry(radius, tube, 10, 40);
-      const mat = new THREE.MeshBasicMaterial({ color: col(c), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
-      const m = new THREE.Mesh(geo, mat);
-      m.position.set(s.p[0] + s.u[0] * 1.5, s.p[1] + s.u[1] * 1.5, s.p[2] + s.u[2] * 1.5);
-      const target = new THREE.Vector3(s.p[0] + s.f[0] * 10, s.p[1] + s.f[1] * 10, s.p[2] + s.f[2] * 10);
-      m.lookAt(target);
-      group.add(m);
-      if (quality !== 'low') {
-        // gate ring glow → dynamic light pool (see DD.updateLightPool); the torus mesh + bloom carry the look
-        addLightSource(track, [s.p[0] + s.u[0] * 1.5, s.p[1] + s.u[1] * 1.5, s.p[2] + s.u[2] * 1.5], col(c), 5.0, radius * 2.5);
+    const ss = track.samples;
+    const N = ss.length;
+    if (!N) return group;
+
+    track.checkpointPlanes = [];
+
+    const structMat = new THREE.MeshBasicMaterial({ color: 0x0c0a15, transparent: true, opacity: 0.92, fog: false });
+    const glowMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+
+    const ckptCount = (track.checkpoints || []).length;
+    const totalGantries = ckptCount + 2; // +start +finish
+
+    const structGeo = new THREE.BoxGeometry(1, 1, 1);
+    
+    const postIM = new THREE.InstancedMesh(structGeo, structMat, totalGantries * 4);
+    const braceIM = new THREE.InstancedMesh(structGeo, structMat, totalGantries * 4);
+    const barIM = new THREE.InstancedMesh(structGeo, structMat, totalGantries * 2);
+    const postNeonIM = new THREE.InstancedMesh(structGeo, glowMat, totalGantries * 2);
+    const barNeonIM = new THREE.InstancedMesh(structGeo, glowMat, totalGantries);
+
+    const m = new THREE.Matrix4();
+    let gi = 0, pi = 0, bri = 0, pni = 0, bni = 0;
+
+    function placeGantry(idx, signText, signColor, isStart, isFinish, ckptIdx) {
+      const s = ss[idx];
+      if (!s) return;
+      const halfW = s.w * 0.5;
+      const postH = 4.2;
+      const right = new THREE.Vector3(s.r[0], s.r[1], s.r[2]);
+      const up = new THREE.Vector3(s.u[0], s.u[1], s.u[2]);
+      const fwd = new THREE.Vector3(s.f[0], s.f[1], s.f[2]);
+      const yaw = Math.atan2(s.f[0], s.f[2]);
+      const pitch = Math.asin(s.f[1]);
+      const roll = Math.atan2(s.r[1], s.r[0]);
+      const e = new THREE.Euler().set(pitch, yaw, roll, 'YXZ');
+      const quat = new THREE.Quaternion().setFromEuler(e);
+
+      // left column post 1
+      const lp1 = new THREE.Vector3(
+        s.p[0] - right.x * halfW - fwd.x * 0.3 + up.x * postH * 0.5,
+        s.p[1] - right.y * halfW - fwd.y * 0.3 + up.y * postH * 0.5,
+        s.p[2] - right.z * halfW - fwd.z * 0.3 + up.z * postH * 0.5
+      );
+      m.compose(lp1, quat, new THREE.Vector3(0.15, postH, 0.15));
+      postIM.setMatrixAt(pi++, m);
+
+      // left column post 2
+      const lp2 = new THREE.Vector3(
+        s.p[0] - right.x * halfW + fwd.x * 0.3 + up.x * postH * 0.5,
+        s.p[1] - right.y * halfW + fwd.y * 0.3 + up.y * postH * 0.5,
+        s.p[2] - right.z * halfW + fwd.z * 0.3 + up.z * postH * 0.5
+      );
+      m.compose(lp2, quat, new THREE.Vector3(0.15, postH, 0.15));
+      postIM.setMatrixAt(pi++, m);
+
+      // right column post 1
+      const rp1 = new THREE.Vector3(
+        s.p[0] + right.x * halfW - fwd.x * 0.3 + up.x * postH * 0.5,
+        s.p[1] + right.y * halfW - fwd.y * 0.3 + up.y * postH * 0.5,
+        s.p[2] + right.z * halfW - fwd.z * 0.3 + up.z * postH * 0.5
+      );
+      m.compose(rp1, quat, new THREE.Vector3(0.15, postH, 0.15));
+      postIM.setMatrixAt(pi++, m);
+
+      // right column post 2
+      const rp2 = new THREE.Vector3(
+        s.p[0] + right.x * halfW + fwd.x * 0.3 + up.x * postH * 0.5,
+        s.p[1] + right.y * halfW + fwd.y * 0.3 + up.y * postH * 0.5,
+        s.p[2] + right.z * halfW + fwd.z * 0.3 + up.z * postH * 0.5
+      );
+      m.compose(rp2, quat, new THREE.Vector3(0.15, postH, 0.15));
+      postIM.setMatrixAt(pi++, m);
+
+      // diagonal braces for left column
+      const angle = 0.14; // approx angle
+      const lColCenter = new THREE.Vector3(
+        s.p[0] - right.x * halfW + up.x * postH * 0.5,
+        s.p[1] - right.y * halfW + up.y * postH * 0.5,
+        s.p[2] - right.z * halfW + up.z * postH * 0.5
+      );
+      const qb1 = new THREE.Quaternion().copy(quat);
+      if (qb1.multiply) qb1.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, 0)));
+      m.compose(lColCenter, qb1, new THREE.Vector3(0.08, 4.24, 0.08));
+      braceIM.setMatrixAt(bri++, m);
+
+      const qb2 = new THREE.Quaternion().copy(quat);
+      if (qb2.multiply) qb2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-angle, 0, 0)));
+      m.compose(lColCenter, qb2, new THREE.Vector3(0.08, 4.24, 0.08));
+      braceIM.setMatrixAt(bri++, m);
+
+      // diagonal braces for right column
+      const rColCenter = new THREE.Vector3(
+        s.p[0] + right.x * halfW + up.x * postH * 0.5,
+        s.p[1] + right.y * halfW + up.y * postH * 0.5,
+        s.p[2] + right.z * halfW + up.z * postH * 0.5
+      );
+      const qb3 = new THREE.Quaternion().copy(quat);
+      if (qb3.multiply) qb3.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, 0)));
+      m.compose(rColCenter, qb3, new THREE.Vector3(0.08, 4.24, 0.08));
+      braceIM.setMatrixAt(bri++, m);
+
+      const qb4 = new THREE.Quaternion().copy(quat);
+      if (qb4.multiply) qb4.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-angle, 0, 0)));
+      m.compose(rColCenter, qb4, new THREE.Vector3(0.08, 4.24, 0.08));
+      braceIM.setMatrixAt(bri++, m);
+
+      // crossbars
+      const barCenter1 = new THREE.Vector3(
+        s.p[0] + up.x * postH,
+        s.p[1] + up.y * postH,
+        s.p[2] + up.z * postH
+      );
+      m.compose(barCenter1, quat, new THREE.Vector3(s.w * 1.02, 0.2, 0.2));
+      barIM.setMatrixAt(gi++, m);
+
+      const barCenter2 = new THREE.Vector3(
+        s.p[0] + up.x * (postH - 0.5),
+        s.p[1] + up.y * (postH - 0.5),
+        s.p[2] + up.z * (postH - 0.5)
+      );
+      m.compose(barCenter2, quat, new THREE.Vector3(s.w * 1.02, 0.15, 0.15));
+      barIM.setMatrixAt(gi++, m);
+
+      // neon vertical trims
+      const lnPos = new THREE.Vector3(
+        s.p[0] - right.x * (halfW - 0.08) + up.x * postH * 0.5,
+        s.p[1] - right.y * (halfW - 0.08) + up.y * postH * 0.5,
+        s.p[2] - right.z * (halfW - 0.08) + up.z * postH * 0.5
+      );
+      m.compose(lnPos, quat, new THREE.Vector3(0.03, postH, 0.06));
+      postNeonIM.setMatrixAt(pni++, m);
+      if (postNeonIM.setColorAt) postNeonIM.setColorAt(pni - 1, col(signColor));
+
+      const rnPos = new THREE.Vector3(
+        s.p[0] + right.x * (halfW - 0.08) + up.x * postH * 0.5,
+        s.p[1] + right.y * (halfW - 0.08) + up.y * postH * 0.5,
+        s.p[2] + right.z * (halfW - 0.08) + up.z * postH * 0.5
+      );
+      m.compose(rnPos, quat, new THREE.Vector3(0.03, postH, 0.06));
+      postNeonIM.setMatrixAt(pni++, m);
+      if (postNeonIM.setColorAt) postNeonIM.setColorAt(pni - 1, col(signColor));
+
+      // horizontal neon trim
+      const hnPos = new THREE.Vector3(
+        s.p[0] + up.x * (postH + 0.11),
+        s.p[1] + up.y * (postH + 0.11),
+        s.p[2] + up.z * (postH + 0.11)
+      );
+      m.compose(hnPos, quat, new THREE.Vector3(s.w * 0.98, 0.04, 0.08));
+      barNeonIM.setMatrixAt(bni++, m);
+      if (barNeonIM.setColorAt) barNeonIM.setColorAt(bni - 1, col(signColor));
+
+      if (isStart) {
+        track.startLights = [];
+        const lightGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        for (let i = 0; i < 5; i++) {
+          const lightMat = new THREE.MeshBasicMaterial({ color: 0x221111, transparent: true, opacity: 0.8 });
+          const lightMesh = new THREE.Mesh(lightGeo, lightMat);
+          const offsetRatio = (i - 2) * 0.22;
+          const bulbPos = new THREE.Vector3(
+            s.p[0] + up.x * (postH - 0.45) + right.x * s.w * offsetRatio,
+            s.p[1] + up.y * (postH - 0.45) + right.y * s.w * offsetRatio,
+            s.p[2] + up.z * (postH - 0.45) + right.z * s.w * offsetRatio
+          );
+          lightMesh.position.copy(bulbPos);
+          group.add(lightMesh);
+          track.startLights.push(lightMesh);
+        }
+
+        const gridPad = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.96, 12),
+          new THREE.MeshBasicMaterial({ map: getStartGridTexture(theme), transparent: true, opacity: 0.82, fog: false }));
+        const padPos = new THREE.Vector3(s.p[0] + up.x * 0.05, s.p[1] + up.y * 0.05, s.p[2] + up.z * 0.05);
+        gridPad.position.copy(padPos);
+        gridPad.lookAt(new THREE.Vector3(padPos.x + up.x, padPos.y + up.y, padPos.z + up.z));
+        group.add(gridPad);
       }
-      return m;
-    };
+
+      if (ckptIdx !== undefined) {
+        track.checkpointLights = track.checkpointLights || {};
+        track.checkpointLights[ckptIdx] = [];
+        const lightGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        for (let i = 0; i < 3; i++) {
+          const lightMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.5 });
+          const lightMesh = new THREE.Mesh(lightGeo, lightMat);
+          const offsetRatio = (i - 1) * 0.22;
+          const bulbPos = new THREE.Vector3(
+            s.p[0] + up.x * (postH - 0.45) + right.x * s.w * offsetRatio,
+            s.p[1] + up.y * (postH - 0.45) + right.y * s.w * offsetRatio,
+            s.p[2] + up.z * (postH - 0.45) + right.z * s.w * offsetRatio
+          );
+          lightMesh.position.copy(bulbPos);
+          group.add(lightMesh);
+          track.checkpointLights[ckptIdx].push(lightMesh);
+        }
+      }
+
+      if (isFinish) {
+        track.finishLights = [];
+        const lightGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        for (let i = 0; i < 5; i++) {
+          const lightMat = new THREE.MeshBasicMaterial({ color: 0x0055ff, transparent: true, opacity: 0.8 });
+          const lightMesh = new THREE.Mesh(lightGeo, lightMat);
+          const offsetRatio = (i - 2) * 0.22;
+          const bulbPos = new THREE.Vector3(
+            s.p[0] + up.x * (postH - 0.45) + right.x * s.w * offsetRatio,
+            s.p[1] + up.y * (postH - 0.45) + right.y * s.w * offsetRatio,
+            s.p[2] + up.z * (postH - 0.45) + right.z * s.w * offsetRatio
+          );
+          lightMesh.position.copy(bulbPos);
+          group.add(lightMesh);
+          track.finishLights.push(lightMesh);
+        }
+
+        const finishPos = new THREE.Vector3(s.p[0], s.p[1], s.p[2]);
+        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.95, 1.6),
+          new THREE.MeshBasicMaterial({ map: getCheckeredTexture(), transparent: true, opacity: 0.85, fog: false }));
+        stripe.position.set(
+          finishPos.x + up.x * 0.08,
+          finishPos.y + up.y * 0.08,
+          finishPos.z + up.z * 0.08
+        );
+        stripe.lookAt(new THREE.Vector3(
+          finishPos.x + up.x,
+          finishPos.y + up.y,
+          finishPos.z + up.z
+        ));
+        group.add(stripe);
+      }
+
+      if (quality !== 'low') {
+        addLightSource(track, [s.p[0] + up.x * 4, s.p[1] + up.y * 4, s.p[2] + up.z * 4], col(signColor), 4.5, s.w * 1.2);
+      }
+    }
+
+    // checkpoints: numbered sector gates (T4)
+    const ckpts = track.checkpoints || [];
+    for (let i = 0; i < ckpts.length; i++) {
+      placeGantry(ckpts[i], 'SECTOR ' + (i + 1), theme.accent2, false, false, i);
+    }
+
+    // start gantry (T3)
+    placeGantry(track.startIdx || 2, 'START / SECTOR 0', theme.accent, true, false);
+
+    // finish gantry (T3)
+    placeGantry(track.finishIdx || (N - 3), 'FINISH', theme.boostColor || theme.accent, false, true);
+
+    postIM.count = pi; braceIM.count = bri; barIM.count = gi;
+    postNeonIM.count = pni; barNeonIM.count = bni;
+
+    postIM.instanceMatrix.needsUpdate = true;
+    braceIM.instanceMatrix.needsUpdate = true;
+    barIM.instanceMatrix.needsUpdate = true;
+    postNeonIM.instanceMatrix.needsUpdate = true;
+    barNeonIM.instanceMatrix.needsUpdate = true;
+
+    if (postNeonIM.instanceColor) postNeonIM.instanceColor.needsUpdate = true;
+    if (barNeonIM.instanceColor) barNeonIM.instanceColor.needsUpdate = true;
+
+    postIM.frustumCulled = false;
+    braceIM.frustumCulled = false;
+    barIM.frustumCulled = false;
+    postNeonIM.frustumCulled = false;
+    barNeonIM.frustumCulled = false;
+
+    group.add(postIM);
+    group.add(braceIM);
+    group.add(barIM);
+    group.add(postNeonIM);
+    group.add(barNeonIM);
+
+    track.postNeonIM = postNeonIM;
+    track.barNeonIM = barNeonIM;
+    track.flashingGantries = {};
     track.gateMeshes = [];
-    for (const ci of track.checkpoints) track.gateMeshes.push(mk(ci, track.samples[ci].w * 0.62, 0.16, theme.accent2, 0.75));
-    mk(track.finishIdx, track.samples[track.finishIdx].w * 0.66, 0.3, theme.accent, 0.95);
-    mk(track.finishIdx, track.samples[track.finishIdx].w * 0.5, 0.12, theme.accent2, 0.8);
     return group;
   }
 
@@ -1494,6 +1807,8 @@
     return group;
   }
 
+  // buildGatesV2 removed, integrated into buildGates above
+
 
   function buildHorizonMountains(track, theme, rng) {
     const group = new THREE.Group();
@@ -1704,10 +2019,553 @@
   DD._sceneShared.buildNeonProps = buildNeonProps;
   DD._sceneShared.buildSupportPillars = buildSupportPillars;
   DD._sceneShared.buildNeonArches = buildNeonArches;
+  DD._sceneShared.buildBoostPads = buildBoostPads;
   DD._sceneShared.buildHorizonMountains = buildHorizonMountains;
   DD._sceneShared.buildNebulae = buildNebulae;
   DD._sceneShared.getAuroraTexture = getAuroraTexture;
   DD._sceneShared.buildAurora = buildAurora;
   DD._sceneShared.buildSciFiPlanet = buildSciFiPlanet;
+
+  function buildBoostPads(track, theme) {
+    const group = new THREE.Group();
+    const ss = track.samples;
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i < ss.length; i++) {
+      if (ss[i].surf === DD.SURF.BOOST) {
+        if (start === -1) start = i;
+      } else {
+        if (start !== -1) {
+          runs.push({ start, end: i - 1 });
+          start = -1;
+        }
+      }
+    }
+    if (start !== -1) {
+      runs.push({ start, end: ss.length - 1 });
+    }
+
+    if (runs.length === 0) return group;
+
+    let totalChevrons = 0;
+    const padData = [];
+
+    runs.forEach(run => {
+      const len = run.end - run.start + 1;
+      const numChevrons = Math.max(2, Math.floor(len / 6));
+      totalChevrons += numChevrons;
+      padData.push({
+        run,
+        numChevrons,
+        chevrons: []
+      });
+    });
+
+    const boostCol = col(theme.boostColor || [0, 1, 0.5]);
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0715,
+      emissive: boostCol,
+      emissiveIntensity: 0.18,
+      roughness: 0.5,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    const chevronMat = new THREE.MeshBasicMaterial({
+      color: boostCol,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const baseGeo = new THREE.BoxGeometry(1, 0.03, 1);
+    const chevronGeo = new THREE.ConeGeometry(0.35, 1.0, 3);
+
+    const baseInst = new THREE.InstancedMesh(baseGeo, baseMat, runs.length);
+    const chevronInst = new THREE.InstancedMesh(chevronGeo, chevronMat, totalChevrons);
+
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+
+    runs.forEach((run, idx) => {
+      const midIdx = Math.floor((run.start + run.end) / 2);
+      const sMid = ss[midIdx];
+      const startP = ss[run.start].p;
+      const endP = ss[run.end].p;
+      const dist = V.dist(startP, endP);
+
+      pos.set(sMid.p[0], sMid.p[1] + 0.04, sMid.p[2]);
+
+      const yaw = Math.atan2(sMid.f[0], sMid.f[2]);
+      const pitch = Math.asin(sMid.f[1]);
+      const roll = Math.atan2(sMid.r[1], sMid.r[0]);
+      q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+
+      scl.set(sMid.w * 0.65, 1.0, dist + 2.0);
+
+      m4.compose(pos, q, scl);
+      baseInst.setMatrixAt(idx, m4);
+
+      if (idx < 8) {
+        addLightSource(track, [sMid.p[0], sMid.p[1] + 1.2, sMid.p[2]], boostCol, 1.3, 16.0);
+      }
+    });
+
+    group.add(baseInst);
+    group.add(chevronInst);
+    track.boostChevronInst = chevronInst;
+    track.boostBaseMat = baseMat;
+    track.boostChevronMat = chevronMat;
+
+    let chevGlobalIdx = 0;
+    padData.forEach(pad => {
+      for (let c = 0; c < pad.numChevrons; c++) {
+        const initialProgress = c / pad.numChevrons;
+        pad.chevrons.push({
+          globalIdx: chevGlobalIdx++,
+          progress: initialProgress
+        });
+      }
+    });
+
+    track.boostPadsData = padData;
+    return group;
+  }
+
+  function buildLandingPads(track, theme) {
+    const group = new THREE.Group();
+    const ss = track.samples;
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i < ss.length; i++) {
+      if (ss[i].landing) {
+        if (start === -1) start = i;
+      } else {
+        if (start !== -1) {
+          runs.push({ start, end: i - 1 });
+          start = -1;
+        }
+      }
+    }
+    if (start !== -1) {
+      runs.push({ start, end: ss.length - 1 });
+    }
+
+    if (runs.length === 0) return group;
+
+    const landCol = col(theme.accent2 || [1, 0, 0.5]);
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0x0f0b1a,
+      emissive: landCol,
+      emissiveIntensity: 0.2,
+      roughness: 0.6,
+      metalness: 0.6,
+      transparent: true,
+      opacity: 0.85
+    });
+
+    const targetMat = new THREE.MeshBasicMaterial({
+      color: landCol,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const baseGeo = new THREE.BoxGeometry(1, 0.02, 1);
+    const arrowGeo = new THREE.ConeGeometry(0.4, 1.2, 3);
+
+    let totalArrows = 0;
+    runs.forEach(run => {
+      const len = run.end - run.start + 1;
+      totalArrows += Math.floor(len / 3);
+    });
+
+    const baseInst = new THREE.InstancedMesh(baseGeo, baseMat, runs.length);
+    const arrowInst = new THREE.InstancedMesh(arrowGeo, targetMat, totalArrows);
+
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    let ai = 0;
+
+    runs.forEach((run, idx) => {
+      const midIdx = Math.floor((run.start + run.end) / 2);
+      const sMid = ss[midIdx];
+      const startP = ss[run.start].p;
+      const endP = ss[run.end].p;
+      const dist = V.dist(startP, endP);
+
+      pos.set(sMid.p[0], sMid.p[1] + 0.03, sMid.p[2]);
+
+      const yaw = Math.atan2(sMid.f[0], sMid.f[2]);
+      const pitch = Math.asin(sMid.f[1]);
+      const roll = Math.atan2(sMid.r[1], sMid.r[0]);
+      q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+
+      scl.set(sMid.w * 0.82, 1.0, dist + 1.0);
+      m4.compose(pos, q, scl);
+      baseInst.setMatrixAt(idx, m4);
+
+      for (let k = run.start; k <= run.end; k++) {
+        if ((k - run.start) % 3 === 0 && ai < totalArrows) {
+          const s = ss[k];
+          pos.set(s.p[0], s.p[1] + 0.05, s.p[2]);
+          const kYaw = Math.atan2(s.f[0], s.f[2]);
+          const kPitch = Math.asin(s.f[1]);
+          const kRoll = Math.atan2(s.r[1], s.r[0]);
+          q.setFromEuler(e.set(kPitch, kYaw, kRoll, 'YXZ'));
+          const localRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+          q.multiply(localRot);
+          scl.set(s.w * 0.5 * 2.2, 0.05, 1.0);
+
+          m4.compose(pos, q, scl);
+          arrowInst.setMatrixAt(ai++, m4);
+        }
+      }
+    });
+
+    baseInst.instanceMatrix.needsUpdate = true;
+    arrowInst.instanceMatrix.needsUpdate = true;
+    group.add(baseInst);
+    group.add(arrowInst);
+    track.landingChevronInst = arrowInst;
+
+    return group;
+  }
+
+  function updateLandingPads(track, t) {
+    if (!track || !track.landingChevronInst) return;
+    const osc = 0.55 + Math.sin(t * 0.008) * 0.3;
+    track.landingChevronInst.material.opacity = osc;
+  }
+
+  function buildTunnels(track, theme, quality) {
+    const group = new THREE.Group();
+    const ss = track.samples;
+    const N = ss.length;
+    if (N < 50) return group;
+
+    const rng = DD.makeRng(track.seed + '::tunnels');
+    const biome = theme.biome || 'neon';
+    let maxTunnels = 1;
+    let prob = 0.15;
+    if (biome === 'neon') { maxTunnels = 3; prob = 0.35; }
+    else if (biome === 'canyon') { maxTunnels = 2; prob = 0.22; }
+    else if (biome === 'frozen' || biome === 'dune') { maxTunnels = 1; prob = 0.10; }
+
+    const tunnelRanges = [];
+    let i = 25;
+    while (i < N - 25 && tunnelRanges.length < maxTunnels) {
+      const rangeLen = 16;
+      let valid = true;
+      for (let k = 0; k < rangeLen; k++) {
+        const idx = i + k;
+        const s = ss[idx];
+        if (!s) { valid = false; break; }
+        if (track.checkpoints && track.checkpoints.includes(idx)) { valid = false; break; }
+        if (idx > 0) {
+          const dot = V.dot(s.f, ss[idx - 1].f);
+          if (dot < 0.993) { valid = false; break; }
+        }
+        if (Math.abs(s.f[1]) > 0.15) { valid = false; break; }
+      }
+
+      if (valid && rng.range(0, 1) < prob) {
+        tunnelRanges.push({ start: i, end: i + rangeLen });
+        i += rangeLen + 30;
+      } else {
+        i += 4;
+      }
+    }
+
+    if (tunnelRanges.length === 0) return group;
+
+    let totalRings = 0;
+    tunnelRanges.forEach(r => {
+      const len = r.end - r.start + 1;
+      totalRings += Math.floor(len / 2);
+    });
+
+    const ringCol = col(theme.accent);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x080610,
+      emissive: ringCol,
+      emissiveIntensity: 1.5,
+      roughness: 0.4,
+      metalness: 0.8
+    });
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const ringInst = new THREE.InstancedMesh(unitBox, ringMat, totalRings * 3);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    let ri = 0;
+
+    tunnelRanges.forEach(range => {
+      const posAttr = [];
+      const indices = [];
+
+      for (let idx = range.start; idx <= range.end; idx++) {
+        const s = ss[idx];
+        const halfW = s.w * 0.5;
+        const postH = 4.2;
+        const right = { x: s.r[0], y: s.r[1], z: s.r[2] };
+        const up = { x: s.u[0], y: s.u[1], z: s.u[2] };
+        const yaw = Math.atan2(s.f[0], s.f[2]);
+        const pitch = Math.asin(s.f[1]);
+        const roll = Math.atan2(s.r[1], s.r[0]);
+        const quat = new THREE.Quaternion().setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+
+        const lp = new THREE.Vector3(s.p[0] - right.x * halfW, s.p[1] - right.y * halfW, s.p[2] - right.z * halfW);
+        const rp = new THREE.Vector3(s.p[0] + right.x * halfW, s.p[1] + right.y * halfW, s.p[2] + right.z * halfW);
+        const lpt = new THREE.Vector3(lp.x + up.x * postH, lp.y + up.y * postH, lp.z + up.z * postH);
+        const rpt = new THREE.Vector3(rp.x + up.x * postH, rp.y + up.y * postH, rp.z + up.z * postH);
+
+        posAttr.push(lp.x, lp.y, lp.z);
+        posAttr.push(lpt.x, lpt.y, lpt.z);
+        posAttr.push(rpt.x, rpt.y, rpt.z);
+        posAttr.push(rp.x, rp.y, rp.z);
+
+        if (idx > range.start) {
+          const k0 = 4 * (idx - range.start - 1);
+          const k1 = 4 * (idx - range.start);
+          indices.push(k0 + 0, k0 + 1, k1 + 0);
+          indices.push(k1 + 0, k0 + 1, k1 + 1);
+          indices.push(k0 + 1, k0 + 2, k1 + 1);
+          indices.push(k1 + 1, k0 + 2, k1 + 2);
+          indices.push(k0 + 2, k0 + 3, k1 + 2);
+          indices.push(k1 + 2, k0 + 3, k1 + 3);
+        }
+
+        if ((idx - range.start) % 2 === 0) {
+          const lColPos = new THREE.Vector3(lp.x + up.x * postH * 0.5, lp.y + up.y * postH * 0.5, lp.z + up.z * postH * 0.5);
+          m4.compose(lColPos, quat, new THREE.Vector3(0.3, postH, 0.4));
+          ringInst.setMatrixAt(ri++, m4);
+
+          const rColPos = new THREE.Vector3(rp.x + up.x * postH * 0.5, rp.y + up.y * postH * 0.5, rp.z + up.z * postH * 0.5);
+          m4.compose(rColPos, quat, new THREE.Vector3(0.3, postH, 0.4));
+          ringInst.setMatrixAt(ri++, m4);
+
+          const rBeamPos = new THREE.Vector3(lpt.x + right.x * halfW, lpt.y + right.y * halfW, lpt.z + right.z * halfW);
+          const rBeamQuat = new THREE.Quaternion().copy(quat);
+          m4.compose(rBeamPos, rBeamQuat, new THREE.Vector3(s.w * 1.02, 0.3, 0.4));
+          ringInst.setMatrixAt(ri++, m4);
+        }
+
+        if ((idx - range.start) % 6 === 3 && quality !== 'low') {
+          const lightP = new THREE.Vector3(lpt.x + right.x * halfW + up.x * -0.4, lpt.y + right.y * halfW + up.y * -0.4, lpt.z + right.z * halfW + up.z * -0.4);
+          addLightSource(track, [lightP.x, lightP.y, lightP.z], col(theme.accent), 2.2, s.w * 1.2);
+        }
+      }
+
+      const roofGeo = new THREE.BufferGeometry();
+      roofGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posAttr), 3));
+      roofGeo.setIndex(indices);
+      roofGeo.computeVertexNormals();
+
+      const roofMat = new THREE.MeshStandardMaterial({
+        color: 0x07040e,
+        roughness: 0.7,
+        metalness: 0.3,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide
+      });
+      const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+      group.add(roofMesh);
+    });
+
+    ringInst.count = ri;
+    ringInst.instanceMatrix.needsUpdate = true;
+    ringInst.frustumCulled = false;
+    group.add(ringInst);
+
+    return group;
+  }
+
+  function updateBoostPads(track, dt) {
+    if (!track || !track.boostPadsData || !track.boostChevronInst) return;
+    const ss = track.samples;
+    const chevronInst = track.boostChevronInst;
+
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+
+    track.boostPadsData.forEach(pad => {
+      const len = pad.run.end - pad.run.start;
+      pad.chevrons.forEach(chev => {
+        chev.progress = (chev.progress + dt * 1.6) % 1.0;
+
+        const localVal = pad.run.start + chev.progress * len;
+        const idxA = Math.floor(localVal);
+        const idxB = Math.min(pad.run.end, idxA + 1);
+        const fraction = localVal - idxA;
+
+        const sA = ss[idxA], sB = ss[idxB];
+
+        const px = sA.p[0] + (sB.p[0] - sA.p[0]) * fraction;
+        const py = sA.p[1] + (sB.p[1] - sA.p[1]) * fraction;
+        const pz = sA.p[2] + (sB.p[2] - sA.p[2]) * fraction;
+
+        const fx = sA.f[0] + (sB.f[0] - sA.f[0]) * fraction;
+        const fy = sA.f[1] + (sB.f[1] - sA.f[1]) * fraction;
+        const fz = sA.f[2] + (sB.f[2] - sA.f[2]) * fraction;
+
+        const rx = sA.r[0] + (sB.r[0] - sA.r[0]) * fraction;
+        const ry = sA.r[1] + (sB.r[1] - sA.r[1]) * fraction;
+        const rz = sA.r[2] + (sB.r[2] - sA.r[2]) * fraction;
+
+        pos.set(px, py + 0.07, pz);
+
+        const yaw = Math.atan2(fx, fz);
+        const pitch = Math.asin(fy);
+        const roll = Math.atan2(ry, rx);
+        q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+        const localRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+        q.multiply(localRot);
+
+        const width = (sA.w + (sB.w - sA.w) * fraction) * 0.45;
+        scl.set(width * 1.8, 0.05, 1.0);
+
+        m4.compose(pos, q, scl);
+        chevronInst.setMatrixAt(chev.globalIdx, m4);
+      });
+    });
+
+    chevronInst.instanceMatrix.needsUpdate = true;
+  }
+
+  function updateGates(track, dt, state, countdownT, nextCkpt) {
+    if (!track) return;
+
+    // 1. Update start lights countdown sequence
+    if (track.startLights) {
+      if (state === 'countdown') {
+        const activeCount = countdownT > 2.0 ? 1 : (countdownT > 1.0 ? 3 : 5);
+        for (let i = 0; i < 5; i++) {
+          if (i < activeCount) {
+            track.startLights[i].material.color.setHex(0xff0000); // Red
+            track.startLights[i].material.opacity = 1.0;
+          } else {
+            track.startLights[i].material.color.setHex(0x221111); // Off/Dim
+            track.startLights[i].material.opacity = 0.4;
+          }
+        }
+      } else if (state === 'play') {
+        track.startPlayTime = (track.startPlayTime || 0) + dt;
+        if (track.startPlayTime < 1.0) {
+          // Green lights!
+          for (let i = 0; i < 5; i++) {
+            track.startLights[i].material.color.setHex(0x00ff66); // Green
+            track.startLights[i].material.opacity = 1.0;
+          }
+        } else {
+          // Off
+          for (let i = 0; i < 5; i++) {
+            track.startLights[i].material.color.setHex(0x111111); // Off
+            track.startLights[i].material.opacity = 0.2;
+          }
+        }
+      } else {
+        // Off
+        for (let i = 0; i < 5; i++) {
+          track.startLights[i].material.color.setHex(0x111111); // Off
+          track.startLights[i].material.opacity = 0.2;
+        }
+      }
+    }
+
+    // 2. Update checkpoint indicator lights and flash color triggers
+    const ckpts = track.checkpoints || [];
+    if (track.checkpointLights) {
+      for (let i = 0; i < ckpts.length; i++) {
+        const lights = track.checkpointLights[i];
+        if (!lights) continue;
+        
+        const passed = i < nextCkpt;
+        const flashTime = track.flashingGantries ? (track.flashingGantries[i] || 0) : 0;
+        
+        for (let j = 0; j < lights.length; j++) {
+          if (flashTime > 0) {
+            // Pulsing bright white during checkpoint crossing moment
+            lights[j].material.color.setHex(0xffffff);
+            lights[j].material.opacity = 1.0;
+          } else if (passed) {
+            // Green when passed
+            lights[j].material.color.setHex(0x00ff66);
+            lights[j].material.opacity = 0.95;
+          } else {
+            // Orange (not yet passed)
+            lights[j].material.color.setHex(0xff5500);
+            lights[j].material.opacity = 0.5;
+          }
+        }
+      }
+    }
+
+    // 3. Update finish line indicator beacons
+    if (track.finishLights) {
+      if (state === 'finish') {
+        const timeSecs = (track.finishPlayTime || 0) + dt;
+        track.finishPlayTime = timeSecs;
+        const activeIdx = Math.floor(timeSecs * 8) % 5;
+        for (let i = 0; i < 5; i++) {
+          if (i === activeIdx) {
+            track.finishLights[i].material.color.setHex(0x00ffcc);
+            track.finishLights[i].material.opacity = 1.0;
+          } else {
+            track.finishLights[i].material.color.setHex(0x002244);
+            track.finishLights[i].material.opacity = 0.4;
+          }
+        }
+      } else {
+        // Slow breathing blue animation waiting
+        const timer = (track.finishTimer || 0) + dt;
+        track.finishTimer = timer;
+        const breath = Math.sin(timer * 4) * 0.3 + 0.7;
+        for (let i = 0; i < 5; i++) {
+          track.finishLights[i].material.color.setHex(0x0055ff);
+          track.finishLights[i].material.opacity = breath * 0.8;
+        }
+      }
+    }
+
+    // 4. Update instanced neon columns flash animation
+    if (track.flashingGantries) {
+      let colorsNeedUpdate = false;
+      for (let i = 0; i < ckpts.length; i++) {
+        if (track.flashingGantries[i] !== undefined && track.flashingGantries[i] > 0) {
+          track.flashingGantries[i] -= dt * 2.5;
+          if (track.flashingGantries[i] < 0) track.flashingGantries[i] = 0;
+          colorsNeedUpdate = true;
+        }
+      }
+      
+      if (colorsNeedUpdate && track.postNeonIM && track.barNeonIM) {
+        const theme = track.theme || { accent2: [1, 0.5, 0] };
+        const col = (c) => new THREE.Color(c[0], c[1], c[2]);
+        const baseCol = col(theme.accent2);
+        
+        for (let i = 0; i < ckpts.length; i++) {
+          const f = track.flashingGantries[i] || 0;
+          const flashCol = new THREE.Color().copy(baseCol).lerp(new THREE.Color(0xffffff), f * 0.95);
+          track.postNeonIM.setColorAt(i * 2, flashCol);
+          track.postNeonIM.setColorAt(i * 2 + 1, flashCol);
+          track.barNeonIM.setColorAt(i, flashCol);
+        }
+        if (track.postNeonIM.instanceColor) track.postNeonIM.instanceColor.needsUpdate = true;
+        if (track.barNeonIM.instanceColor) track.barNeonIM.instanceColor.needsUpdate = true;
+      }
+    }
+  }
+
+  DD._sceneShared.buildBoostPads = buildBoostPads;
+  DD._sceneShared.updateBoostPads = updateBoostPads;
+  DD._sceneShared.updateGates = updateGates;
+  DD._sceneShared.buildTunnels = buildTunnels;
+  DD._sceneShared.buildLandingPads = buildLandingPads;
+  DD._sceneShared.updateLandingPads = updateLandingPads;
 
 })(typeof window !== 'undefined' ? window : globalThis);

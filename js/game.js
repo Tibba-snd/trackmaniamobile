@@ -606,6 +606,10 @@
         if (G.car.justCkpt) {
           const i = G.car.justCkpt - 1; G.car.justCkpt = 0;
           DD.sfxCheckpoint(i);
+          if (G.track) {
+            G.track.flashingGantries = G.track.flashingGantries || {};
+            G.track.flashingGantries[i] = 1.0;
+          }
           if (DD.testMode) {
             console.log('[TEST] CHECKPOINT: index=' + i + ', time=' + G.car.splits[i] + 'ms');
           }
@@ -724,6 +728,15 @@
       }
     }
     DD.updateTrail(G.trail, G.car, G.track, speedNorm);
+    if (DD._sceneShared.updateBoostPads) {
+      DD._sceneShared.updateBoostPads(G.track, dtReal);
+    }
+    if (DD._sceneShared.updateGates) {
+      DD._sceneShared.updateGates(G.track, dtReal, G.state, G.countdownT, G.car ? G.car.nextCkpt : 0);
+    }
+    if (DD._sceneShared.updateLandingPads) {
+      DD._sceneShared.updateLandingPads(G.track, t);
+    }
     DD.updateSpeedLines(G.speedLines, G.camera, speedNorm);
     DD.updateFireflies(G.track.fireflies, t * 0.001);
     if (G.weather && DD.updateWeather) {
@@ -791,7 +804,8 @@
     // world glow: one shared breath LFO (DD.GLOW.breathHz) — boost pads, decor and gates
     // pulse together, gently, instead of three sines at competing frequencies
     const breath = Math.sin(t * 0.001 * Math.PI * 2 * DD.GLOW.breathHz);
-    if (G.track.boostMesh) G.track.boostMesh.material.opacity = DD.GLOW.boost.base + DD.GLOW.boost.amp * breath;
+    if (G.track.boostBaseMat) G.track.boostBaseMat.opacity = (DD.GLOW.boost.base + DD.GLOW.boost.amp * breath) * 1.5;
+    if (G.track.boostChevronMat) G.track.boostChevronMat.opacity = 0.5 + (DD.GLOW.boost.base + DD.GLOW.boost.amp * breath) * 0.8;
     if (G.track && G.track.emissiveDecorMesh) {
       const mat = G.track.emissiveDecorMesh.userData.mat;
       if (mat) mat.emissiveIntensity = (DD.GLOW.decor.base + DD.GLOW.decor.amp * breath) * DD.glowMul(G.save.settings, G.track.theme);
