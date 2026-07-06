@@ -201,7 +201,7 @@
    DD.GLOW = {
     master: { subtle: 0.7, standard: 1.0, vivid: 1.3 },   // user-facing slider
     biome: { dune: 1.0, neon: 1.0, canyon: 1.0, frozen: 0.82 }, // bright palettes get less headroom
-    bloom: { base: 0.80, speedCreep: 0.3, driftFlash: 0.25, flashDecay: 7.0, cap: 1.3, radius: 0.65, threshold: 0.85 },
+    bloom: { base: 0.80, speedCreep: 0.3, driftFlash: 0.18, flashDecay: 7.0, cap: 1.3, radius: 0.65, threshold: 0.85 },
     aurora: { bands: 3, glow: 1.2, scrollSpeed: [0.03, -0.05, 0.02] },
     // one shared "breath" LFO (Hz): world elements pulse together, gently — replaces three
     // independent sines at competing frequencies that made the whole scene flicker
@@ -235,6 +235,19 @@
     const m = DD.GLOW.master[(settings && settings.glow) || 'standard'] || 1.0;
     const b = (theme && DD.GLOW.biome[theme.biome]) || 1.0;
     return m * b;
+  };
+
+  // Single source of truth for the UnrealBloomPass strength. Every render state (race, menu,
+  // replay, finish) must call this so the glow reads identically everywhere — three separate
+  // inline formulas were why bloom looked "all over the place". speedNorm/driftFlash default to
+  // 0 for static screens (menu/garage) so they just get the steady base*glowMul. game.js smooths
+  // the result over time so drift accents swell in rather than pop.
+  DD.bloomStrength = function (settings, theme, speedNorm, driftFlash) {
+    const B = DD.GLOW.bloom;
+    const gm = DD.glowMul(settings, theme);
+    const creep = Math.max(0, (speedNorm || 0) - 0.6) * B.speedCreep; // swell only above 60% speed
+    const flash = (driftFlash || 0) * B.driftFlash;                    // drift accent
+    return Math.min((B.base + creep + flash) * gm, B.cap);
   };
 
   // Garage cosmetic options (v1: applied as materials in scene.js)

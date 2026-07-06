@@ -484,10 +484,8 @@
 
     if (G.ghostMesh) G.ghostMesh.visible = false;
 
-    if (G.composer && G.composer._bloom) {
-      G.composer._bloom.strength = Math.min(
-        DD.GLOW.bloom.base * DD.glowMul(G.save.settings, G.track && G.track.theme), DD.GLOW.bloom.cap);
-    }
+    applyBloom(0, 0, 0); // static screen — steady base glow
+    applySpeedBlur(0);
     if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
   }
 
@@ -655,11 +653,73 @@
     }
   }
 
+  // Drive the bloom pass toward the shared target strength (DD.bloomStrength) — the ONE formula all
+  // render states share, so the glow reads consistently instead of "all over the place". dt>0 damps
+  // toward the target (drift/speed accents swell in rather than pop); dt<=0 snaps (static screens).
+  function applyBloom(speedNorm, driftFlash, dt) {
+    const c = G.composer;
+    if (!c || !c._bloom) return;
+    const target = DD.bloomStrength(G.save.settings, G.track && G.track.theme, speedNorm, driftFlash);
+    if (dt && dt > 0) {
+      c._bloom.strength += (target - c._bloom.strength) * (1 - Math.exp(-8 * dt));
+    } else {
+      c._bloom.strength = target;
+    }
+  }
+
+  // Drive the radial speed-blur strength from normalized speed. Ramps in above half speed so slow
+  // driving and menus pay nothing (the shader early-outs at strength 0). DD.speedBlurMax tunes the
+  // peak (live-adjustable from the console).
+  function applySpeedBlur(speedNorm) {
+    const sb = G.composer && G.composer._speedBlur;
+    if (sb) sb.uniforms.uStrength.value = Math.max(0, (speedNorm - 0.5) / 0.5) * (DD.speedBlurMax || 0);
+  }
+
+  // Adaptive DPR (dynamic resolution). Frame cost swings by track section (emissive overdraw, draw
+  // count); a FIXED pixel ratio either wastes headroom on light sections or drops to a vsync-quantized
+  // 40fps on heavy ones. We trade resolution to hold 60. KEY: under vsync, frame time is pinned at
+  // ~16.7ms whenever we hit 60 — so it can't reveal spare GPU headroom. Instead we PROBE: shed pixels
+  // fast when frames miss 60, and after holding 60 for a while, nudge the ratio back up to reclaim
+  // sharpness; if that nudge causes drops, the drop path reverts it. No GPU timer needed (EXT can be
+  // absent/HUD-gated), so this works on every browser. Isolated one-offs (GC, track build) ignored.
+  function updateAdaptiveDPR(dt) {
+    if (!DD.adaptiveDPR || !G.renderer || !G._dprCap) return;
+    const a = G._adpt || (G._adpt = { dpr: G.renderer.getPixelRatio(), down: 0, up: 0, cd: 0 });
+    const ms = dt * 1000;
+    if (ms > 60) return;                    // one-off hitch (GC / first track-build frame) — ignore
+    if (a.cd > 0) { a.cd--; return; }       // settle window after a change — don't react while the
+                                            // reallocated render targets warm up (that realloc is itself
+                                            // a one-frame cost, so changes must be RARE, not per-second)
+    const MIN = 1.0, STEP = 0.05;
+    // count only CONSECUTIVE runs — a single stray frame resets the tally, so we act on sustained
+    // load, never noise. Down is responsive (4 frames); up is deliberately slow (300 clean frames ≈ 5s)
+    // so a section that dips even occasionally never climbs → the controller settles and stops pumping.
+    if (ms > 18.5) { a.down++; a.up = 0; } else if (ms < 16.7) { a.up++; a.down = 0; } else { a.down = 0; a.up = 0; }
+    if (a.down >= 4 && a.dpr > MIN) {
+      a.dpr = Math.max(MIN, +(a.dpr - STEP).toFixed(3)); DD.setDPR(a.dpr); a.down = 0; a.cd = 90;
+    } else if (a.up >= 300 && a.dpr < G._dprCap) {
+      a.dpr = Math.min(G._dprCap, +(a.dpr + STEP).toFixed(3)); DD.setDPR(a.dpr); a.up = 0; a.cd = 90;
+    }
+  }
+
   /* ---------------- main loop ---------------- */
   function loop(t) {
     requestAnimationFrame(loop);
     const dtReal = Math.min((t - G.lastT) / 1000, 0.1);
     G.lastT = t;
+    // Dev: spike hunter. Set DD.spikeLog=true (or a ms threshold) then race; any long frame logs the
+    // renderer.info deltas since the previous frame, so the culprit (texture upload, new geometry,
+    // shader program) shows up as a +N. Isolates the 1%low stutter source, which is DPR-independent.
+    if (DD.spikeLog && (G.state === 'play' || G.state === 'countdown')) {
+      const ms = dtReal * 1000, thr = (DD.spikeLog === true ? 22 : DD.spikeLog);
+      const inf = G.renderer.info, p = G._spikePrev || {};
+      const d = (cur, prev) => (cur - (prev || 0) >= 0 ? '+' : '') + (cur - (prev || 0));
+      if (ms > thr && G._spikePrev) {
+        console.log(`[SPIKE] ${ms.toFixed(1)}ms | draws ${inf.render.calls} ${d(inf.render.calls, p.calls)} | tris ${(inf.render.triangles / 1000).toFixed(0)}k | tex ${inf.memory.textures} ${d(inf.memory.textures, p.tex)} | geo ${inf.memory.geometries} ${d(inf.memory.geometries, p.geo)} | prog ${inf.programs ? inf.programs.length : '?'}`);
+      }
+      G._spikePrev = { calls: inf.render.calls, tex: inf.memory.textures, geo: inf.memory.geometries };
+    }
+    if (G.state === 'play' || G.state === 'countdown') updateAdaptiveDPR(dtReal);
     if (G.state === 'loading') return;
 
     if (G.state === 'replay') {
@@ -824,10 +884,8 @@
         DD.updateWeather(G.weather, G.camera, dtReal, t * 0.001);
       }
 
-      if (G.composer && G.composer._bloom) {
-        G.composer._bloom.strength = Math.min(
-          DD.GLOW.bloom.base * DD.glowMul(G.save.settings, G.track && G.track.theme), DD.GLOW.bloom.cap);
-      }
+      applyBloom(0, 0, dtReal); // non-racing animated state — ease to steady base glow
+      applySpeedBlur(0);
       if (G.track && DD.updateLightPool) DD.updateLightPool(G.track, G.camera.position.x, G.camera.position.y, G.camera.position.z);
       if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
       return;
@@ -1202,16 +1260,9 @@
       }
     }
 
-    if (G.composer && G.composer._bloom) {
-      const speedNorm = speed / DD.PHYS.vmax;
-      const bloomSpeedCreep = Math.max(0, speedNorm - 0.6) * DD.GLOW.bloom.speedCreep;
-      const flash = (G.driftFlash || 0) * DD.GLOW.bloom.driftFlash;
-      // composed strength scales with the user/biome glow multiplier and is hard-capped —
-      // event surges can accent the scene but never white it out
-      G.composer._bloom.strength = Math.min(
-        (DD.GLOW.bloom.base + bloomSpeedCreep + flash) * DD.glowMul(G.save.settings, G.track.theme),
-        DD.GLOW.bloom.cap);
-    }
+    // race glow: speed swell + drift accent, smoothed so surges never pop or white out (hard-capped)
+    applyBloom(speed / DD.PHYS.vmax, G.driftFlash || 0, dtReal);
+    applySpeedBlur(speed / DD.PHYS.vmax);
 
     if (G.track && DD.updateLightPool) DD.updateLightPool(G.track, G.camera.position.x, G.camera.position.y, G.camera.position.z);
     if (G.composer) G.composer.render(); else G.renderer.render(G.scene, G.camera);
@@ -2177,6 +2228,13 @@
     DD.cameraProfile = G.save.settings.camera || 'close'; // saved framing profile (see DD.CAM_PROFILES)
     const canvas = $('gl');
     G.renderer = DD.createRenderer(canvas, G.save.settings.quality);
+    // Adaptive-DPR ceiling = the quality-capped ratio createRenderer chose. updateAdaptiveDPR scales
+    // between 1.0 and this to hold 60fps. Off at low quality (no composer / already minimal).
+    G._dprCap = G.renderer.getPixelRatio();
+    // Adaptive DPR OFF by default — a fixed cap (createRenderer) holds 60 without the render-target
+    // realloc hitches dynamic resolution caused. Still available: set DD.adaptiveDPR=true to re-enable.
+    if (DD.adaptiveDPR === undefined) DD.adaptiveDPR = false;
+    if (DD.speedBlurMax === undefined) DD.speedBlurMax = 0.03; // peak radial speed-blur; tune live from console
     G.scene = new THREE.Scene();
     G.camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 6000);
     G.composer = DD.createComposer(G.renderer, G.scene, G.camera, G.save.settings.quality);
@@ -2187,6 +2245,12 @@
       G.renderer.setSize(window.innerWidth, window.innerHeight);
       if (G.composer) {
         G.composer.setSize(window.innerWidth, window.innerHeight);
+        // composer.setSize resets every pass to full res; re-apply half-res bloom (see createComposer)
+        if (G.composer._bloom && G.composer._bloomScale) {
+          G.composer._bloom.setSize(
+            Math.round(window.innerWidth * G.composer._bloomScale),
+            Math.round(window.innerHeight * G.composer._bloomScale));
+        }
         // keep FXAA's texel size in sync with the drawing-buffer (size * pixelRatio)
         if (G.composer._fxaa) {
           const dpr = G.renderer.getPixelRatio();
@@ -2196,6 +2260,32 @@
       G.camera.aspect = window.innerWidth / window.innerHeight;
       G.camera.updateProjectionMatrix();
     });
+
+    // Dev: live-set the device-pixel-ratio to profile fill-rate cost WITHOUT reloading. Try
+    // DD.setDPR(1.0) vs DD.setDPR(1.25) vs DD.setDPR(1.5) mid-race and watch GPU ms in the perf HUD;
+    // returns the new drawing-buffer dims. Fill scales with pixel count = (dims), so this isolates
+    // the single biggest GPU lever on high-DPI screens.
+    DD.setDPR = function (x) {
+      G.renderer.setPixelRatio(x);
+      G.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (G.composer) {
+        G.composer.setPixelRatio(x);
+        G.composer.setSize(window.innerWidth, window.innerHeight);
+        if (G.composer._bloom && G.composer._bloomScale) {
+          G.composer._bloom.setSize(
+            Math.round(window.innerWidth * G.composer._bloomScale),
+            Math.round(window.innerHeight * G.composer._bloomScale));
+        }
+        if (G.composer._fxaa) {
+          G.composer._fxaa.material.uniforms['resolution'].value.set(1 / (window.innerWidth * x), 1 / (window.innerHeight * x));
+        }
+      }
+      return { dpr: x, buffer: [G.renderer.domElement.width, G.renderer.domElement.height] };
+    };
+    // Dev: read the live adaptive-DPR state (call repeatedly mid-race to watch it hold 60).
+    DD.dprInfo = function () {
+      return { dpr: +G.renderer.getPixelRatio().toFixed(3), cap: G._dprCap, adaptive: DD.adaptiveDPR };
+    };
 
     const audioKick = () => { DD.initAudio(G.save.settings); };
     window.addEventListener('pointerdown', audioKick, { once: true });

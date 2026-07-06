@@ -147,7 +147,13 @@
     // PERF: cap the device-pixel-ratio. 'high' used to render at DPR 2 (4x the pixels of native),
     // which is brutal on laptop GPUs and the dominant fill-rate cost. 1.5 keeps edges crisp
     // (an FXAA pass cleans up the rest — see DD.createComposer) at ~1.8x fewer pixels than DPR 2.
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 1.5 : 1.25));
+    // PERF: cap the device-pixel-ratio — fill rate is the dominant cost. On very high-DPI screens
+    // (dpr>=2.5, e.g. 3x laptop/phone panels) the panel downsamples so hard that 1.15 is visually
+    // fine and holds a locked 60 with no dynamic-resolution hitches; lower-DPI screens keep 1.5.
+    // FXAA (see createComposer) cleans the edges. Live-tune with DD.setDPR(x) + the perf HUD.
+    const _dpr = window.devicePixelRatio || 1;
+    const _cap = quality === 'high' ? (_dpr >= 2.5 ? 1.15 : 1.5) : 1.25;
+    renderer.setPixelRatio(Math.min(_dpr, _cap));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;   // cinematic color rolloff, no blown highlights
@@ -168,21 +174,10 @@
     
     let rt = null;
     const isWebGL2 = renderer.capabilities.isWebGL2;
-    
-    // Try WebGLMultisampleRenderTarget first (high quality, WebGL2)
-    if (isWebGL2 && quality === 'high' && THREE.WebGLMultisampleRenderTarget) {
-      try {
-        rt = new THREE.WebGLMultisampleRenderTarget(window.innerWidth, window.innerHeight, {
-          type: THREE.HalfFloatType,
-          minFilter: THREE.LinearFilter,
-          magFilter: THREE.LinearFilter,
-          format: THREE.RGBAFormat
-        });
-        rt.samples = 4; // Explicitly confirm 4 samples for WebGL2 MSAA
-      } catch (e) {
-        console.warn("[Composer Warning] WebGLMultisampleRenderTarget with HalfFloatType failed, falling back...", e);
-      }
-    }
+
+    // PERF (T1): MSAA disabled. FXAA is the final composer pass and does the AA; 4x MSAA on a
+    // HalfFloat render target was ~1.5ms of pure fill for no visible gain once FXAA runs. So we
+    // skip WebGLMultisampleRenderTarget and use a plain HalfFloat RT with samples:0 below.
     
     // Fallback 1: WebGLRenderTarget with HalfFloatType
     if (!rt) {
@@ -192,7 +187,7 @@
           minFilter: THREE.LinearFilter,
           magFilter: THREE.LinearFilter,
           format: THREE.RGBAFormat,
-          samples: (isWebGL2 && quality === 'high') ? 4 : 0
+          samples: 0 // PERF (T1): no MSAA — FXAA handles AA
         });
       } catch (e) {
         console.warn("[Composer Warning] WebGLRenderTarget with HalfFloatType failed, falling back to default...", e);
@@ -206,7 +201,7 @@
           minFilter: THREE.LinearFilter,
           magFilter: THREE.LinearFilter,
           format: THREE.RGBAFormat,
-          samples: (isWebGL2 && quality === 'high') ? 4 : 0
+          samples: 0 // PERF (T1): no MSAA — FXAA handles AA
         });
       } catch (e) {
         console.error("[Composer Error] All render targets failed to initialize", e);
@@ -216,13 +211,6 @@
     
     try {
       const composer = new THREE.EffectComposer(renderer, rt);
-      
-      // Programmatically confirm WebGL2 MSAA is active on the composer's render target
-      if (composer.renderTarget1 && composer.renderTarget1.samples > 0) {
-        console.log(`[Composer] WebGL2 MSAA is ACTIVE on render target with ${composer.renderTarget1.samples} samples.`);
-      } else {
-        console.warn("[Composer] WebGL2 MSAA is NOT active on the render target (samples: 0 or WebGL1).");
-      }
 
       // CRITICAL for sharpness: because we pass our own HDR render target, EffectComposer forces its
       // internal _pixelRatio to 1, so without this it renders the whole scene at CSS-pixel resolution
@@ -232,12 +220,41 @@
       composer.setPixelRatio(renderer.getPixelRatio());
       composer.setSize(window.innerWidth, window.innerHeight);
       composer.addPass(new THREE.RenderPass(scene, camera));
-      // tuned centrally in DD.GLOW (theme.js) — strength is recomposed per-frame in game.js
+      // tuned centrally in DD.GLOW (theme.js) — strength is recomposed per-frame in game.js.
+      // PERF (T1): bloom runs at half resolution (BLOOM_SCALE). Bloom is a wide blur, so half-res
+      // is visually near-identical (marginally softer glow — fits the dreamy look) but ~1.2ms cheaper
+      // on the dominant post cost. Keep game.js's resize handler in sync via composer._bloomScale.
+      const BLOOM_SCALE = 0.5;
       const bloom = new THREE.UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        new THREE.Vector2(Math.round(window.innerWidth * BLOOM_SCALE), Math.round(window.innerHeight * BLOOM_SCALE)),
         DD.GLOW.bloom.base, DD.GLOW.bloom.radius, DD.GLOW.bloom.threshold);
       composer.addPass(bloom);
       composer._bloom = bloom;
+      composer._bloomScale = BLOOM_SCALE;
+      // Radial speed blur — a cheap 6-tap zoom smear toward the focal point, strength driven by car
+      // speed in game.js (0 below ~half speed, so its ~6 taps of fill only cost when you're actually
+      // fast). Sits before FXAA so the streaks get cleaned up. Reads as a forward "rush" at top speed.
+      if (THREE.ShaderPass) {
+        const speedBlur = new THREE.ShaderPass({
+          uniforms: { tDiffuse: { value: null }, uStrength: { value: 0 }, uCenter: { value: new THREE.Vector2(0.5, 0.52) } },
+          vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+          fragmentShader: [
+            'uniform sampler2D tDiffuse; uniform float uStrength; uniform vec2 uCenter; varying vec2 vUv;',
+            'void main(){',
+            '  if (uStrength <= 0.0) { gl_FragColor = texture2D(tDiffuse, vUv); return; }',
+            '  vec2 dir = vUv - uCenter;',           // sampling toward centre = radial zoom streaks
+            '  vec4 sum = vec4(0.0);',
+            '  for (int i = 0; i < 6; i++) {',
+            '    float t = float(i) / 5.0;',
+            '    sum += texture2D(tDiffuse, vUv - dir * (t * uStrength));',
+            '  }',
+            '  gl_FragColor = sum / 6.0;',
+            '}'
+          ].join('\n')
+        });
+        composer.addPass(speedBlur);
+        composer._speedBlur = speedBlur;
+      }
       // AA: FXAA as the final pass. The composer renders into an offscreen target, so the
       // renderer's own MSAA never reaches the screen here; and the bloom bright-pass adds hard,
       // stair-stepped edges on neon/lights. FXAA (cheap, single pass) cleans both up. resolution

@@ -1080,8 +1080,11 @@
   // car" (hero presence); `classic` = the original farther/higher frame. game.js sets
   // DD.cameraProfile from settings; the module default keeps headless tests on the old numbers.
   DD.CAM_PROFILES = {
-    classic: { dist0: 7.4, distV: 2.0, h0: 2.45, hV: 0.45, look: 11, fov0: 63, fovV: 34 },
-    close:   { dist0: 6.0, distV: 1.6, h0: 1.90, hV: 0.40, look: 10, fov0: 64, fovV: 32 }
+    // distV = extra follow distance at vmax, fovV = extra FOV(deg) at vmax. Both were pushed high
+    // enough that the car read as "too far away" at speed (the wide FOV shrinks it as much as the
+    // pull-back does). Trimmed both: still a clear speed sensation, but the car stays close at top end.
+    classic: { dist0: 7.2, distV: 1.1, h0: 2.45, hV: 0.45, look: 11, fov0: 63, fovV: 22 },
+    close:   { dist0: 5.7, distV: 0.8, h0: 1.90, hV: 0.40, look: 10, fov0: 64, fovV: 20 }
   };
   DD.cameraProfile = 'classic';
   DD.makeCamState = () => ({ pos: [0, 5, -10], look: [0, 0, 0], fov: 68, shake: [0, 0, 0], prevGrounded: true, prevVelY: 0 });
