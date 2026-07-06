@@ -25,7 +25,10 @@
     metalBias:  [-0.30, 0.30, 0.0],
     sectionExp: [0.30, 1.50, 1.0],
     rimRadiusPct:  [0.40, 0.90, 0.82],   // inner rim/disc radius as a fraction of tyre radius (was hardcoded 0.82)
-    tyreRoundness: [0.00, 1.00, 0.00]    // 0 = flat cylinder tread, 1 = rounded/torus-like cross-section
+    tyreRoundness: [0.00, 1.00, 0.00],   // 0 = flat cylinder tread, 1 = rounded/torus-like cross-section
+    suspensionY:   [-0.20, 0.20, 0.00],  // vertical offset of suspension arms
+    suspensionZ:   [0.05, 0.35, 0.18],   // wishbone splay/spread
+    hollowHub:     [0.00, 1.00, 0.00]    // 0 = solid hub, 1 = hollow hub
   };
   const CAP_STYLES = ['flat', 'pointed', 'rounded', 'hollow']; // hull nose/tail cap treatments
   const MAX_STATIONS = 24, MAX_PARTS = 16, MAX_MOUNT_BLOCKS = 64;
@@ -62,7 +65,7 @@
   const PARTS = ['frontWing', 'rearWingBiplane', 'rearSpoilerLow', 'hoverFins', 'splitter',
     'splitterGlow', 'halo', 'sharkFin', 'diffuser', 'exhausts', 'exposedEngine', 'hoverChannels',
     'glowCore', 'ducktail', 'chromeTrim', 'lightBar'];
-  const WHEEL_STYLES = ['multiSpoke', 'turbofan', 'glowDisc', 'classicSpoke'];
+  const WHEEL_STYLES = ['multiSpoke', 'turbofan', 'glowDisc', 'classicSpoke', 'meshBBS', 'starFive', 'deepDish6'];
   DD.CAR_PART_NAMES = PARTS;
   DD.CAR_WHEEL_STYLES = WHEEL_STYLES;
 
@@ -88,6 +91,35 @@
     const section = hull.section || {};
     const kind = (section.kind === 'superellipse') ? 'superellipse' : 'ellipse';
 
+    // T12 cross-section ring overrides — per-station 2D outline replacing the global superellipse.
+    // Stored as a sibling map (not station[4]) so the station tuple stays 4 elements and existing
+    // index math is untouched. keys = station index, values = { pts:[{x,y,smooth}], mirror }.
+    // pts.length must match buildHull's K (currently 18) or the override is dropped (1:1 vertex map).
+    const RING_K = 18; // must match buildHull's K
+    let rings = {};
+    if (hull.rings && typeof hull.rings === 'object') {
+      for (const k in hull.rings) {
+        const ix = Number(k) | 0;
+        if (ix < 0 || ix >= station.length) continue;
+        const r = hull.rings[k];
+        if (!r || !Array.isArray(r.pts) || r.pts.length !== RING_K) continue;
+        const pts = [];
+        let okPts = true;
+        for (const p of r.pts) {
+          if (!p || typeof p !== 'object') { okPts = false; break; }
+          const x = Number(p.x), y = Number(p.y);
+          if (!isFinite(x) || !isFinite(y)) { okPts = false; break; }
+          pts.push({
+            x: x < -1.5 ? -1.5 : (x > 1.5 ? 1.5 : x),
+            y: y < -1.5 ? -1.5 : (y > 1.5 ? 1.5 : y),
+            smooth: p.smooth !== false // default true
+          });
+        }
+        if (!okPts) continue;
+        rings[ix] = { pts: pts, mirror: r.mirror !== false }; // default mirror on
+      }
+    }
+
     const out = {
       schemaVersion: 1,
       id: (typeof spec.id === 'string') ? spec.id.slice(0, 40) : null,  // custom-design id (null for presets)
@@ -102,14 +134,18 @@
           tyreW: cl(hp.tyreW, 'tyreW'),
           rimRadiusPct: cl(hp.rimRadiusPct, 'rimRadiusPct'),
           tyreRoundness: cl(hp.tyreRoundness, 'tyreRoundness'),
-          spokeCount: clampIntOrNull(hp.spokeCount, 3, 8)
+          spokeCount: clampIntOrNull(hp.spokeCount, 3, 8),
+          suspensionY: cl(hp.suspensionY, 'suspensionY'),
+          suspensionZ: cl(hp.suspensionZ, 'suspensionZ'),
+          hollowHub: cl(hp.hollowHub, 'hollowHub')
         },
         hull: {
           station: station,
           section: { kind: kind, exp: cl(section.exp, 'sectionExp') },
           capStyleFront: capStyle(hull.capStyleFront),
           capStyleRear: capStyle(hull.capStyleRear),
-          fenderClamp: cl(hull.fenderClamp, 'fenderClamp')
+          fenderClamp: cl(hull.fenderClamp, 'fenderClamp'),
+          rings: rings // T12 per-station cross-section overrides (sparse map by station index)
         },
         floor: ch.floor === null ? null : {
           w: clamp((ch.floor || {}).w, 0.4, 1.6, 1.0),
@@ -119,9 +155,13 @@
       },
       wheelStyle: WHEEL_STYLES.indexOf(spec.wheelStyle) >= 0 ? spec.wheelStyle : 'multiSpoke',
       canopy: {
-        kind: (spec.canopy && spec.canopy.kind) || 'bubble',
-        scale: (spec.canopy && Array.isArray(spec.canopy.scale)) ? spec.canopy.scale.map(Number) : [0.22, 0.13, 0.55],
-        z: clamp((spec.canopy || {}).z, -0.5, 1, 0.25),
+        kind: (spec.canopy && ['bubble', 'open', 'recessed', 'speedster'].indexOf(spec.canopy.kind) >= 0) ? spec.canopy.kind : 'bubble',
+        scale: [
+          clamp((spec.canopy && spec.canopy.scale) ? spec.canopy.scale[0] : 0.22, 0.1, 0.45, 0.22),
+          clamp((spec.canopy && spec.canopy.scale) ? spec.canopy.scale[1] : 0.13, 0.05, 0.35, 0.13),
+          clamp((spec.canopy && spec.canopy.scale) ? spec.canopy.scale[2] : 0.55, 0.1, 1.2, 0.55)
+        ],
+        z: clamp((spec.canopy || {}).z, -0.5, 1.0, 0.25),
         y: clamp((spec.canopy || {}).y, 0.2, 0.9, 0.46),
         halo: !!(spec.canopy && spec.canopy.halo)
       },
@@ -140,7 +180,9 @@
       },
       gallery: {
         grad: clamp((spec.gallery || {}).grad, 0, 7, 6) | 0,
-        finish: clamp((spec.gallery || {}).finish, 0, 4, 1) | 0
+        finish: clamp((spec.gallery || {}).finish, 0, 4, 1) | 0,
+        rimGrad: clamp((spec.gallery || {}).rimGrad, 0, 7, 1) | 0,
+        rimFinish: clamp((spec.gallery || {}).rimFinish, 0, 4, 1) | 0
       }
     };
     return out;
@@ -153,7 +195,7 @@
       schemaVersion: 1, name: 'Apex Formula', basePreset: 'apex',
       chassis: {
         L: 0.94,
-        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.34, rearR: 0.40, tyreW: 0.47 },
+        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.34, rearR: 0.40, tyreW: 0.47, hollowHub: 1 },
         hull: {
           station: [[1, 0.07, 0.05, 0.09], [0.75, 0.19, 0.21, 0.19], [0.5, 0.32, 0.29, 0.27],
             [0.25, 0.49, 0.35, 0.23], [0, 0.70, 0.38, 0.27], [-0.25, 0.74, 0.37, 0.26],
@@ -162,18 +204,18 @@
         },
         floor: { w: 0.95, h: 0.07, z: 0.05 }
       },
-      wheelStyle: 'multiSpoke',
+      wheelStyle: 'deepDish6',
       canopy: { kind: 'open', scale: [0.20, 0.12, 0.45], z: 0.25, y: 0.46, halo: true },
       mounts: ['frontWing', 'rearWingBiplane', 'halo', 'splitter', 'diffuser',
         { part: 'lightBar', knobs: { x: 0.82, y: 0.27, z: -0.28, len: 0.9 } }],
       palette: { glowI: 0.95, metalBias: 0.05 },
-      gallery: { grad: 2, finish: 1 }
+      gallery: { grad: 2, finish: 1, rimGrad: 1, rimFinish: 1 }
     },
     { // 1 — Endurance Prototype
       schemaVersion: 1, name: 'Endurance Prototype', basePreset: 'endurance',
       chassis: {
         L: 0.93,
-        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.34, rearR: 0.42, tyreW: 0.34 },
+        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.34, rearR: 0.42, tyreW: 0.34, hollowHub: 1 },
         hull: {
           station: [[1, 0.24, 0.08, 0.06], [0.75, 0.54, 0.40, 0.22], [0.5, 0.84, 0.44, 0.28],
             [0.25, 0.70, 0.43, 0.28], [0, 0.72, 0.48, 0.28], [-0.25, 0.72, 0.52, 0.30],
@@ -187,13 +229,13 @@
       mounts: ['splitter', 'rearSpoilerLow', 'sharkFin', 'diffuser',
         { part: 'lightBar', knobs: { x: 0.84, y: 0.31, z: -0.6, len: 1.3 } }],
       palette: { glowI: 0.7, metalBias: 0.1 },
-      gallery: { grad: 6, finish: 1 }
+      gallery: { grad: 6, finish: 1, rimGrad: 6, rimFinish: 0 }
     },
     { // 2 — Neon Speeder
       schemaVersion: 1, name: 'Neon Speeder', basePreset: 'neon',
       chassis: {
         L: 0.98,
-        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.40, rearR: 0.50, tyreW: 0.42 },
+        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.40, rearR: 0.50, tyreW: 0.42, hollowHub: 1 },
         hull: {
           station: [[1, 0.16, 0.08, 0.08], [0.75, 0.34, 0.16, 0.12], [0.5, 0.46, 0.37, 0.18],
             [0.25, 0.52, 0.46, 0.24], [0, 0.89, 0.50, 0.26], [-0.25, 0.88, 0.52, 0.27],
@@ -207,13 +249,13 @@
       mounts: ['splitterGlow', 'hoverFins', 'hoverChannels', 'glowCore',
         { part: 'lightBar', knobs: { x: 0.86, y: 0.28, z: -0.62, len: 1.4 } }],
       palette: { glowI: 1.4, metalBias: -0.05 },
-      gallery: { grad: 0, finish: 4 }
+      gallery: { grad: 0, finish: 4, rimGrad: 0, rimFinish: 4 }
     },
     { // 3 — Classic Cigar
       schemaVersion: 1, name: 'Classic Cigar', basePreset: 'classic',
       chassis: {
         L: 1.02,
-        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.40, rearR: 0.44, tyreW: 0.20 },
+        hardpoints: { frontZ: 1.5, rearZ: -1.35, trackF: 0.86, trackR: 0.90, frontR: 0.40, rearR: 0.44, tyreW: 0.20, hollowHub: 1 },
         hull: {
           station: [[1, 0.10, 0.10, 0.10], [0.75, 0.22, 0.18, 0.14], [0.5, 0.30, 0.22, 0.16],
             [0.25, 0.34, 0.26, 0.18], [0, 0.36, 0.30, 0.20], [-0.25, 0.34, 0.26, 0.18],
@@ -222,11 +264,11 @@
         },
         floor: { w: 0.7, h: 0.06, z: 0.05 }
       },
-      wheelStyle: 'classicSpoke',
+      wheelStyle: 'meshBBS',
       canopy: { kind: 'speedster', scale: [0.18, 0.12, 0.34], z: 0.2, y: 0.44, halo: false },
       mounts: ['ducktail', 'exposedEngine', 'exhausts', 'chromeTrim'],
       palette: { glowI: 0.5, metalBias: 0.15 },
-      gallery: { grad: 7, finish: 1 }
+      gallery: { grad: 7, finish: 1, rimGrad: 7, rimFinish: 1 }
     }
   ];
 
@@ -270,7 +312,14 @@
       spec = JSON.parse(JSON.stringify(presets[(idx + presets.length) % presets.length]));
     }
     // honor the live garage paint/finish over the resolved spec's gallery defaults
-    if (garage) { spec.gallery = { grad: garage.grad | 0, finish: garage.finish | 0 }; }
+    if (garage) {
+      spec.gallery = {
+        grad: garage.grad | 0,
+        finish: garage.finish | 0,
+        rimGrad: (garage.rimGrad != null ? garage.rimGrad : 1) | 0,
+        rimFinish: (garage.rimFinish != null ? garage.rimFinish : 1) | 0
+      };
+    }
     return DD.normalizeSpec(spec);
   };
 

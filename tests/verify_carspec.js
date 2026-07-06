@@ -29,13 +29,38 @@ DD.CAR_PRESETS.forEach((p, i) => {
 });
 
 // 3. Range clamps + enum coercion.
-const s = DD.normalizeSpec({ chassis: { hardpoints: { rimRadiusPct: 5, tyreRoundness: -1, spokeCount: 99 },
-  hull: { capStyleFront: 'banana', capStyleRear: 'pointed' } } });
+const s = DD.normalizeSpec({
+  chassis: {
+    hardpoints: {
+      rimRadiusPct: 5,
+      tyreRoundness: -1,
+      spokeCount: 99,
+      suspensionY: 5.0,
+      suspensionZ: -2.0,
+      hollowHub: 3.5
+    },
+    hull: { capStyleFront: 'banana', capStyleRear: 'pointed' }
+  },
+  gallery: { rimGrad: 99, rimFinish: -1 }
+});
 eq(s.chassis.hardpoints.rimRadiusPct, 0.9, 'rimRadiusPct clamp hi');
 eq(s.chassis.hardpoints.tyreRoundness, 0, 'tyreRoundness clamp lo');
 eq(s.chassis.hardpoints.spokeCount, 8, 'spokeCount clamp hi');
+eq(s.chassis.hardpoints.suspensionY, 0.20, 'suspensionY clamp hi');
+eq(s.chassis.hardpoints.suspensionZ, 0.05, 'suspensionZ clamp lo');
+eq(s.chassis.hardpoints.hollowHub, 1.00, 'hollowHub clamp hi');
 eq(s.chassis.hull.capStyleFront, 'flat', 'invalid capStyle -> flat');
 eq(s.chassis.hull.capStyleRear, 'pointed', 'valid capStyle kept');
+eq(s.gallery.rimGrad, 7, 'rimGrad clamp hi');
+eq(s.gallery.rimFinish, 0, 'rimFinish clamp lo');
+
+// 3b. Defaults for new properties when unspecified
+const def = DD.normalizeSpec({});
+eq(def.chassis.hardpoints.suspensionY, 0.00, 'default suspensionY is 0.00');
+eq(def.chassis.hardpoints.suspensionZ, 0.18, 'default suspensionZ is 0.18');
+eq(def.chassis.hardpoints.hollowHub, 0.00, 'default hollowHub is 0.00');
+eq(def.gallery.rimGrad, 1, 'default rimGrad is 1');
+eq(def.gallery.rimFinish, 1, 'default rimFinish is 1');
 
 // 4. Knob safety: non-finite numbers + non-primitives dropped, valid values kept.
 const k = DD.normalizeSpec({ mounts: [{ part: 'lightBar', knobs: { len: 1.3, x: Infinity, y: NaN, bad: {}, tag: 'ok', flag: true } }] });
@@ -125,6 +150,43 @@ eq(DD.decodeShareCode(123), null, 'non-string input returns null');
 const foreignCode = DD.encodeShareCode({ chassis: { hardpoints: { frontR: 99 } }, schemaVersion: 1 });
 eq(DD.decodeShareCode(foreignCode).chassis.hardpoints.frontR, DD.CAR_SCHEMA.frontR[1],
   'foreign share code with out-of-range frontR is clamped on decode');
+
+// 17. T12 cross-section ring overrides: absent rings = empty map (preset back-comat).
+eq(DD.normalizeSpec({}).chassis.hull.rings.constructor, Object, 'default rings is an empty object');
+eq(Object.keys(DD.normalizeSpec({}).chassis.hull.rings).length, 0, 'default rings map empty');
+
+// 18. valid ring override (K=18) is kept; mirror defaults true.
+const K18 = 18;
+const goodPts = [];
+for (let i = 0; i < K18; i++) goodPts.push({ x: 0.5, y: 0.3, smooth: true });
+const specWithRing = DD.normalizeSpec({ chassis: { hull: { rings: { 2: { pts: goodPts } } } } });
+ok(specWithRing.chassis.hull.rings[2], 'valid K=18 ring override kept');
+eq(specWithRing.chassis.hull.rings[2].pts.length, K18, 'ring pts length preserved');
+eq(specWithRing.chassis.hull.rings[2].mirror, true, 'ring mirror defaults true when absent');
+
+// 19. wrong-K ring override dropped (K must match buildHull's 18 exactly for the 1:1 vertex map).
+const badK = DD.normalizeSpec({ chassis: { hull: { rings: { 0: { pts: [{x:0,y:0}] } } } } });
+eq(badK.chassis.hull.rings[0], undefined, 'wrong-K ring override dropped');
+
+// 20. out-of-range x/y clamped to ±1.5; non-finite dropped (whole ring fails).
+const clampPts = [];
+for (let i = 0; i < K18; i++) clampPts.push({ x: 5, y: -7, smooth: false });
+const clampedRing = DD.normalizeSpec({ chassis: { hull: { rings: { 1: { pts: clampPts, mirror: false } } } } });
+eq(clampedRing.chassis.hull.rings[1].pts[0].x, 1.5, 'ring x clamped to +1.5');
+eq(clampedRing.chassis.hull.rings[1].pts[0].y, -1.5, 'ring y clamped to -1.5');
+eq(clampedRing.chassis.hull.rings[1].mirror, false, 'ring mirror=false honored');
+
+// 21. out-of-bounds station index dropped.
+const oobPts = [];
+for (let i = 0; i < K18; i++) oobPts.push({ x: 0.1, y: 0.1 });
+const oobSpec = DD.normalizeSpec({ chassis: { hull: { rings: { 999: { pts: oobPts } } } } });
+eq(oobSpec.chassis.hull.rings[999], undefined, 'ring with out-of-bounds station index dropped');
+
+// 22. ring survives share-code round-trip (it's plain JSON in the spec).
+const ringCode = DD.encodeShareCode(specWithRing);
+const ringBack = DD.decodeShareCode(ringCode);
+ok(ringBack.chassis.hull.rings[2], 'ring override survives share-code round-trip');
+eq(ringBack.chassis.hull.rings[2].pts.length, K18, 'ring pts length survives round-trip');
 
 console.log(`\ncarspec: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

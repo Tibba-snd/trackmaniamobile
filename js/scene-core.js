@@ -360,10 +360,10 @@
       theme.glassColor, 0.28, THREE.AdditiveBlending);
     if (glass) root.add(glass);
 
-    // guardrails: translucent wall + bright top rail
+    // guardrails: solid wall + bright top rail
     const railWall = (side) => DD._sceneShared.buildStrip(track, theme,
       (s) => s.wall && !s.gap ? [V.addS(s.p, s.r, side * s.w / 2), V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85)] : null,
-      theme.accent2, 0.22, THREE.AdditiveBlending);
+      theme.accent2, 1.0, THREE.NormalBlending);
     const railTop = (side) => DD._sceneShared.buildStrip(track, theme,
       (s) => {
         if (!s.wall || s.gap) return null;

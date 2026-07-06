@@ -497,11 +497,11 @@
     const wet = theme.wet;
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: wet ? 0.62 : 1.0, // Raised roughness floor to soften the 'wet' reflection
+      roughness: wet ? 0.85 : 1.0, // Raised roughness floor to soften reflections
       roughnessMap: getAsphaltRoughnessTexture(),
-      metalness: wet ? 0.15 : 0.0,
+      metalness: wet ? 0.05 : 0.0,
       side: THREE.DoubleSide,
-      envMapIntensity: wet ? 0.85 : 1.0, // Softened env probe reflection intensity
+      envMapIntensity: wet ? 0.40 : 0.60, // Significantly lowered environment map reflection intensity
       normalMap: getAsphaltNormalTexture(),
       normalScale: wet ? new THREE.Vector2(0.06, 0.06) : new THREE.Vector2(0.12, 0.12) // Reduced normal-map strength to prevent shimmering/jags
     });
@@ -540,7 +540,8 @@
     geo.setIndex(idx);
     const mat = new THREE.MeshBasicMaterial({
       color: col(color), transparent: opacity < 1, opacity,
-      blending: blending || THREE.NormalBlending, side: THREE.DoubleSide, depthWrite: false
+      blending: blending || THREE.NormalBlending, side: THREE.DoubleSide,
+      depthWrite: (blending === THREE.NormalBlending || !blending)
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;

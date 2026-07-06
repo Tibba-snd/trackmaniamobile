@@ -89,27 +89,86 @@
 
   /* Garage Sidebar & Showcase Layout */
   .garage-sidebar {
-    width: min(100%, 370px);
+    width: min(85vw, 320px);
     height: 100%;
-    background: rgba(10, 7, 22, 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(var(--accent-rgb), 0.16);
-    padding: min(8vh, 45px) min(6vw, 32px) 30px min(6vw, 32px);
+    background: rgba(6, 6, 9, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(var(--accent-rgb), 0.12);
+    padding: 24px 20px 20px 20px;
     display: flex;
     flex-direction: column;
     z-index: 11;
     position: absolute;
     left: 0;
     top: 0;
-    box-shadow: 10px 0 40px rgba(0,0,0,0.5);
+    box-shadow: 8px 0 32px rgba(0,0,0,0.6);
+  }
+  @media (min-width: 1024px) {
+    .garage-sidebar {
+      width: min(35vw, 380px);
+      padding: 36px 28px 24px 28px;
+    }
+  }
+  @media (max-height: 480px) {
+    .garage-sidebar {
+      padding: 12px 14px 12px 14px;
+    }
+    .garage-title { font-size: 20px; margin-bottom: 2px; }
+    .garage-subtitle { margin-bottom: 12px; }
+    .garage-tabs { margin-bottom: 12px; }
+    .backBtn { margin-top: 12px; padding: 8px 20px; }
+  }
+  /* Custom modern dark scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
   }
   .garage-title { font-family:'Chakra Petch',sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.25em; color: var(--warm); text-shadow: 0 0 15px rgba(var(--warm-rgb), 0.25); margin-bottom: 4px; }
   .garage-subtitle { font-size: 10px; opacity: 0.55; letter-spacing: 0.08em; margin-bottom: 24px; text-transform: uppercase; font-weight: 600; }
-  .garage-tabs { display: flex; background: rgba(0, 0, 0, 0.3); border-radius: 0; padding: 4px; margin-bottom: 22px; border: 1px solid rgba(var(--accent-rgb), 0.1);
-    clip-path:polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
-  .tab-btn { flex: 1; background: transparent; border: none; color: #e8e4f5; opacity: 0.6; padding: 10px 0; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; cursor: pointer; border-radius: 0; transition: all 0.2s; font-family: inherit; }
-  .tab-btn.active { background: rgba(var(--accent-rgb), 0.16); opacity: 1; color: #fff; text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4); }
+  .garage-tabs { display: flex; flex-wrap: wrap; gap: 4px; background: rgba(0, 0, 0, 0.2); padding: 2px; margin-bottom: 20px; border: 1px solid rgba(var(--accent-rgb), 0.1); }
+  .tab-btn {
+    flex: 1 1 calc(25% - 4px);
+    min-width: 60px;
+    background: transparent;
+    border: none;
+    color: #e8e4f5;
+    opacity: 0.55;
+    padding: 8px 2px;
+    font-size: 9px;
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    border-bottom: 1px solid transparent;
+  }
+  .tab-btn.active {
+    background: transparent;
+    opacity: 1;
+    color: var(--warm);
+    border-bottom: 1px solid var(--warm);
+    text-shadow: 0 0 8px rgba(var(--warm-rgb), 0.25);
+  }
+  .tab-btn:hover:not(.active) {
+    opacity: 0.85;
+  }
   .tab-content { flex: 1; overflow-y: auto; padding-right: 6px; }
   .section-title { font-family:'Chakra Petch',sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; opacity: 0.4; margin-bottom: 12px; }
   .garage-back { margin-top: 24px; width: 100%; }
@@ -611,39 +670,206 @@
   .setRow input[type=checkbox] { width:20px; height:20px; accent-color:var(--accent); cursor:pointer; }
   h2.ph { font-family:'Chakra Petch',sans-serif; font-size:14px; letter-spacing:0.25em; font-weight:700; opacity:0.85; margin-bottom:6px; text-transform:uppercase; color:var(--accent); }
   .gGroup { display:flex; flex-direction:column; gap:8px; width:100%; }
-  .gItem { width:100%; padding:12px 16px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.16); background:rgba(var(--accent-rgb),0.05);
-    color:#e8e4f5; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:all 0.2s; font-family:inherit; text-align:left; font-weight:500;
-    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
-  .gItem:hover { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); }
-  .gItem.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); box-shadow:0 0 15px rgba(var(--warm-rgb),0.15); }
-  .gItem .sw { width:20px; height:20px; border-radius:6px; display:inline-block; border:1px solid rgba(255,255,255,0.15); }
-  /* G4 garage sliders — finger-friendly range inputs. NO ::before/::after transitions (WebView freeze). */
-  .gSlider { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border:1px solid rgba(var(--accent-rgb),0.16);
-    background:rgba(var(--accent-rgb),0.05); clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
-  .gSlider-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:500; color:#e8e4f5; letter-spacing:0.04em; }
-  .gSlider-val { font-family:'Chakra Petch',monospace; font-size:12px; color:var(--warm); opacity:0.85; min-width:42px; text-align:right; }
-  .gSlider input[type=range] { width:100%; height:28px; background:transparent; cursor:pointer; appearance:none; -webkit-appearance:none; margin:0; }
-  .gSlider input[type=range]::-webkit-slider-runnable-track { height:4px; background:rgba(var(--accent-rgb),0.25); border-radius:2px; }
-  .gSlider input[type=range]::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
-    background:var(--warm); margin-top:-9px; border:2px solid rgba(0,0,0,0.4); box-shadow:0 0 8px rgba(var(--warm-rgb),0.4); }
-  .gSlider input[type=range]::-moz-range-track { height:4px; background:rgba(var(--accent-rgb),0.25); border-radius:2px; }
-  .gSlider input[type=range]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:var(--warm); border:2px solid rgba(0,0,0,0.4); }
-  .gSeg { display:flex; gap:4px; flex-wrap:wrap; }
-  .gSegBtn { flex:1; min-width:60px; padding:8px 6px; border:1px solid rgba(var(--accent-rgb),0.16); background:rgba(var(--accent-rgb),0.05);
-    color:#e8e4f5; font-size:11px; font-weight:600; letter-spacing:0.04em; cursor:pointer; font-family:inherit; text-transform:uppercase;
-    clip-path: polygon(0 6px, 6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
-  .gSegBtn.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); color:#fff; }
-  .editModeBar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-  .editModeBtn { flex:1 1 auto; padding:8px 10px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.16);
-    background:rgba(var(--accent-rgb),0.05); color:#e8e4f5; font-size:12px; cursor:pointer; font-family:inherit;
-    font-weight:500; transition:all 0.2s; text-align:center; }
-  .editModeBtn:hover:not(:disabled) { background:rgba(var(--accent-rgb),0.12); border-color:rgba(var(--accent-rgb),0.4); }
-  .editModeBtn.sel { border-color:var(--warm); background:rgba(var(--warm-rgb),0.15); box-shadow:0 0 15px rgba(var(--warm-rgb),0.15); }
-  .editModeBtn:disabled { opacity:0.35; cursor:not-allowed; }
-  .backBtn { margin-top:24px; padding:12px 34px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.3); background:transparent; color:#e8e4f5; letter-spacing:0.2em; cursor:pointer; font-size:13px; font-weight:600; transition:all .2s; font-family:inherit;
-    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
-  .backBtn:hover { background:rgba(var(--accent-rgb),0.1); border-color:rgba(var(--accent-rgb),0.55); }
-  .backBtn:active { transform:scale(0.96); }
+  .gItem {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
+    background: rgba(var(--accent-rgb), 0.02);
+    color: #cbd5e1;
+    font-size: 11px;
+    font-family: 'Azeret Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    text-align: left;
+    font-weight: 500;
+    clip-path: none;
+  }
+  .gItem:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+  .gItem.sel {
+    border-color: var(--warm);
+    background: rgba(var(--warm-rgb), 0.1);
+    box-shadow: 0 0 12px rgba(var(--warm-rgb), 0.1);
+  }
+  .gItem .sw {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: inline-block;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .gSlider {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid rgba(var(--accent-rgb), 0.08);
+    background: rgba(var(--accent-rgb), 0.02);
+    clip-path: none;
+    border-radius: 4px;
+  }
+  @media (max-height: 480px) {
+    .gSlider { padding: 6px 8px; }
+  }
+  .gSlider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #cbd5e1;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .gSlider-val {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    color: var(--warm);
+    opacity: 0.9;
+  }
+  .gSlider input[type=range] {
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .gSlider input[type=range]::-webkit-slider-runnable-track {
+    height: 1px;
+    background: rgba(var(--accent-rgb), 0.2);
+  }
+  .gSlider input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 0;
+    background: var(--warm);
+    margin-top: -4.5px;
+    border: none;
+    box-shadow: 0 0 6px rgba(var(--warm-rgb), 0.3);
+    transition: transform 0.15s ease;
+  }
+  .gSlider input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+  .gSlider input[type=range]::-moz-range-track {
+    height: 1px;
+    background: rgba(var(--accent-rgb), 0.2);
+  }
+  .gSlider input[type=range]::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 0;
+    background: var(--warm);
+    border: none;
+  }
+  .gSeg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .gSegBtn {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 8px;
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
+    background: rgba(var(--accent-rgb), 0.03);
+    color: #e8e4f5;
+    font-size: 9px;
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .gSegBtn:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+  .gSegBtn.sel {
+    border-color: var(--warm);
+    background: rgba(var(--warm-rgb), 0.12);
+    color: #fff;
+  }
+  .editModeBar {
+    position: absolute;
+    top: 20px;
+    left: calc(50% + 160px);
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: rgba(6, 6, 9, 0.9);
+    border: 1px solid rgba(var(--accent-rgb), 0.16);
+    padding: 4px;
+    z-index: 10;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    border-radius: 4px;
+  }
+  @media (max-width: 768px) {
+    .editModeBar {
+      left: 50%;
+      top: 10px;
+    }
+  }
+  .editModeBtn {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #cbd5e1;
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+  .editModeBtn:hover:not(:disabled) {
+    background: rgba(var(--accent-rgb), 0.1);
+    color: #fff;
+  }
+  .editModeBtn.sel {
+    border-color: var(--warm);
+    background: rgba(var(--warm-rgb), 0.12);
+    color: var(--warm);
+    text-shadow: 0 0 6px rgba(var(--warm-rgb), 0.2);
+  }
+  .editModeBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .backBtn {
+    margin-top: 20px;
+    padding: 10px 24px;
+    border-radius: 4px;
+    border: 1px solid rgba(var(--accent-rgb), 0.25);
+    background: transparent;
+    color: #cbd5e1;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 500;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .backBtn:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.5);
+    color: #fff;
+  }
+  .backBtn:active { transform: scale(0.97); }
 
   /* loading */
   #loadPlate {
@@ -904,26 +1130,18 @@
     <h2 class="garage-title">GARAGE</h2>
     <p class="garage-subtitle">select and customise your dream machine</p>
     
-    <div class="garage-tabs">
+    <div class="garage-tabs" id="garageTabSelector">
       <button class="tab-btn active" id="tabBtnPaint">paint</button>
       <button class="tab-btn" id="tabBtnFinish">finish</button>
-      <button class="tab-btn" id="tabBtnForm">chassis</button>
+      <button class="tab-btn" id="tabBtnForm">presets</button>
       <button class="tab-btn" id="tabBtnBody">body</button>
       <button class="tab-btn" id="tabBtnWheels">wheels</button>
-      <button class="tab-btn" id="tabBtnWings">wings</button>
+      <button class="tab-btn" id="tabBtnWings" style="display:none !important;">aero</button>
+      <button class="tab-btn" id="tabBtnParts">parts</button>
     </div>
 
-    <div class="garage-tabs">
-      <button class="tab-btn" id="btnCustomize">customize</button>
-      <button class="tab-btn" id="btnEditReset" style="display:none;">reset to preset</button>
-    </div>
-    <div class="editModeBar" id="editModeBar" style="display:none;">
-      <button class="editModeBtn" id="editMode_orbit">orbit</button>
-      <button class="editModeBtn" id="editMode_length">shape</button>
-      <button class="editModeBtn" id="editMode_move">move</button>
-      <button class="editModeBtn" id="editMode_cross" disabled title="coming soon">cross-section</button>
-      <button class="editModeBtn" id="editMode_addrm" disabled title="coming soon">add/remove</button>
-    </div>
+    <!-- Hidden compat elements for game.js reference safety -->
+    <button id="btnCustomize" style="display:none !important;"></button>
 
     <div class="tab-content" id="tabPaint">
       <h3 class="section-title">gradient paint</h3>
@@ -944,20 +1162,42 @@
       <div class="gGroup" id="gBody"></div>
       <p class="section-title" style="margin-top:14px;">station shape</p>
       <div class="gGroup" id="gBodyStations"></div>
+      <p class="section-title" style="margin-top:14px;">cabin style</p>
+      <div class="gGroup" id="gCabinStyle"></div>
+      <p class="section-title" style="margin-top:14px;">cabin specs</p>
+      <div class="gGroup" id="gCabinSpecs"></div>
     </div>
     <div class="tab-content" id="tabWheels" style="display:none;">
       <h3 class="section-title">wheel specs</h3>
       <div class="gGroup" id="gWheels"></div>
-      <p class="section-title" style="margin-top:14px;">style</p>
       <div class="gGroup" id="gWheelStyles"></div>
     </div>
-    <div class="tab-content" id="tabWings" style="display:none;">
-      <h3 class="section-title">wing & aero parts</h3>
+    <div class="tab-content" id="tabWings" style="display:none !important;">
       <div class="gGroup" id="gWings"></div>
+    </div>
+    <div class="tab-content" id="tabParts" style="display:none;">
+      <h3 class="section-title">add/remove parts</h3>
+      <div class="gGroup" id="gParts"></div>
+    </div>
+
+    <!-- Action panel: grouped at the bottom, visible during active customization -->
+    <div id="garageActionPanel" style="display: none; margin-top: auto; display: flex; flex-direction: column; gap: 8px; width: 100%;">
+      <div id="saveBtnContainer" style="display: flex; gap: 6px; width: 100%;">
+        <button class="backBtn" id="btnEditReset" style="flex: 1; margin: 0; padding: 10px; font-size: 11px;">save design</button>
+      </div>
+      <button class="backBtn" id="btnDiscard" style="background: rgba(220, 50, 50, 0.12); border-color: rgba(220, 50, 50, 0.25); flex: 1; margin: 0; padding: 10px; font-size: 11px;">discard changes</button>
     </div>
     
     <button class="backBtn garage-back">back</button>
   </div>
+
+  <div class="editModeBar" id="editModeBar" style="display:none;">
+    <button class="editModeBtn" id="editMode_orbit">orbit</button>
+    <button class="editModeBtn" id="editMode_length">shape</button>
+    <button class="editModeBtn" id="editMode_move">move</button>
+    <button class="editModeBtn" id="editMode_cross" disabled title="grab a ring first">cross-section</button>
+  </div>
+
   <div class="garage-instruction">
     <svg class="drag-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 2a8 8 0 0 1 8 8a8 8 0 0 1-8 8a8 8 0 0 1-8-8a8 8 0 0 1 8-8m-3 4l-4 4l4 4v-3h6v3l4-4l-4-4v3H9V8Z"/></svg>
     drag to rotate
@@ -1081,12 +1321,13 @@
 <script src="js/physics.js?v=28"></script>
 <script src="js/audio.js?v=17"></script>
 <script src="js/input.js?v=16"></script>
-<script src="js/carspec.js?v=4"></script>
+<script src="js/carspec.js?v=5"></script>
 <script src="js/scene-core.js?v=53"></script>
 <script src="js/scene-decor.js?v=56"></script>
-<script src="js/scene-car.js?v=55"></script>
+<script src="js/scene-car.js?v=56"></script>
 <script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=61"></script>
+<script src="js/game.js?v=62"></script>
 <script src="js/physdev.js?v=3"></script>
+<script src="js/perfhud.js?v=2"></script>
 </body>
 </html>

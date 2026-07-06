@@ -198,19 +198,19 @@
      calibration edit, not a code hunt across scene.js/game.js. scene.js reads the build-time
      entries (bloom pass params, skid intensity, arch pools); game.js reads the per-frame ones
      (bloom composition, the shared breath LFO). settings.glow picks the user master. */
-  DD.GLOW = {
+   DD.GLOW = {
     master: { subtle: 0.7, standard: 1.0, vivid: 1.3 },   // user-facing slider
     biome: { dune: 1.0, neon: 1.0, canyon: 1.0, frozen: 0.82 }, // bright palettes get less headroom
-    bloom: { base: 1.15, speedCreep: 0.6, driftFlash: 0.45, flashDecay: 7.0, cap: 1.8, radius: 0.65, threshold: 0.85 },
+    bloom: { base: 0.80, speedCreep: 0.3, driftFlash: 0.25, flashDecay: 7.0, cap: 1.3, radius: 0.65, threshold: 0.85 },
     aurora: { bands: 3, glow: 1.2, scrollSpeed: [0.03, -0.05, 0.02] },
     // one shared "breath" LFO (Hz): world elements pulse together, gently — replaces three
     // independent sines at competing frequencies that made the whole scene flicker
     breathHz: 0.10,
-    gate:  { base: 0.60, amp: 0.14, passed: 0.18 },  // was 0.55 ± 0.30
-    decor: { base: 1.55, amp: 0.22 },                 // was 1.90 ± 0.50
-    boost: { base: 0.45, amp: 0.12 },                 // was 0.40 ± 0.25
-    skid:  { drift: 1.15, straight: 0.2 },            // was 1.8 on drift — white-hot trails fed bloom hardest
-    archPool: 0.22                                    // was 0.35 — additive pools on the road under arches
+    gate:  { base: 0.40, amp: 0.14, passed: 0.18 },  // was 0.55 ± 0.30
+    decor: { base: 1.15, amp: 0.22 },                 // was 1.90 ± 0.50
+    boost: { base: 0.30, amp: 0.12 },                 // was 0.40 ± 0.25
+    skid:  { drift: 0.70, straight: 0.2 },            // was 1.8 on drift — white-hot trails fed bloom hardest
+    archPool: 0.12                                    // was 0.35 — additive pools on the road under arches
   };
 
   DD.TERRAIN_BAKE = {

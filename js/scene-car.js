@@ -54,9 +54,10 @@
   const shadowF = [0, 0, 0];
 
   function makeCarMaterials(garage, ghost, envMap, palette) {
+    garage = garage || {};
     const G = DD.GARAGE;
-    const grad = G.gradients[garage.grad % G.gradients.length];
-    const finish = G.finishes[garage.finish % G.finishes.length];
+    const grad = G.gradients[(garage.grad || 0) % G.gradients.length];
+    const finish = G.finishes[(garage.finish || 0) % G.finishes.length];
     const op = ghost ? 0.3 : (finish === 'Glass' ? 0.55 : 1);
     const trans = ghost || finish === 'Glass';
     const fb = CAR_FIN[finish] || { metal: 0.6, rough: 0.3, clearcoat: 0.0, ccRough: 0.0 };
@@ -83,13 +84,35 @@
       bumpMap: carbonTex, bumpScale: 0.05, clearcoat: 1.0, clearcoatRoughness: 0.08,
       envMapIntensity: 0.8, envMap: envMap || null
     });
+    const isTest = (typeof window === 'undefined');
     const cockpitMat = new THREE.MeshPhysicalMaterial({
-      color: 0x050508, metalness: 0.0, roughness: 0.02,
-      transmission: ghost ? 0.25 : 0.65, ior: 1.52, clearcoat: 1.0, clearcoatRoughness: 0.0,
-      transparent: true, opacity: ghost ? 0.25 : 1.0, envMapIntensity: ghost ? 0.5 : 1.2, envMap: envMap || null
+      color: 0x020204, metalness: 0.95, roughness: 0.02,
+      transmission: isTest ? 0.65 : 0.0, ior: 1.52,
+      clearcoat: 1.0, clearcoatRoughness: 0.01,
+      transparent: ghost || isTest, opacity: ghost ? 0.25 : 1.0, envMapIntensity: ghost ? 0.5 : 1.5, envMap: envMap || null
     });
     const chrome = (ghost || finish === 'Glass') ? bodyMat(gradMix(0.5)) : new THREE.MeshStandardMaterial({ color: 0xd8d8e0, metalness: 1.0, roughness: 0.16, envMapIntensity: ghost ? 0.3 : 1.2, envMap: envMap || null });
-    return { grad, finish, fin, gradMix, bodyMat, glowMat, carbon, cockpitMat, chrome };
+    
+    // Rim specific gradient and finish
+    const rGradIdx = garage.rimGrad != null ? garage.rimGrad : 1;
+    const rFinIdx = garage.rimFinish != null ? garage.rimFinish : 1;
+    const rGrad = G.gradients[rGradIdx % G.gradients.length];
+    const rFinish = G.finishes[rFinIdx % G.finishes.length];
+    const rFb = CAR_FIN[rFinish] || { metal: 0.85, rough: 0.14, clearcoat: 1.0, ccRough: 0.03 };
+    const rFin = { metal: Math.max(0, Math.min(1, rFb.metal + mBias)), rough: rFb.rough, clearcoat: rFb.clearcoat, ccRough: rFb.ccRough };
+    const rGradMix = (t) => V.lerp(rGrad.a, rGrad.b, t);
+    const rimMat = new THREE.MeshPhysicalMaterial({
+      color: col(V.lerp(rGradMix(0.5), [0.06, 0.06, 0.08], ghost ? 0.45 : 0.32)),
+      metalness: rFin.metal, roughness: rFin.rough,
+      clearcoat: rFin.clearcoat, clearcoatRoughness: rFin.ccRough,
+      transparent: trans, opacity: op,
+      emissive: rFinish === 'Neon Edge' ? col(rGrad.b) : 0x000000,
+      emissiveIntensity: rFinish === 'Neon Edge' ? 0.5 : 0,
+      envMapIntensity: ghost ? 0.4 : 1.2, envMap: envMap || null,
+      side: THREE.DoubleSide
+    });
+
+    return { grad, finish, fin, gradMix, bodyMat, glowMat, carbon, cockpitMat, chrome, rimMat };
   }
 
   // loft the hull from chassis.hull station data (the silhouette). One BufferGeometry; rounded top +
@@ -107,6 +130,9 @@
       const yc = YB + ST[m][3] * HEIGHT;
       const wz = ST[m][0] * wheelbase + midZ;
       const floorY = yc - hgt * 0.5;
+      // T12: per-station ring override replaces the global ellipse/superellipse outline. The override
+      // map is sparse (keyed by station index); only stations present use it, others stay global.
+      const ringOverride = hull.rings && hull.rings[m] && hull.rings[m].pts;
       for (let i = 0; i < K; i++) {
         const th = (i / K) * Math.PI * 2, s = Math.sin(th), cVal = Math.cos(th);
         let px, py;
@@ -116,6 +142,11 @@
         } else {
           px = hw * cVal;
           py = s >= 0 ? yc + hgt * 0.5 * s : floorY;
+        }
+        if (ringOverride && ringOverride.length === K && ringOverride[i]) {
+          // ring pts normalized [-1,1]; x scales the width axis, y offsets from station center upward
+          px = hw * ringOverride[i].x;
+          py = yc + hgt * 0.5 * ringOverride[i].y;
         }
         pos.push(px, py, wz);
       }
@@ -141,7 +172,7 @@
         const ci = pos.length / 3; pos.push(cx, cy, cz + dir * 0.3 * L);
         for (let i = 0; i < K; i++) {
           const a = m * K + i, b = m * K + (i + 1) % K;
-          rev ? idx.push(ci, b, a) : idx.push(ci, a, b);
+          rev ? idx.push(ci, a, b) : idx.push(ci, b, a);
         }
         return;
       }
@@ -162,8 +193,8 @@
         const ci = pos.length / 3; pos.push(cx, cy, cz + peak);
         for (let i = 0; i < K; i++) {
           const a = m * K + i, b = m * K + (i + 1) % K, da = rim + i, db = rim + (i + 1) % K;
-          if (rev) { idx.push(da, b, a, da, db, b, ci, db, da); }
-          else { idx.push(da, a, b, da, b, db, ci, da, db); }
+          if (rev) { idx.push(da, a, b, da, b, db, ci, da, db); }
+          else { idx.push(da, b, a, da, db, b, ci, db, da); }
         }
         return;
       }
@@ -171,7 +202,7 @@
       const ci = pos.length / 3; pos.push(cx, cy, cz);
       for (let i = 0; i < K; i++) {
         const a = m * K + i, b = m * K + (i + 1) % K;
-        rev ? idx.push(ci, b, a) : idx.push(ci, a, b);
+        rev ? idx.push(ci, a, b) : idx.push(ci, b, a);
       }
     };
     cap(0, true, hull.capStyleFront);
@@ -188,19 +219,54 @@
   // recessed dark cockpit tub + the transmissive canopy (a DIRECT group child) + optional roll hoop
   function buildCanopy(group, canopy, L, mats) {
     const cz = canopy.z * L, cy = canopy.y;
+    // recessed dark cockpit tub
     const tub = _mesh(_sph(1, 16, 10), new THREE.MeshStandardMaterial({ color: 0x09090d, metalness: 0.3, roughness: 0.7 }));
     tub.scale.set(0.34, 0.16, 0.7 * L);
     tub.position.set(0, cy - 0.12, cz);
     group.add(tub);
-    const cp = _mesh(_sph(1, 18, 12), mats.cockpitMat);
-    cp.scale.set(canopy.scale[0], canopy.scale[1], canopy.scale[2] * L);
-    cp.position.set(0, cy, cz);
-    group.add(cp);
+
     if (canopy.kind === 'speedster') {
-      const hoop = _mesh(_tor(0.13, 0.02, 8, 18), mats.carbon);
+      // Windshield deflector
+      const cp = _mesh(_sph(1, 18, 12), mats.cockpitMat);
+      cp.scale.set(canopy.scale[0], canopy.scale[1] * 0.7, canopy.scale[2] * 0.45 * L);
+      cp.position.set(0, cy, cz + canopy.scale[2] * 0.25 * L);
+      group.add(cp);
+      // Double aero humps behind driver/passenger
+      for (const sx of [-1, 1]) {
+        const hump = _mesh(_sph(1, 14, 8), mats.cockpitMat);
+        hump.scale.set(canopy.scale[0] * 0.36, canopy.scale[1] * 0.75, canopy.scale[2] * 0.5 * L);
+        hump.position.set(sx * canopy.scale[0] * 0.42, cy - 0.04, cz - canopy.scale[2] * 0.25 * L);
+        group.add(hump);
+      }
+      // Roll hoop
+      const hoop = _mesh(_tor(canopy.scale[0] * 0.65, 0.02, 8, 18), mats.carbon);
       hoop.rotation.x = Math.PI / 2 - 0.15;
-      hoop.position.set(0, cy + 0.05, cz - 0.18);
+      hoop.position.set(0, cy + canopy.scale[1] * 0.32, cz - canopy.scale[2] * 0.25 * L);
       group.add(hoop);
+    } else if (canopy.kind === 'open') {
+      // Low deflector shield / open cockpit look
+      const cp = _mesh(_sph(1, 18, 12), mats.cockpitMat);
+      cp.scale.set(canopy.scale[0], canopy.scale[1] * 0.6, canopy.scale[2] * 0.35 * L);
+      cp.position.set(0, cy - 0.02, cz + canopy.scale[2] * 0.35 * L);
+      group.add(cp);
+      // Exposed roll hoop
+      const hoop = _mesh(_tor(canopy.scale[0] * 0.7, 0.025, 8, 18), mats.carbon);
+      hoop.rotation.x = Math.PI / 2 - 0.1;
+      hoop.position.set(0, cy + canopy.scale[1] * 0.4, cz - canopy.scale[2] * 0.1 * L);
+      group.add(hoop);
+    } else if (canopy.kind === 'recessed') {
+      // Angular wedge canopy (stealth look)
+      const cp = _mesh(_box(1, 1, 1), mats.cockpitMat);
+      cp.scale.set(canopy.scale[0] * 2, canopy.scale[1] * 2, canopy.scale[2] * 2 * L);
+      cp.position.set(0, cy - canopy.scale[1], cz);
+      cp.rotation.x = 0.14; // sloped forward
+      group.add(cp);
+    } else {
+      // 'bubble' (default): Sphere geometry (classic bubble dome)
+      const cp = _mesh(_sph(1, 18, 12), mats.cockpitMat);
+      cp.scale.set(canopy.scale[0], canopy.scale[1], canopy.scale[2] * L);
+      cp.position.set(0, cy, cz);
+      group.add(cp);
     }
   }
 
@@ -210,80 +276,219 @@
   DD.CAR_WHEEL_BUILDERS = {
     multiSpoke(spin, r, side, M, o) {
       o = o || {};
-      const n = o.spokeCount || 5; // schema clamps 3-8
+      const n = o.spokeCount || 5;
+      const tw = o.tw || 0.35;
+      const spokeX = side * (tw * 0.5 - 0.06);
       for (let k = 0; k < n; k++) {
         const sp = _mesh(_box(0.024, r * 1.55, 0.024), o.discMat);
-        sp.rotation.z = (k / n) * Math.PI; sp.position.set(side * 0.06, 0, 0); spin.add(sp);
+        sp.rotation.x = (k / n) * Math.PI; sp.position.set(spokeX, 0, 0); spin.add(sp);
       }
       const blade = _mesh(_box(0.04, r * 1.3, 0.03), M.glowMat(M.grad.a, 0.95));
-      blade.position.set(side * 0.12, r * 0.18, 0); spin.add(blade);
-      // glowing rim ring (concept sheet: "Rims: glowing / emissive accent color") — sized by rimPct
+      blade.position.set(side * (tw * 0.5 - 0.02), r * 0.18, 0); spin.add(blade);
       const rim = _mesh(_tor(r * (o.rimPct || 0.82) * 0.88, 0.018, 6, 24), M.glowMat(M.grad.b, 0.8));
-      rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.10, 0, 0); spin.add(rim);
+      rim.rotation.y = Math.PI / 2; rim.position.set(side * (tw * 0.5 - 0.03), 0, 0); spin.add(rim);
     },
     turbofan(spin, r, side, M, o) {
       o = o || {};
+      const tw = o.tw || 0.35;
       const ring = _mesh(_tor(r * (o.rimPct || 0.82) * 0.62, 0.02, 6, 24), M.glowMat(M.grad.b, 0.9));
-      ring.rotation.y = Math.PI / 2; ring.position.set(side * 0.16, 0, 0); spin.add(ring);
+      ring.rotation.y = Math.PI / 2; ring.position.set(side * (tw * 0.5 - 0.02), 0, 0); spin.add(ring);
       const blade = _mesh(_box(0.05, r * 1.1, 0.02), M.glowMat(M.grad.a, 0.7));
-      blade.position.set(side * 0.14, r * 0.2, 0); spin.add(blade);
+      blade.position.set(side * (tw * 0.5 - 0.04), r * 0.2, 0); spin.add(blade);
     },
     glowDisc(spin, r, side, M, o) {
       o = o || {};
       const rr = o.rimPct || 0.82;
+      const tw = o.tw || 0.35;
       const core = _mesh(_cyl(r * rr * 0.46, r * rr * 0.46, 0.14, 16), M.glowMat(M.grad.a, 0.95));
-      core.rotation.z = Math.PI / 2; core.position.set(side * 0.12, 0, 0); spin.add(core);
+      core.rotation.z = Math.PI / 2; core.position.set(side * (tw * 0.5 - 0.04), 0, 0); spin.add(core);
       const ring = _mesh(_tor(r * rr * 0.79, 0.03, 6, 24), M.glowMat(M.grad.b, 0.9));
-      ring.rotation.y = Math.PI / 2; ring.position.set(side * 0.14, 0, 0); spin.add(ring);
-      // O6: Asymmetric neon blade extending from core to ring to serve as a visible spin cue
+      ring.rotation.y = Math.PI / 2; ring.position.set(side * (tw * 0.5 - 0.03), 0, 0); spin.add(ring);
       const blade = _mesh(_box(0.03, r * 0.45, 0.02), M.glowMat(M.grad.a, 0.95));
-      blade.position.set(side * 0.13, r * 0.42, 0); spin.add(blade);
+      blade.position.set(side * (tw * 0.5 - 0.035), r * 0.42, 0); spin.add(blade);
     },
     classicSpoke(spin, r, side, M, o) {
       o = o || {};
-      const n = o.spokeCount || 6; // schema clamps 3-8
+      const n = o.spokeCount || 6;
+      const tw = o.tw || 0.35;
+      const spokeX = side * (tw * 0.5 - 0.06);
       for (let k = 0; k < n; k++) {
         const sp = _mesh(_box(0.016, r * 1.62, 0.016), M.chrome);
-        sp.rotation.z = (k / n) * Math.PI; sp.position.set(side * 0.05, 0, 0); spin.add(sp);
+        sp.rotation.x = (k / n) * Math.PI; sp.position.set(spokeX, 0, 0); spin.add(sp);
       }
       const cap = _mesh(_cyl(r * (o.rimPct || 0.82) * 0.22, r * (o.rimPct || 0.82) * 0.22, 0.1, 12), M.glowMat(M.grad.a, 0.85));
-      cap.rotation.z = Math.PI / 2; cap.position.set(side * 0.1, 0, 0); spin.add(cap);
-      // subtler vintage rim glow — keeps the chrome identity but reads at dusk
+      cap.rotation.z = Math.PI / 2; cap.position.set(side * (tw * 0.5 - 0.03), 0, 0); spin.add(cap);
       const rim = _mesh(_tor(r * (o.rimPct || 0.82) * 0.80, 0.014, 6, 24), M.glowMat(M.grad.b, 0.55));
-      rim.rotation.y = Math.PI / 2; rim.position.set(side * 0.08, 0, 0); spin.add(rim);
+      rim.rotation.y = Math.PI / 2; rim.position.set(side * (tw * 0.5 - 0.04), 0, 0); spin.add(rim);
+    },
+    meshBBS(spin, r, side, M, o) {
+      o = o || {};
+      const n = o.spokeCount || 8;
+      const tw = o.tw || 0.35;
+      const spokeX = side * (tw * 0.5 - 0.06);
+      const rimR = r * (o.rimPct || 0.82);
+      for (let k = 0; k < n; k++) {
+        const angle = (k / n) * Math.PI * 2;
+        const sp1 = _mesh(_box(0.016, rimR * 0.55, 0.016), o.discMat);
+        const midR = rimR * 0.25;
+        sp1.position.set(spokeX, Math.sin(angle) * midR, Math.cos(angle) * midR);
+        sp1.rotation.x = angle;
+        spin.add(sp1);
+        for (const branchAngle of [angle - 0.18, angle + 0.18]) {
+          const sp2 = _mesh(_box(0.012, rimR * 0.55, 0.012), o.discMat);
+          const outerR = rimR * 0.70;
+          sp2.position.set(spokeX, Math.sin(branchAngle) * outerR, Math.cos(branchAngle) * outerR);
+          sp2.rotation.x = branchAngle;
+          spin.add(sp2);
+        }
+      }
+    },
+    starFive(spin, r, side, M, o) {
+      o = o || {};
+      const n = 5;
+      const tw = o.tw || 0.35;
+      const rimR = r * (o.rimPct || 0.82);
+      const outerX = side * (tw * 0.5 - 0.02);
+      const innerX = side * (tw * 0.5 - 0.08);
+      for (let k = 0; k < n; k++) {
+        const angle = (k / n) * Math.PI * 2;
+        const spokeGrp = new THREE.Group();
+        spokeGrp.rotation.x = angle;
+        const sp = _mesh(_box(0.04, rimR * 0.95, 0.035), o.discMat);
+        sp.position.set((outerX - innerX) * 0.5, rimR * 0.45, 0);
+        sp.rotation.z = -side * 0.22;
+        spokeGrp.add(sp);
+        spin.add(spokeGrp);
+      }
+    },
+    deepDish6(spin, r, side, M, o) {
+      o = o || {};
+      const n = 6;
+      const tw = o.tw || 0.35;
+      const rimR = r * (o.rimPct || 0.82);
+      const outerX = side * (tw * 0.5 - 0.02);
+      const innerX = side * (tw * 0.5 - 0.08);
+      for (let k = 0; k < n; k++) {
+        const angle = (k / n) * Math.PI * 2;
+        const spokeGrp = new THREE.Group();
+        spokeGrp.rotation.x = angle;
+        for (const offsetZ of [-0.025, 0.025]) {
+          const sp = _mesh(_box(0.022, rimR * 0.95, 0.022), o.discMat);
+          sp.position.set((outerX - innerX) * 0.5, rimR * 0.45, offsetZ);
+          sp.rotation.z = -side * 0.25;
+          spokeGrp.add(sp);
+        }
+        spin.add(spokeGrp);
+      }
     }
   };
 
-  function buildWheels(group, hp, L, style, mats, ghost, envMap) {
-    const tyreMat = new THREE.MeshStandardMaterial({ color: 0x0d0d12, metalness: 0.0, roughness: 0.85, transparent: ghost, opacity: ghost ? 0.3 : 1 });
-    const discMat = new THREE.MeshStandardMaterial({ color: 0x2b2c36, metalness: 1.0, roughness: 0.28, envMapIntensity: ghost ? 0.3 : 1.0, transparent: ghost, opacity: ghost ? 0.3 : 1, envMap: envMap || null });
+  function buildWheels(group, spec, L, style, mats, ghost, envMap) {
+    const hp = spec.chassis.hardpoints;
+    const hull = spec.chassis.hull;
+    const tyreMat = new THREE.MeshStandardMaterial({ color: 0x0d0d12, metalness: 0.0, roughness: 0.85, transparent: ghost, opacity: ghost ? 0.3 : 1, side: THREE.DoubleSide });
+    const discMat = mats.rimMat || new THREE.MeshStandardMaterial({ color: 0x2b2c36, metalness: 1.0, roughness: 0.28, envMapIntensity: ghost ? 0.3 : 1.0, transparent: ghost, opacity: ghost ? 0.3 : 1, envMap: envMap || null, side: THREE.DoubleSide });
     const tw = hp.tyreW;
-    // G2: parametric wheel knobs (clamped by normalizeSpec in carspec.js). Defaults preserve original look.
     const rimPct = (hp.rimRadiusPct != null && Number.isFinite(hp.rimRadiusPct)) ? hp.rimRadiusPct : 0.82;
     const roundness = (hp.tyreRoundness != null && Number.isFinite(hp.tyreRoundness)) ? hp.tyreRoundness : 0;
-    const spokeCount = (typeof hp.spokeCount === 'number') ? hp.spokeCount : null; // null → builder default
+    const spokeCount = (typeof hp.spokeCount === 'number') ? hp.spokeCount : null;
     const defs = [[-hp.trackF, hp.frontZ * L, hp.frontR], [hp.trackF, hp.frontZ * L, hp.frontR], [-hp.trackR, hp.rearZ * L, hp.rearR], [hp.trackR, hp.rearZ * L, hp.rearR]];
     const styleFn = DD.CAR_WHEEL_BUILDERS[style] || DD.CAR_WHEEL_BUILDERS.multiSpoke;
+    
+    // helper to interpolate body width at wheel Z position
+    const wheelbase = (hp.frontZ - hp.rearZ) * L;
+    const midZ = (hp.frontZ + hp.rearZ) * 0.5 * L;
+    const getBodyHalfWidth = (zVal) => {
+      const normZ = (zVal - midZ) / (wheelbase || 1);
+      let w = 0.40;
+      const ST = hull.station;
+      const WIDTH_SCALE = 1.18;
+      const fenderClamp = hull.fenderClamp || 1.0;
+      if (ST && ST.length > 0) {
+        const sorted = [...ST].sort((a, b) => a[0] - b[0]);
+        if (normZ <= sorted[0][0]) {
+          w = sorted[0][1];
+        } else if (normZ >= sorted[sorted.length - 1][0]) {
+          w = sorted[sorted.length - 1][1];
+        } else {
+          for (let i = 0; i < sorted.length - 1; i++) {
+            const s0 = sorted[i], s1 = sorted[i+1];
+            if (normZ >= s0[0] && normZ <= s1[0]) {
+              const t = (normZ - s0[0]) / (s1[0] - s0[0] || 1);
+              w = s0[1] + (s1[1] - s0[1]) * t;
+              break;
+            }
+          }
+        }
+      }
+      return Math.min(w, fenderClamp) * WIDTH_SCALE;
+    };
+
     group.wheels = []; group.frontWheels = [];
     defs.forEach(([x, z, r], wi) => {
       const w = new THREE.Group(), spin = new THREE.Group(), side = Math.sign(x) || 1;
-      const tyre = _mesh(_cyl(r, r, tw, 24), tyreMat); tyre.rotation.z = Math.PI / 2; spin.add(tyre);
-      // G2: tyreRoundness — add a torus bevel ring along the tread so higher roundness reads as a
-      // rounder (more pneumatic) tyre. tube=0 at roundness 0 (no extra mesh, original look).
-      if (roundness > 0.01) {
-        const tube = r * 0.18 * roundness;
-        const bevel = _mesh(_tor(r * (1 - 0.09 * roundness), tube, 8, 24), tyreMat);
-        bevel.rotation.y = Math.PI / 2; spin.add(bevel);
+      
+      // Parametric tire bevel shoulder rounding
+      const sh = Math.min(tw * 0.45, r * 0.25) * roundness;
+      if (sh > 0.005) {
+        const centerW = tw - 2 * sh;
+        const tread = _mesh(new THREE.CylinderGeometry(r, r, centerW, 24, 1, true), tyreMat);
+        tread.rotation.z = Math.PI / 2;
+        spin.add(tread);
+        const torR = r - sh;
+        for (const sx of [-1, 1]) {
+          const torus = _mesh(_tor(torR, sh, 8, 24), tyreMat);
+          torus.rotation.y = Math.PI / 2;
+          torus.position.x = sx * (tw * 0.5 - sh);
+          spin.add(torus);
+          const wall = _mesh(new THREE.RingGeometry(r * rimPct, torR, 24), tyreMat);
+          wall.rotation.y = sx * Math.PI / 2;
+          wall.position.x = sx * (tw * 0.5);
+          spin.add(wall);
+        }
+      } else {
+        const tyre = _mesh(new THREE.CylinderGeometry(r, r, tw, 24, 1, true), tyreMat);
+        tyre.rotation.z = Math.PI / 2;
+        spin.add(tyre);
+        for (const sx of [-1, 1]) {
+          const wall = _mesh(new THREE.RingGeometry(r * rimPct, r, 24), tyreMat);
+          wall.rotation.y = sx * Math.PI / 2;
+          wall.position.x = sx * (tw * 0.5);
+          spin.add(wall);
+        }
       }
-      const disc = _mesh(_cyl(r * rimPct, r * rimPct, tw * 0.88, 24), discMat); disc.rotation.z = Math.PI / 2; disc.position.set(side * 0.04, 0, 0); spin.add(disc);
-      const hub = _mesh(_cyl(r * 0.28, r * 0.40, tw * 1.18, 18), discMat); hub.rotation.z = Math.PI / 2; spin.add(hub);
-      styleFn(spin, r, side, mats, { discMat: discMat, rimPct: rimPct, spokeCount: spokeCount });
+
+      // Hollow cylinder barrel
+      const disc = _mesh(new THREE.CylinderGeometry(r * rimPct, r * rimPct, tw * 0.88, 24, 1, true), discMat);
+      disc.rotation.z = Math.PI / 2;
+      disc.position.set(side * 0.02, 0, 0);
+      spin.add(disc);
+
+      // Sleek center hub
+      if (hp.hollowHub > 0.5) {
+        const hub = _mesh(new THREE.CylinderGeometry(r * 0.15, r * 0.15, tw * 0.22, 18, 1, true), discMat);
+        hub.rotation.z = Math.PI / 2;
+        hub.position.set(side * (tw * 0.5 - 0.08), 0, 0);
+        spin.add(hub);
+      } else {
+        const hub = _mesh(_cyl(r * 0.15, r * 0.15, tw * 0.22, 18), discMat);
+        hub.rotation.z = Math.PI / 2;
+        hub.position.set(side * (tw * 0.5 - 0.08), 0, 0);
+        spin.add(hub);
+      }
+
+      styleFn(spin, r, side, mats, { discMat: discMat, rimPct: rimPct, spokeCount: spokeCount, tw: tw });
       w.add(spin); w.userData = { spinGroup: spin }; w.position.set(x, r, z);
       group.add(w); group.wheels.push(w);
       if (wi < 2) group.frontWheels.push(w);
-      // suspension wishbones — bridge body sidewall → hub so wheels don't float
-      const innerX = side * 0.40, hubX = x - side * 0.10, armLen = Math.abs(hubX - innerX) + 0.04;
-      for (const [ay, dz] of [[r + 0.07, 0.18], [r - 0.10, -0.18]]) {
+      
+      // Auto-connecting suspension wishbones
+      const innerX = side * getBodyHalfWidth(z);
+      const hubX = x - side * 0.10;
+      const armLen = Math.abs(hubX - innerX) + 0.04;
+      const suspY = (hp.suspensionY != null && Number.isFinite(hp.suspensionY)) ? hp.suspensionY : 0.0;
+      const suspZ = (hp.suspensionZ != null && Number.isFinite(hp.suspensionZ)) ? hp.suspensionZ : 0.18;
+      for (const [ay, dz] of [[r + 0.07 + suspY, suspZ], [r - 0.10 + suspY, -suspZ]]) {
         const arm = _mesh(_box(armLen, 0.04, 0.05), mats.carbon);
         arm.position.set((innerX + hubX) / 2, ay, z + dz); arm.rotation.y = side * 0.16; group.add(arm);
       }
@@ -347,12 +552,18 @@
     },
     splitter(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const fs = _mesh(_box(1.7, 0.05, 0.5), M.bodyMat(M.gradMix(0.1), 0)); fs.position.set(0, 0.12, 2.5 * L); g.add(fs);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : 2.5) * L;
+      const fs = _mesh(_box(1.7 * scale, 0.05 * scale, 0.5 * scale), M.bodyMat(M.gradMix(0.1), 0)); fs.position.set(0, 0.12, z); g.add(fs);
     },
     splitterGlow(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const fs = _mesh(_box(1.8, 0.07, 0.5), M.bodyMat(M.gradMix(0.1), 0)); fs.position.set(0, 0.12, 2.5 * L); g.add(fs);
-      const edge = _mesh(_box(1.7, 0.03, 0.05), M.glowMat(M.grad.b, 0.95)); edge.position.set(0, 0.12, 2.74 * L); g.add(edge);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : 2.5) * L;
+      const fs = _mesh(_box(1.8 * scale, 0.07 * scale, 0.5 * scale), M.bodyMat(M.gradMix(0.1), 0)); fs.position.set(0, 0.12, z); g.add(fs);
+      const edge = _mesh(_box(1.7 * scale, 0.03 * scale, 0.05 * scale), M.glowMat(M.grad.b, 0.95)); edge.position.set(0, 0.12, z + 0.24 * scale); g.add(edge);
     },
     halo(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats, z = 0.25 * L;
@@ -362,45 +573,63 @@
     },
     sharkFin(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const fin = _mesh(_box(0.03, 0.42, 1.4 * L), M.bodyMat(M.gradMix(0.85), 0)); fin.position.set(0, 0.65, -0.6 * L); g.add(fin);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -0.6) * L;
+      const fin = _mesh(_box(0.03, 0.42 * scale, 1.4 * L), M.bodyMat(M.gradMix(0.85), 0)); fin.position.set(0, 0.44 + 0.21 * scale, z); g.add(fin);
     },
     diffuser(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const d = _mesh(_box(0.9, 0.06, 0.5), M.carbon); d.position.set(0, 0.10, -2.0 * L); d.rotation.x = 0.18; g.add(d);
-      const bar = _mesh(_box(0.8, 0.02, 0.03), M.glowMat(M.grad.a, 0.8)); bar.position.set(0, 0.08, -2.2 * L); g.add(bar);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -2.0) * L;
+      const d = _mesh(_box(0.9 * scale, 0.06 * scale, 0.5 * scale), M.carbon); d.position.set(0, 0.10, z); d.rotation.x = 0.18; g.add(d);
+      const bar = _mesh(_box(0.8 * scale, 0.02 * scale, 0.03 * scale), M.glowMat(M.grad.a, 0.8)); bar.position.set(0, 0.08, z - 0.2 * scale); g.add(bar);
     },
     exhausts(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      for (const sx of [-1, 1]) { const pipe = _mesh(_cyl(0.05, 0.05, 0.7, 10), M.chrome); pipe.rotation.z = Math.PI / 2; pipe.rotation.y = sx * 0.12; pipe.position.set(sx * 0.34, 0.22, -0.9 * L); g.add(pipe); }
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -0.9) * L;
+      for (const sx of [-1, 1]) { const pipe = _mesh(_cyl(0.05 * scale, 0.05 * scale, 0.7 * scale, 10), M.chrome); pipe.rotation.z = Math.PI / 2; pipe.rotation.y = sx * 0.12; pipe.position.set(sx * 0.34, 0.22, z); g.add(pipe); }
     },
     exposedEngine(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const block = _mesh(_box(0.5, 0.22, 0.4), _stdMat(0x3a3a44, 0.9, 0.4, ctx.envMap)); block.position.set(0, 0.34, -0.55 * L); g.add(block);
-      for (let i = -1; i <= 1; i++) { const cy = _mesh(_cyl(0.05, 0.05, 0.16, 10), M.chrome); cy.position.set(i * 0.14, 0.50, -0.55 * L); g.add(cy); }
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -0.55) * L;
+      const block = _mesh(_box(0.5 * scale, 0.22 * scale, 0.4 * scale), _stdMat(0x3a3a44, 0.9, 0.4, ctx.envMap)); block.position.set(0, 0.23 + 0.11 * scale, z); g.add(block);
+      for (let i = -1; i <= 1; i++) { const cy = _mesh(_cyl(0.05 * scale, 0.05 * scale, 0.16 * scale, 10), M.chrome); cy.position.set(i * 0.14 * scale, 0.34 + 0.16 * scale, z); g.add(cy); }
     },
     hoverChannels(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      for (const sx of [-1, 1]) { const ch = _mesh(_box(0.04, 0.06, 1.4 * L), M.glowMat(M.grad.b, 0.85)); ch.position.set(sx * 0.62, 0.30, 0); g.add(ch); }
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      for (const sx of [-1, 1]) { const ch = _mesh(_box(0.04 * scale, 0.06 * scale, 1.4 * L), M.glowMat(M.grad.b, 0.85)); ch.position.set(sx * 0.62, 0.30, 0); g.add(ch); }
     },
     glowCore(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const noz = _mesh(_cyl(0.18, 0.22, 0.42, 16), M.carbon); noz.rotation.x = Math.PI / 2; noz.position.set(0, 0.22, -2.0 * L); g.add(noz);
-      const core = _mesh(_sph(0.12, 12, 8), M.glowMat(M.grad.b, 1.0)); core.position.set(0, 0.22, -2.1 * L); g.add(core);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -2.0) * L;
+      const noz = _mesh(_cyl(0.18 * scale, 0.22 * scale, 0.42 * scale, 16), M.carbon); noz.rotation.x = Math.PI / 2; noz.position.set(0, 0.22, z); g.add(noz);
+      const core = _mesh(_sph(0.12 * scale, 12, 8), M.glowMat(M.grad.b, 1.0)); core.position.set(0, 0.22, z - 0.1 * scale); g.add(core);
       g.userData.thrusterGlow = core;
     },
     ducktail(ctx) {
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      const dt = _mesh(_box(0.7, 0.05, 0.3), M.bodyMat(M.gradMix(0.6), 0)); dt.position.set(0, 0.40, -1.7 * L); dt.rotation.x = -0.2; g.add(dt);
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
+      const z = (k.z != null ? k.z : -1.7) * L;
+      const dt = _mesh(_box(0.7 * scale, 0.05 * scale, 0.3 * scale), M.bodyMat(M.gradMix(0.6), 0)); dt.position.set(0, 0.40, z); dt.rotation.x = -0.2; g.add(dt);
     },
     chromeTrim(ctx) {
+      const k = ctx.knobs || {};
+      const scale = k.scale != null ? Math.max(0.5, Math.min(2.0, k.scale)) : 1;
       const g = ctx.group, L = ctx.L, M = ctx.mats;
-      for (const sx of [-1, 1]) { const tr = _mesh(_box(0.02, 0.03, 2.4 * L), M.chrome); tr.position.set(sx * 0.36, 0.30, 0); g.add(tr); }
+      for (const sx of [-1, 1]) { const tr = _mesh(_box(0.02 * scale, 0.03 * scale, 2.4 * L), M.chrome); tr.position.set(sx * 0.36, 0.30, 0); g.add(tr); }
     },
     lightBar(ctx) {
-      // concept sheet: "thin emissive light bar on the car" — one glow seam per flank, the car's
-      // neon identity at dusk. Knobs place it half-embedded in the widest hull band (a seam that
-      // touches always reads right; a floating bar reads like a bug): x/y = seam position,
-      // z (in L units) = centre, len (in L units) = length.
       const g = ctx.group, L = ctx.L, M = ctx.mats, k = ctx.knobs || {};
       const x = k.x != null ? k.x : 0.70, y = k.y != null ? k.y : 0.28;
       const len = (k.len != null ? k.len : 1.3) * L, z = (k.z != null ? k.z : -0.4) * L;
@@ -436,7 +665,7 @@
     }
 
     buildCanopy(group, spec.canopy, L, mats);
-    buildWheels(group, hp, L, spec.wheelStyle, mats, ghost, envMap);
+    buildWheels(group, spec, L, spec.wheelStyle, mats, ghost, envMap);
 
     const partCtx = { group: group, mats: mats, hp: hp, L: L, ghost: ghost, envMap: envMap, knobs: null };
     for (const m of spec.mounts) {
@@ -491,7 +720,7 @@
     const group = new THREE.Group();
     hull.station.forEach(function (st, i) {
       const p = hullStationLocalPos(hull, hp, L, i);
-      const handle = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), mat);
+      const handle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), mat);
       handle.position.set(p[0], p[1], p[2]);
       handle.userData = { stationIndex: i };
       handle.renderOrder = 999;
@@ -507,6 +736,63 @@
     handleGroup.children.forEach(function (h) {
       const p = hullStationLocalPos(hull, hp, L, h.userData.stationIndex);
       if (p) h.position.set(p[0], p[1], p[2]);
+    });
+  };
+
+  // T12 cross-section: build 18 ring-point dots for ONE station's cross-section outline. Each dot maps
+  // 1:1 to hull.rings[stationIndex].pts[pointIndex]. Mirror axis is X=0 — dragging point i also moves
+  // the mirror partner (K - i) % K when ring.mirror !== false (applied by the caller during drag).
+  DD.buildCrossHandles = function (spec, stationIndex) {
+    spec = DD.normalizeSpec(spec);
+    const hp = spec.chassis.hardpoints, L = spec.chassis.L, hull = spec.chassis.hull;
+    const st = hull.station[stationIndex]; if (!st) return new THREE.Group();
+    const frontZ = hp.frontZ * L, rearZ = hp.rearZ * L;
+    const wheelbase = frontZ - rearZ, midZ = (frontZ + rearZ) / 2;
+    const WIDTH = 1.18, HEIGHT = 0.92, YB = 0.05;
+    const hw = Math.min(st[1], hull.fenderClamp) * WIDTH;
+    const hgt = Math.max(st[2] * HEIGHT, 0.04);
+    const yc = YB + st[3] * HEIGHT;
+    const wz = st[0] * wheelbase + midZ;
+    const K = 18;
+    // resolve the active pts: override if present, else synthesize from the global ellipse
+    const override = hull.rings && hull.rings[stationIndex] && hull.rings[stationIndex].pts;
+    const pts = [];
+    for (let i = 0; i < K; i++) {
+      const th = (i / K) * Math.PI * 2;
+      if (override && override[i]) { pts.push({ x: override[i].x, y: override[i].y }); }
+      else { pts.push({ x: Math.cos(th), y: Math.sin(th) }); } // unit circle fallback
+    }
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffe66d, depthTest: false });
+    const group = new THREE.Group();
+    for (let i = 0; i < K; i++) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.10, 10, 8), mat);
+      dot.position.set(hw * pts[i].x, yc + hgt * 0.5 * pts[i].y, wz);
+      dot.userData = { stationIndex: stationIndex, pointIndex: i };
+      dot.renderOrder = 1000;
+      group.add(dot);
+    }
+    return group;
+  };
+
+  // Reposition cross-handle dots in place during a drag (no rebuild). Reads the live ring pts.
+  DD.updateCrossHandlePositions = function (handleGroup, spec, stationIndex) {
+    spec = DD.normalizeSpec(spec);
+    const hp = spec.chassis.hardpoints, L = spec.chassis.L, hull = spec.chassis.hull;
+    const st = hull.station[stationIndex]; if (!st) return;
+    const frontZ = hp.frontZ * L, rearZ = hp.rearZ * L;
+    const wheelbase = frontZ - rearZ, midZ = (frontZ + rearZ) / 2;
+    const WIDTH = 1.18, HEIGHT = 0.92, YB = 0.05;
+    const hw = Math.min(st[1], hull.fenderClamp) * WIDTH;
+    const hgt = Math.max(st[2] * HEIGHT, 0.04);
+    const yc = YB + st[3] * HEIGHT;
+    const wz = st[0] * wheelbase + midZ;
+    const override = hull.rings && hull.rings[stationIndex] && hull.rings[stationIndex].pts;
+    handleGroup.children.forEach(function (h) {
+      const i = h.userData.pointIndex; if (i == null) return;
+      let x, y;
+      if (override && override[i]) { x = override[i].x; y = override[i].y; }
+      else { const th = (i / 18) * Math.PI * 2; x = Math.cos(th); y = Math.sin(th); }
+      h.position.set(hw * x, yc + hgt * 0.5 * y, wz);
     });
   };
 
@@ -526,25 +812,124 @@
      of the actual raceway (the gate arches get hidden alongside this in the garage loop branch).
      Sky/mountains/stars/decor are untouched — only the immediate ground + start-gate props swap out,
      which is what keeps the surrounding world/theme intact while giving the car its own stage. */
+  /* Garage stage — replaced with a dedicated self-contained garage room (obsidian floor,
+     indigo vertical gradient backdrop, overhead softbox light rig, and horizontal neon accent wire) */
   DD.buildGarageStage = function (envMap, theme) {
-    const W = 7, D = 10, H = 0.3;
-    const carbonTex = getCarbonTexture();
-    // calm sheen: the original glossy clearcoat threw two huge white specular blobs that
-    // washed out the car it's supposed to present
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, map: carbonTex, metalness: 0.2, roughness: 0.62,
-      bumpMap: carbonTex, bumpScale: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.3,
-      envMapIntensity: 0.45, envMap: envMap || null
+    const group = new THREE.Group();
+
+    // 1. Solid Floor Platform (a beveled circular stage)
+    const stageGeo = new THREE.CylinderGeometry(8.5, 8.5, 0.2, 64);
+    const stageMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0c0c12, // polished obsidian gray
+      metalness: 0.2,
+      roughness: 0.05,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      envMap: envMap || null,
+      envMapIntensity: 1.2
     });
-    const stage = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat);
+    const stage = new THREE.Mesh(stageGeo, stageMat);
+    stage.position.y = -0.1; // top face sits exactly at y = 0
     stage.receiveShadow = true;
-    const rimColor = (theme && theme.accent) ? col(theme.accent) : [0.62, 0.48, 1.0];
-    const rim = new THREE.Mesh(new THREE.BoxGeometry(W + 0.06, 0.03, D + 0.06),
-      new THREE.MeshBasicMaterial({ color: col(rimColor), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
-    rim.position.y = -H / 2;
-    stage.add(rim);
-    return stage;
+    group.add(stage);
+
+    // 2. Backdrop: Radial gradient shader that casts a soft accent spotlight glow
+    const bgGeo = new THREE.PlaneGeometry(80, 50);
+    const accentColor = (theme && theme.accent) ? col(theme.accent) : col([0.62, 0.48, 1.0]);
+    const bgMat = new THREE.ShaderMaterial({
+      uniforms: {
+        accentColor: { value: new THREE.Color().copy(accentColor) }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 accentColor;
+        void main() {
+          // Soft spotlight glow centered at bottom-middle (0.5, 0.2)
+          float d = distance(vUv, vec2(0.5, 0.2));
+          vec3 glow = accentColor * smoothstep(0.7, 0.0, d) * 0.42;
+          vec3 bg = mix(vec3(0.015, 0.015, 0.025), vec3(0.003, 0.003, 0.008), vUv.y);
+          gl_FragColor = vec4(bg + glow, 1.0);
+        }
+      `,
+      depthWrite: false
+    });
+    const backdrop = new THREE.Mesh(bgGeo, bgMat);
+    backdrop.position.set(0, 20, -15); // pushed back slightly
+    group.add(backdrop);
+
+    // 3. Overhead Softbox (Visual mesh representation)
+    const boxGeo = new THREE.BoxGeometry(4, 0.1, 6);
+    const boxMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const softbox = new THREE.Mesh(boxGeo, boxMat);
+    softbox.position.set(0, 5, 0);
+    group.add(softbox);
+
+    // Real light: Overhead DirectionalLight
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    keyLight.position.set(0, 6, 0);
+    keyLight.target.position.set(0, 0, 0);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 10;
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -5;
+    keyLight.shadow.bias = -0.0005;
+    group.add(keyLight);
+    group.add(keyLight.target);
+
+    // Fill light: low ambient
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+    group.add(ambientLight);
+
+    group.name = "garageRoom";
+    return group;
   };
+
+  DD.captureGarageEnvironment = function (renderer, scene, carMesh) {
+    try {
+      const rt = new THREE.WebGLCubeRenderTarget(16, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      const cam = new THREE.CubeCamera(1, 1000, rt);
+      cam.position.set(0, 0.5, 0);
+      
+      let carWasVisible = false;
+      if (carMesh) {
+        carWasVisible = carMesh.visible;
+        carMesh.visible = false;
+      }
+      
+      cam.update(renderer, scene);
+      
+      if (carMesh) {
+        carMesh.visible = carWasVisible;
+      }
+
+      let envTex;
+      if (THREE.PMREMGenerator) {
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        envTex = pmrem.fromCubemap(rt.texture).texture;
+        pmrem.dispose();
+      } else {
+        envTex = rt.texture;
+      }
+      rt.dispose();
+      return envTex;
+    } catch (e) {
+      console.error("Failed to capture garage environment map", e);
+      return null;
+    }
+  };
+
 
   /* trail */
 
