@@ -60,6 +60,22 @@
     slideRearMul: 0.92,     // once sliding, rear stays a touch loose (drifts hold, weak feedback loop)
     slideYawDamp: 1.6,      // extra yaw damping while sliding — slides recover, don't spin
     slideEnter: 0.15, slideExit: 0.07, // rad rear slip hysteresis
+    // ---- high-speed brake-tap slide assist (the "slide is the meta for tight fast entries" tool) ----
+    // Speed-gated so it does NOTHING at low/mid speed (grip stays the fastest line there) and ramps
+    // to full only at race pace, where grip is yaw-capped and plows wide into the wall. Active only in
+    // the slide regime (brake-tap / wheelspin / ice), never in a grip turn.
+    slideAssistVLo: 45,     // m/s (~162 km/h) — below this: no brake-slide latch + zero assist (grip only)
+    slideAssistVHi: 62,     // m/s (~223 km/h) — at/above this: full assist
+    slideRotFree: 0.55,     // 0..1 — how much the anti-spin counter is relaxed in a fast slide so the
+                            // nose actually rotates (0 = counter full = no extra rotation; 1 = counter off)
+    slideCoupling: 6.0,     // 1/s — velocity-follows-heading rate in a fast slide. The anti-understeer:
+                            // pulls the velocity vector onto the rotated nose so the car MAKES the corner
+                            // instead of pointing in while momentum washes wide. 0 = pure model (no help)
+    // Drift-angle stabiliser: the "feels like sliding" pair. The slide SEEKS and HOLDS a target chassis
+    // slip angle (the car sits visibly sideways) instead of snapping to a shallow shunt or spinning. The
+    // held angle scales with steer, so you modulate the slide on the wheel. Only in a fast braked slide.
+    slideAngle: 0.44,       // rad (~25°) — target slip angle at full steer. Bigger = more sideways.
+    slideStab: 10.0,        // how firmly it seeks/holds slideAngle (yaw /s per rad of angle error).
     sdBoost: 1.4,           // speed-drift exploit: small accel while sliding shallow at speed
     // surfaces
     glassGripMul: 0.12, glassSteerMul: 0.6, // glass = ICE: nearly no lateral friction, glide it sideways
@@ -98,7 +114,7 @@
       pitchVis: 0, rollVis: 0,
       grounded: true, onDirt: false,
       idx: track.startIdx,
-      slideState: false, sliding: false, slipR: 0, slipF: 0,
+      slideState: false, sliding: false, slipR: 0, slipF: 0, slideHold: false,
       airTime: 0,
       surf: 0,
       finished: false,
@@ -130,7 +146,7 @@
     car.nextCkpt = c ? c.nextCkpt : 0;
     car.lap = c ? (c.lap || 0) : 0;
     car.awaitSeam = c ? !!c.awaitSeam : false;
-    car.grounded = true; car.onDirt = false; car.slideState = false;
+    car.grounded = true; car.onDirt = false; car.slideState = false; car.slideHold = false;
     car.yawRate = 0; car.steerPos = 0; car.airTime = 0; car.missedCkpt = false;
     car.shiftCut = 0; car.suspY = 0; car.suspV = 0;
     car.gear = 1;
@@ -328,7 +344,18 @@
     // Disabled whenever the player is ASKING for a slide (brake-tap, wheelspin, ice).
     const vRef = Math.max(speed, 2.5);
     const dir = vLong >= 0 ? 1 : -1;
-    const wantSlide = (brake > 0.4 && vLong > 3) || (throttle > 0.85 && speed < 24) || glass;
+    // Brake-slide LATCH (deterministic — steerPos/vLong only, no time/random): a brake-tap breaks the
+    // rear loose and HOLDS the slide while you keep steering into it, so you tap to initiate, carry it
+    // on the wheel, and STRAIGHTEN to exit. Without the hold the rear never builds enough slip to keep
+    // slideState latched, so the "slide" collapses back to a grip turn (the understeer complaint).
+    // Gated to the high-speed window (>= slideAssistVLo): the brake-slide is the fast-corner tool, and
+    // below that speed grip is already the tighter, faster line — latching a raw slide there would only
+    // spin (the assist that stabilises it is speed-gated off). Hysteresis on drop-out (0.85×) so
+    // scrubbing mid-slide doesn't chatter the latch.
+    const brakeSlide = brake > 0.4 && vLong > P.slideAssistVLo;
+    if (brakeSlide) car.slideHold = true;
+    else if (Math.abs(car.steerPos) < 0.15 || vLong < P.slideAssistVLo * 0.85) car.slideHold = false; // straighten / slow = exit
+    const wantSlide = car.slideHold || (throttle > 0.85 && speed < 24) || glass;
     if (!wantSlide && speed > 8) {
       // soft overdrive: light inputs stay fully proportional (you can FEEL the modulation);
       // only steering past the useful band gives diminishing return — no hard clamp, no dead zone.
@@ -376,13 +403,40 @@
       vLat = DD.dampTo(vLat, vLatTarget, 12, dt);
     } else {
       r += ((P.cgF * FyF - P.cgR * FyR) / P.yawInertia) * dt; // bicycle-model yaw moment
+      // high-speed brake-tap slide assist: 0 below slideAssistVLo, full at slideAssistVHi. Only a
+      // fast slide gets it — grip regime and slow slides are untouched.
+      const sa = DD.smoothstep(DD.clamp((speed - P.slideAssistVLo) / Math.max(1, P.slideAssistVHi - P.slideAssistVLo), 0, 1));
       // continuous auto-countersteer: catches runaway spin on any slide (brake-tap, wheelspin,
       // ice). Ramp-gated above 0.04 rad slip so it never blocks initiation, only the over-rotation.
+      // In a fast slide it's relaxed (slideRotFree) so the nose can actually rotate through the corner
+      // — the counter still scales with slip so a true spin is still caught, just later.
       const ramp = DD.smoothstep(DD.clamp((Math.abs(alphaR) - 0.04) / 0.10, 0, 1));
-      r += DD.clamp(alphaR * dir * P.counterAssist * ramp, -2.6, 2.6) * dt;
+      const counterMul = 1 - P.slideRotFree * sa;
+      r += DD.clamp(alphaR * dir * P.counterAssist * counterMul * ramp, -2.6, 2.6) * dt;
+      // drift-angle stabiliser (high-speed braked slide only): seek + HOLD a target chassis slip angle
+      // so the car sits SIDEWAYS at a controllable angle instead of a shallow shunt (counter->0) or a
+      // spin (yaw runaway). Proportional around the target — adds yaw below the angle, catches it above —
+      // so it's inherently spin-safe, and the target scales with steer so you shape the slide on the wheel.
+      if (sa > 0 && car.slideHold && P.slideStab > 0) {
+        const beta = Math.atan2(vLat, vLong);                 // chassis slip: velocity vs nose (signed)
+        const targetBeta = -car.steerPos * P.slideAngle * sa; // slide toward steer, scaled by steer + speed gate
+        r += (targetBeta - beta) * P.slideStab * sa * dt;
+      }
       const yawDamp = DD.lerp(0.6, P.slideYawDamp, DD.clamp(speed / 40, 0, 1)); // always damped
       r *= Math.exp(-dt * yawDamp);
       vLat += (FyF + FyR - r * vLong) * dt;
+      // anti-understeer coupling: rotate the velocity vector toward the (now-rotated) heading so the
+      // car's PATH tightens with the nose instead of plowing wide. Speed-gated (sa) + slide-only, so
+      // it never touches the low/mid-speed grip line. Bounded per-tick so it can't snap or spin.
+      if (sa > 0 && P.slideCoupling > 0) {
+        const velSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
+        if (velSpeed > 1) {
+          let theta = Math.atan2(vLat, vLong);
+          theta -= theta * DD.clamp(P.slideCoupling * sa * dt, 0, 0.5);
+          vLong = velSpeed * Math.cos(theta);
+          vLat = velSpeed * Math.sin(theta);
+        }
+      }
     }
     r = DD.clamp(r, -3.4, 3.4);
 

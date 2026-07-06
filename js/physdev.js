@@ -46,15 +46,25 @@
       ]
     },
     {
-      tab: 'DRIFT',
-      title: 'Drift & Assist',
+      tab: 'SLIDE',
+      title: 'Brake-Tap Slide',
       params: [
-        { key: 'driftYawAuthority', min: 1.0, max: 15.0, step: 0.1, desc: 'Drift rotation authority on the wheel. Higher = rotates faster.' },
-        { key: 'driftCouplingLo', min: 1.0, max: 15.0, step: 0.1, desc: 'Low-speed coupling. Higher = velocity vector aligns with nose faster.' },
-        { key: 'driftCouplingHi', min: 5.0, max: 30.0, step: 0.5, desc: 'High-speed coupling. Higher = tightens drift lines at race speed.' },
-        { key: 'slideRearMul', min: 0.2, max: 1.2, step: 0.02, desc: 'Rear grip scale when sliding. Lower = rear washes out easier.' },
-        { key: 'slideYawDamp', min: 0.2, max: 5.0, step: 0.1, desc: 'Slide yaw stabilizer damping. Higher = dampens spins.' },
-        { key: 'counterAssist', min: 0.0, max: 40.0, step: 0.5, desc: 'Auto-countersteer assist. Higher = catches spins automatically.' }
+        // Entry: how the brake-tap breaks the rear loose and how the nose bites into the corner.
+        { key: 'brakeRearGripMul', min: 0.2, max: 0.9, step: 0.01, desc: 'Rear grip during a brake-tap. LOWER = rear breaks loose easier = more rotation into the slide.' },
+        { key: 'brakeFrontGripMul', min: 0.4, max: 1.0, step: 0.01, desc: 'Front grip during a brake-tap. HIGHER = more nose bite = the slide pulls the car onto a tighter line.' },
+        // The "feels like sliding" pair — how far sideways the car sits, and how firmly it holds there.
+        { key: 'slideAngle', min: 0.0, max: 0.7, step: 0.01, desc: 'How SIDEWAYS the slide sits — target slip angle at full steer, in RADIANS (0.44≈25°, 0.7≈40°). Bigger = more visibly sliding. The angle scales with how far you steer.' },
+        { key: 'slideStab', min: 0.0, max: 20.0, step: 0.5, desc: 'How firmly the slide holds its angle. HIGHER = locks the drift angle in (crisp, spin-safe); LOWER = looser, angle drifts around. 0 = off (back to a shunt).' },
+        // The anti-understeer core — what makes the slide MAKE the tight fast corner instead of plowing.
+        { key: 'slideCoupling', min: 0.0, max: 16.0, step: 0.5, desc: 'Anti-understeer: how hard velocity follows the nose in a fast slide. HIGHER = tighter line, less wall-plow. 0 = off (pure model).' },
+        { key: 'slideRotFree', min: 0.0, max: 1.0, step: 0.05, desc: 'Rotation freedom in a fast slide (relaxes the anti-spin counter so the nose rotates through the corner). HIGHER = rotates more before the assist catches it.' },
+        // Speed window: below Lo the brake-tap just grips (grip stays fastest); above Hi full slide assist.
+        { key: 'slideAssistVLo', min: 20.0, max: 80.0, step: 1.0, desc: 'Slide-assist START speed (m/s; 45≈162 km/h). Below this a brake-tap just grips — grip stays the fast line.' },
+        { key: 'slideAssistVHi', min: 30.0, max: 100.0, step: 1.0, desc: 'Slide-assist FULL speed (m/s; 62≈223 km/h). At/above this the brake-slide gets full rotation + anti-understeer.' },
+        // Stability: how the slide settles and recovers.
+        { key: 'slideYawDamp', min: 0.2, max: 5.0, step: 0.1, desc: 'Slide yaw damping. HIGHER = slide settles/recovers faster; LOWER = looser, holds rotation longer.' },
+        { key: 'counterAssist', min: 0.0, max: 40.0, step: 0.5, desc: 'Auto-countersteer (anti-spin on ANY slide). HIGHER = catches spins harder. This is what slideRotFree relaxes at speed.' },
+        { key: 'slideRearMul', min: 0.2, max: 1.2, step: 0.02, desc: 'Rear grip once sliding. LOWER = rear stays looser through the slide.' }
       ]
     },
     {
@@ -285,6 +295,9 @@
     let groupControls = '';
     group.params.forEach(p => {
       const curVal = DD.PHYS[p.key];
+      // Guard: never render a slider for a key that isn't a live PHYS number (a renamed/removed
+      // constant would otherwise show a blank, dead control — exactly what the old DRIFT tab did).
+      if (typeof curVal !== 'number') { console.warn('[physdev] skipping unknown PHYS key:', p.key); return; }
       groupControls += `
         <div class="phys-control">
           <div class="phys-row-meta">

@@ -330,6 +330,44 @@ console.log('[15] brake-tap slide (steady-state radius)');
   const carBrakeSpin = spawn(V);
   for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(carBrakeSpin, { steer: 1.0, throttle: thr, brake }, FT); }
   check('brake-slide did not spin out', Math.abs(carBrakeSpin.slipR) < 1.0, 'final slipR ' + (carBrakeSpin.slipR * 57.3).toFixed(1) + ' deg');
+
+  // ---- high-speed ENTRY (THE design claim): at race pace into a corner too tight for grip, the brake-
+  // tap slide rotates the car THROUGH the corner in far less track than grip — it MAKES the corner while
+  // grip's yaw cap plows wide into the wall. Measured as forward distance to swing the velocity vector
+  // 60° (less = makes a tighter corner in less room). NOTE: steady-state circle radius is deliberately
+  // NOT used here — a real drift angle scrubs a WIDE steady circle, so holding a drift is slower than
+  // grip on a sustained curve (correct: grip stays the fast line where it's enough). The slide's win is
+  // the ENTRY transient — the fast rotation that makes the geometry of a corner grip can't. ----
+  const Vhi = 69; // ~248 km/h
+  function entryFwd(V0, ctl) {
+    const c = spawn(V0); const z0 = c.pos[2];
+    for (let t = 0; t < 60 * 6; t++) {
+      DD.stepCar(c, ctl(t), FT);
+      if (Math.abs(Math.atan2(c.vel[0], c.vel[2])) >= Math.PI / 3) return c.pos[2] - z0; // velocity swung 60°
+    }
+    return Infinity;
+  }
+  const gripEntry = entryFwd(Vhi, () => ({ steer: 1, throttle: 1, brake: 0 }));
+  const slideEntry = entryFwd(Vhi, (t) => (t < 8 ? { steer: 1, throttle: 0, brake: 1 } : { steer: 1, throttle: 1, brake: 0 }));
+  check('high-speed: brake-slide makes the corner in far less room than grip (the crossover)', slideEntry < gripEntry * 0.8,
+    'rotate 60deg — brake-slide ' + slideEntry.toFixed(0) + 'm vs grip ' + gripEntry.toFixed(0) + 'm');
+  const carHiSpin = spawn(Vhi);
+  for (let t = 0; t < SETTLE + MEASURE; t++) { const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1; DD.stepCar(carHiSpin, { steer: 1.0, throttle: thr, brake }, FT); }
+  check('high-speed brake-slide did not spin out', Math.abs(carHiSpin.slipR) < 1.0, 'final slipR ' + (carHiSpin.slipR * 57.3).toFixed(1) + ' deg');
+
+  // It must FEEL like a slide, not a shunt: the drift-angle stabiliser holds a real chassis slip angle
+  // (the car sits visibly sideways) — but bounded, so it's a controlled drift and not a spin.
+  const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const carAngle = spawn(Vhi);
+  let slipDeg = 0;
+  for (let t = 0; t < SETTLE + MEASURE; t++) {
+    const brake = (t < 8) ? 1 : 0; const thr = brake ? 0 : 1;
+    DD.stepCar(carAngle, { steer: 1.0, throttle: thr, brake }, FT);
+    if (t >= SETTLE) slipDeg += Math.abs(wrapPi(carAngle.yaw - Math.atan2(carAngle.vel[0], carAngle.vel[2])) * 57.3);
+  }
+  slipDeg /= MEASURE;
+  check('high-speed slide holds a real drift angle (sideways, feels like sliding)', slipDeg > 12 && slipDeg < 45,
+    'mean slip ' + slipDeg.toFixed(1) + ' deg');
 }
 
 /* ---- [16] closed circuits: loop closure geometry + multilap completion ---- */
