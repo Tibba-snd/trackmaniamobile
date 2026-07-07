@@ -62,7 +62,7 @@
     // Per-star size + colour + twinkle phase in ONE draw call via a custom point shader; additive
     // so they glow against the night and catch a touch of bloom.
     const dense = theme.atmosphere === 'starfield' || theme.biome === 'neon';
-    const n = dense ? 1700 : 950;
+    const n = dense ? 2200 : 1300;
     const pos = new Float32Array(n * 3);
     const colr = new Float32Array(n * 3);
     const siz = new Float32Array(n);
@@ -512,6 +512,46 @@
     return mesh;
   }
 
+  /* ---------------- ROAD BODY — vertical side skirts give the ribbon 3D girth ----------------
+     The ribbon is a flat slab decal; on a fill-bound GPU geometry is ~free, so drop a solid side
+     wall down each edge so the track reads as a raised deck, not a sticker. Dark asphalt-side
+     material; 1 draw call; skips gap seams. */
+  function buildRoadBody(track, theme) {
+    const ss = track.samples, n = ss.length;
+    const depth = 1.9;                       // how far the slab drops below the road surface
+    const pos = [], idx = [];
+    let vi = 0;
+    const push = (a) => { pos.push(a[0], a[1], a[2]); return vi++; };
+    for (let i = 0; i < n - 1; i++) {
+      const s = ss[i], s2 = ss[i + 1];
+      if (s.gap || s2.gap) continue;
+      const wl = s.w / 2, wl2 = s2.w / 2;
+      // left side face
+      const Lt = V.addS(s.p, s.r, -wl), Lb = V.addS(Lt, s.u, -depth);
+      const Lt2 = V.addS(s2.p, s2.r, -wl2), Lb2 = V.addS(Lt2, s2.u, -depth);
+      { const a = push(Lt), b = push(Lb), c = push(Lt2), d = push(Lb2); idx.push(a, b, c, b, d, c); }
+      // right side face
+      const Rt = V.addS(s.p, s.r, wl), Rb = V.addS(Rt, s.u, -depth);
+      const Rt2 = V.addS(s2.p, s2.r, wl2), Rb2 = V.addS(Rt2, s2.u, -depth);
+      { const e = push(Rt), f = push(Rb), g = push(Rt2), h = push(Rb2); idx.push(e, g, f, f, g, h); }
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const t = theme.skyBottom;
+    const mat = new THREE.MeshStandardMaterial({
+      color: col([0.04 + t[0] * 0.03, 0.04 + t[1] * 0.03, 0.05 + t[2] * 0.04]),
+      roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide, envMapIntensity: 0.25
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.frustumCulled = false;
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    return mesh;
+  }
+
   function buildStrip(track, theme, offsetFn, color, opacity, blending) {
     // generic thin strip builder along track; offsetFn(s) -> [centerOffsetVec, halfWidthVec] or null to skip
     const ss = track.samples;
@@ -569,10 +609,12 @@
       for (let i = Math.max(2, c.entry - 3); i < Math.min(ss.length - 1, c.end + 3); i++) {
         const s = ss[i], sN = ss[i + 1];
         if (!s || !sN || s.gap || sN.gap) continue;
+        // inner edge sits on the deck; outer edge lifts ~0.12 so the kerb is a beveled 3D rumble
+        // strip (catches light on its slope) instead of a flat painted sticker.
         const e1 = V.addS(V.addS(s.p, s.r, side * (s.w / 2)), s.u, 0.035);
-        const o1 = V.addS(e1, s.r, side * kerbW);
+        const o1 = V.addS(V.addS(e1, s.r, side * kerbW), s.u, 0.12);
         const e2 = V.addS(V.addS(sN.p, sN.r, side * (sN.w / 2)), sN.u, 0.035);
-        const o2 = V.addS(e2, sN.r, side * kerbW);
+        const o2 = V.addS(V.addS(e2, sN.r, side * kerbW), sN.u, 0.12);
         addQuad(e1, o1, e2, o2, (i % 2 === 0) ? white : stripe);
       }
     }
@@ -1813,16 +1855,17 @@
 
   function buildHorizonMountains(track, theme, rng) {
     const group = new THREE.Group();
-    const numLayers = 3;
-    const numMountains = 24;
-    
+    const numLayers = 4;
+    const numMountains = 30;
+
     const coneGeo = new THREE.ConeGeometry(1, 1, 5);
     coneGeo.translate(0, 0.5, 0);
-    
+
     const colors = [
       col([theme.skyBottom[0] * 0.22, theme.skyBottom[1] * 0.22, theme.skyBottom[2] * 0.28]),
       col([theme.skyBottom[0] * 0.14, theme.skyBottom[1] * 0.14, theme.skyBottom[2] * 0.20]),
-      col([theme.skyBottom[0] * 0.08, theme.skyBottom[1] * 0.08, theme.skyBottom[2] * 0.12])
+      col([theme.skyBottom[0] * 0.08, theme.skyBottom[1] * 0.08, theme.skyBottom[2] * 0.12]),
+      col([theme.skyBottom[0] * 0.05, theme.skyBottom[1] * 0.05, theme.skyBottom[2] * 0.09])
     ];
 
     // Compute track bounding box to center the mountains dynamically
@@ -1963,6 +2006,33 @@
     return group;
   }
 
+  /* ---------------- GODRAYS — far-parallax light shafts, depth-occluded by terrain ----------------
+     NOT a fullscreen post pass (fill-bound GPU = expensive). Geometry shafts hung high in the far
+     sky near the sun azimuth, raking down toward the horizon. depthTest stays ON so foreground
+     ridges/decor EAT the shaft bases — that occlusion is what reads as volumetric instead of a
+     floating transparent quad. Camera-followed like the planet so they hold their far parallax. */
+  function buildGodrays(track, theme) {
+    const group = new THREE.Group();
+    const tex = getAuroraTexture();                         // soft 0→1→0 gradient along length
+    const rayCol = V.lerp(theme.accent2, [1, 1, 1], 0.6);   // warm-white shaft
+    const N = 5;
+    for (let i = 0; i < N; i++) {
+      const clonedTex = tex.clone(); clonedTex.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({
+        color: col(rayCol), map: clonedTex, transparent: true,
+        opacity: 0.06, blending: THREE.AdditiveBlending,
+        depthWrite: false, side: THREE.DoubleSide, fog: false
+      });
+      const t = i / (N - 1) - 0.5;                          // -0.5..0.5 fan across the sky
+      const geo = new THREE.PlaneGeometry(70 + Math.abs(t) * 45, 1500);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(t * 520 + Math.sin(theme.lightAngle) * 260, 360, -1150);
+      m.rotation.set(-0.55, t * 0.6, t * 0.9);              // rake down + fan outward
+      group.add(m);
+    }
+    return group;
+  }
+
   function buildSciFiPlanet(theme, rng) {
     const group = new THREE.Group();
     // A luminous dream-moon. `fog: false` is load-bearing: the planet sits beyond fogFar, so
@@ -2010,6 +2080,7 @@
   DD._sceneShared.buildTerrain = buildTerrain;
   DD._sceneShared.buildTerrainGrid = buildTerrainGrid;
   DD._sceneShared.buildRibbon = buildRibbon;
+  DD._sceneShared.buildRoadBody = buildRoadBody;
   DD._sceneShared.buildStrip = buildStrip;
   DD._sceneShared.buildKerbs = buildKerbs;
   DD._sceneShared.buildCornerSigns = buildCornerSigns;
@@ -2025,6 +2096,7 @@
   DD._sceneShared.buildNebulae = buildNebulae;
   DD._sceneShared.getAuroraTexture = getAuroraTexture;
   DD._sceneShared.buildAurora = buildAurora;
+  DD._sceneShared.buildGodrays = buildGodrays;
   DD._sceneShared.buildSciFiPlanet = buildSciFiPlanet;
 
   function buildBoostPads(track, theme) {

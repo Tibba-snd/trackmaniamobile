@@ -65,15 +65,31 @@
     const fin = { metal: Math.max(0, Math.min(1, fb.metal + mBias)), rough: fb.rough, clearcoat: fb.clearcoat, ccRough: fb.ccRough };
     const gradMix = (t) => V.lerp(grad.a, grad.b, t);
     // 'body' slot — gradient pulled toward dark metal (liveried, not a toy). The boostShell/iridescent hull.
-    const bodyMat = (c, emisAmt) => new THREE.MeshPhysicalMaterial({
-      color: col(emisAmt ? c : V.lerp(c, [0.06, 0.06, 0.08], ghost ? 0.45 : 0.32)),
-      metalness: fin.metal, roughness: fin.rough,
-      clearcoat: fin.clearcoat, clearcoatRoughness: fin.ccRough,
-      transparent: trans, opacity: op,
-      emissive: emisAmt ? col(c) : (finish === 'Neon Edge' ? col(grad.b) : 0x000000),
-      emissiveIntensity: emisAmt || (finish === 'Neon Edge' ? 0.5 : 0),
-      envMapIntensity: ghost ? 0.4 : 1.0, envMap: envMap || null
-    });
+    // Fresnel silhouette rim light injected on solid shells (not ghost, not self-emissive glow slots):
+    // grazing-angle emissive that traces the car outline against the dark bg. Car pixels only = cheap.
+    const _rimCol = new THREE.Color(...V.lerp(grad.b, [1, 1, 1], 0.35));
+    const bodyMat = (c, emisAmt) => {
+      const m = new THREE.MeshPhysicalMaterial({
+        color: col(emisAmt ? c : V.lerp(c, [0.06, 0.06, 0.08], ghost ? 0.45 : 0.32)),
+        metalness: fin.metal, roughness: fin.rough,
+        clearcoat: fin.clearcoat, clearcoatRoughness: fin.ccRough,
+        transparent: trans, opacity: op,
+        emissive: emisAmt ? col(c) : (finish === 'Neon Edge' ? col(grad.b) : 0x000000),
+        emissiveIntensity: emisAmt || (finish === 'Neon Edge' ? 0.5 : 0),
+        envMapIntensity: ghost ? 0.4 : 1.0, envMap: envMap || null
+      });
+      if (!ghost && !emisAmt) {
+        m.onBeforeCompile = (shader) => {
+          shader.uniforms.uRimColor = { value: _rimCol };
+          shader.uniforms.uRimPow = { value: 2.6 };
+          shader.uniforms.uRimI = { value: 0.85 };
+          shader.fragmentShader = 'uniform vec3 uRimColor;\nuniform float uRimPow;\nuniform float uRimI;\n' +
+            shader.fragmentShader.replace('#include <emissivemap_fragment>',
+              '#include <emissivemap_fragment>\n  float rimF = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), uRimPow);\n  totalEmissiveRadiance += uRimColor * rimF * uRimI;');
+        };
+      }
+      return m;
+    };
     // 'glow' slot — emissive + bloom only (NEVER a real light: protects the light pool / texture-unit limit)
     const gi = (palette && palette.glowI != null) ? palette.glowI : 0.9;
     const glowMul = Math.min(1.3, 0.55 + gi * 0.55);

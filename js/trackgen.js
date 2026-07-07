@@ -76,16 +76,18 @@
       },
       crest: () => {
         const len = rng.range(70, 110), w = wVar(), mag = rng.range(0.10, 0.20) * DD.lerp(0.8, 1.3, t01);
+        // C-infinity pitch pulse (rise then fall) instead of hard step targets — the old
+        // t<0.4/t<0.7 steps kinked the pitch derivative at the seams = the visible vertical crease.
         return { name: 'crest', len, fn: (d) => {
           const t = d / len;
-          return { curv: 0, pitchT: t < 0.4 ? mag : (t < 0.7 ? -mag : 0), bankT: 0, widthT: w };
+          return { curv: 0, pitchT: mag * Math.sin(t * Math.PI * 2), bankT: 0, widthT: w };
         } };
       },
       dip: () => {
         const len = rng.range(70, 110), w = wVar(), mag = rng.range(0.10, 0.18);
         return { name: 'dip', len, fn: (d) => {
           const t = d / len;
-          return { curv: 0, pitchT: t < 0.4 ? -mag : (t < 0.7 ? mag : 0), bankT: 0, widthT: w };
+          return { curv: 0, pitchT: -mag * Math.sin(t * Math.PI * 2), bankT: 0, widthT: w };
         } };
       },
       kicker: () => {
@@ -368,9 +370,11 @@
 
     function decorate(p, name) {
       p.rail = rng.chance(RAIL_CHANCE[name] != null ? RAIL_CHANCE[name] : 0.7);
-      if (['straight', 'sweeper', 'weave', 'boost', 'chicane', 'banked'].includes(name) && !p.brakingZone && rng.chance(0.65)) {
-        p.bumpA = rng.range(0.015, 0.05) + (tier - 1) * 0.005;
-        p.bumpW = rng.range(22, 55);
+      if (['straight', 'sweeper', 'weave', 'boost', 'chicane', 'banked'].includes(name) && !p.brakingZone && rng.chance(0.55)) {
+        // gentler + longer-wavelength surface undulation — old amplitude/frequency read as a
+        // "weird wiggle" up and down rather than a subtle rolling surface.
+        p.bumpA = rng.range(0.008, 0.022) + (tier - 1) * 0.003;
+        p.bumpW = rng.range(40, 80);
         p.bumpP = rng.range(0, Math.PI * 2);
       }
       return p;

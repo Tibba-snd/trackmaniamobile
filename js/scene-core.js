@@ -278,8 +278,9 @@
   DD.captureEnvironment = function (renderer, scene, track) {
     try {
       if (track._envRT) track._envRT.dispose();
-      // Reduced resolution to 16 to blur the env probe more, creating broad and soft reflections
-      const rt = new THREE.WebGLCubeRenderTarget(16, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      // Res 128: legible nebula/sky/terrain in the reflection. Rendered ONCE at load (static
+      // furniture) so runtime cost ~0; PMREM roughness-blur below still softens for matte materials.
+      const rt = new THREE.WebGLCubeRenderTarget(128, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
       const cam = new THREE.CubeCamera(1, 5000, rt);
       const s = track.samples[track.startIdx];
       cam.position.set(s.p[0], s.p[1] + 6, s.p[2]);
@@ -333,6 +334,7 @@
     track.fireflies = DD._sceneShared.buildFireflies(track, theme, rng);
     root.add(track.fireflies);
     root.add(DD._sceneShared.buildRibbon(track, theme));
+    { const body = DD._sceneShared.buildRoadBody(track, theme); if (body) root.add(body); }
 
     // edge glow strips
     const edge = (side) => DD._sceneShared.buildStrip(track, theme,
@@ -450,6 +452,10 @@
       const planet = DD._sceneShared.buildSciFiPlanet(theme, rng);
       root.add(planet);
       track.planetMesh = planet;
+
+      const godrays = DD._sceneShared.buildGodrays(track, theme);
+      root.add(godrays);
+      track.godrayMesh = godrays;
     }
 
     // NIGHT lighting: cool moonlight from the sky, a warm directional sun grazing
@@ -726,18 +732,7 @@
     if (landed && fallSpeed > 2) {
       ipAddS(camState.shake, camState.shake, up, -0.6 * DD.clamp(fallSpeed / 22, 0, 1));
     }
-    if (car.hitWall) {
-      if (vmag > 1) {
-        ipNorm(camVelDir, camVproj);
-        // O7: Scale wall-impact camera shake kick with normalized speed (sv)
-        const kickMag = -0.3 - sv * 1.2;
-        ipAddS(camState.shake, camState.shake, camVelDir, kickMag);
-      } else {
-        ipAddS(camState.shake, camState.shake, camF, -0.3);
-      }
-      // O7: Inject a temporary FOV punch on heavy wall impacts (sv * 15 degrees)
-      camState.fov = camState.fov + sv * 15;
-    }
+    // Wall-hit camera kick + FOV punch removed — read as jumpy, not impactful. Landing kick kept.
     camState.prevGrounded = car.grounded;
     camState.prevVelY = vel[1];
 
@@ -767,6 +762,7 @@
       // apparent direction; group rotation in the loop = slow drift across the sky)
       if (track.planetMesh) track.planetMesh.position.copy(camera.position);
       if (track.nebulaeMesh) track.nebulaeMesh.position.copy(camera.position);
+      if (track.godrayMesh) track.godrayMesh.position.copy(camera.position);
       if (track.auroraMesh) {
         track.auroraMesh.position.copy(camera.position);
         if (track.auroraMaterials) {

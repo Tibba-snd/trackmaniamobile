@@ -90,7 +90,9 @@
     shoulderWidth: 2.2,
     shoulderScrub: 0.99,
     shoulderPush: 9,
-    wallBounce: 0.22,
+    carHalfW: 0.8,           // capsule half-width: clamp the car BODY at the wall, not its centre
+                             // point (stops the visible clip-through / "bug out" on contact).
+    wallBounce: 0.08,        // low (was 0.22): pinball reflection flung the car; now it scrapes/slides
     wallFriction: 0.97,      // reverted from 0.94 (too punishing — every scrape on a narrow track
                              // killed momentum). 0.97 = light scrape cost (~3%/contact) without the
                              // "every small touch loses the run" feel. Wall-riding is solved by wider
@@ -549,15 +551,19 @@
     if (!s.wall || s.gap) return;
     const rel = V.sub(car.pos, s.p);
     const lat = V.dot(rel, s.r);
-    const lim = s.w / 2 - 0.55;
+    const lim = s.w / 2 - P.carHalfW;   // capsule: car body edge, not centre
     if (Math.abs(lat) > lim && car.grounded && !car.onDirt) {
       car.pos = V.addS(car.pos, s.r, (Math.sign(lat) * lim) - lat);
       const vr = V.dot(car.vel, s.r);
-      car.vel = V.addS(car.vel, s.r, -vr * (1 + P.wallBounce));
-      // ponytail: only punish active wall impacts, gentle scrape friction when sliding along
-      const impact = vr * Math.sign(lat);
-      const fMul = impact > 0.15 ? P.wallFriction : DD.lerp(1, P.wallFriction, 0.12);
-      car.vel = V.scale(car.vel, fMul);
+      // damped SLIDE: only cancel velocity heading INTO the wall (same sign as the overshoot).
+      // The old unconditional reflect fired even while leaving the wall = a clamp/bounce/re-clamp
+      // oscillation that flung the car. Tangential velocity is untouched, so you scrape along.
+      if (Math.sign(vr) === Math.sign(lat) && vr !== 0) {
+        car.vel = V.addS(car.vel, s.r, -vr * (1 + P.wallBounce));
+        const impact = Math.abs(vr);
+        const fMul = impact > 0.15 ? P.wallFriction : DD.lerp(1, P.wallFriction, 0.12);
+        car.vel = V.scale(car.vel, fMul);
+      }
       // no yawRate damping to prevent getting stuck in walls
       car.hitWall = true;
     }

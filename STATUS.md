@@ -94,6 +94,62 @@ These are real today (the code, not the marketing). Roughly high→low impact.
 
 ---
 
+## Resolved this pass — efficient-graphics batch + track feel (2026-07-07)
+
+Agenda premise (see [[driftdream-perf-profile]]): the game is **GPU/fill-rate bound**, not geometry
+bound — so spend richness in geometry/vertex space + per-material shader terms, and refuse new
+fullscreen fill passes (DoF/SSAO stay deferred). Nine items across three batches, all verified.
+
+**Batch 1 — car + reflection (visual, zero test risk)**
+1. **Fresnel silhouette rim light** — grazing-angle emissive injected via `onBeforeCompile` in
+   `makeCarMaterials` `bodyMat` (`scene-car.js`), on solid shells only (not ghost, not self-emissive
+   glow slots). Traces the car outline against the dark bg; costs car pixels only. Deliberately a
+   shader term, NOT a real light — sidesteps the light-pool / texture-unit limit
+   ([[driftdream-light-pool]], [[driftdream-texture-unit-limit]]).
+2. **Env cube 16→128** (`scene-core.js` `captureEnvironment`) — the reflected nebula/sky/terrain is
+   legible now instead of mush. Rendered once at load (static furniture) so runtime cost ~0; PMREM
+   still roughness-blurs for matte materials.
+3. **Richness** — stars 950/1700 → 1300/2200; horizon mountains 3→4 parallax layers (+a 4th, darkest
+   distance ring), 24→30 per ring.
+
+**Batch 2 — road body + feel (visual)**
+4. **Track girth** — new `buildRoadBody` (`scene-decor.js`): vertical side-skirt slab (drops 1.9m
+   below each edge) so the ribbon reads as a raised deck, not a flat decal. 1 draw call, dark
+   asphalt-side material, skips gap seams. Added right after `buildRibbon` in the orchestrator.
+5. **Wall-hit camera kick removed** (`scene-core.js` `updateCamera`) — the `car.hitWall` positional
+   shake + FOV punch read as jumpy, not impactful. Deleted; the landing kick is kept.
+6. **Kerbs → 3D** — `buildKerbs` outer edge lifted 0.12 so rumble strips are beveled (catch light on
+   the slope) instead of flat painted stickers.
+7. **Godrays** — new `buildGodrays` (`scene-decor.js`): far-parallax additive light shafts near the
+   sun azimuth, raking down. **depthTest stays ON** so foreground ridges/decor occlude the shaft
+   bases — that occlusion is what reads as volumetric (vs a floating quad). Camera-followed like the
+   planet. NOT a fullscreen post pass (fill-bound GPU).
+
+**Batch 3 — physics/gen (Claude-owned; moves e2e goldens, headless suite still green)**
+8. **Vertical smoothness** (`trackgen.js`): crest/dip hard-step pitch targets (`t<0.4 ? mag : …`)
+   replaced with a C-∞ pulse `mag·sin(2πt)` — kills the derivative jump at piece seams that caused
+   the visible vertical crease. `bumpA` undulation halved (0.015–0.05 → 0.008–0.022) + wavelength
+   ~2× (22–55 → 40–80m) + chance 0.65→0.55 — the "weird wiggle" is now a subtle rolling surface.
+   Jumps (kicker/jumpgap/bigjump) left sharp on purpose (snapPitch launch feel).
+9. **Wall collision** (`physics.js` `postWallClamp`): new `P.carHalfW 0.8` capsule so the car BODY
+   clamps at the wall, not its centre point (no clip-through / "bug out"). Reflection now fires ONLY
+   when moving INTO the wall (`sign(vr)===sign(lat)`) — the old unconditional reflect oscillated
+   clamp/bounce/re-clamp = the fling; tangential velocity is preserved so you scrape along.
+   `wallBounce 0.22→0.08` (scrape, not pinball).
+
+**Verified:** `node --check` all touched files; full suite green — **drivability 45/45**, determinism
+(still deterministic → no headless re-baseline), colors 4500, m2 18, camera 21, sky, carspec 111.
+Live: track builds (no NaN), `composer.render()` clean with every new shader/mesh (rim compiled, no
+program errors), Batch-2 shot confirmed girth + godrays + layered horizon; 60fps / cpu 2.8ms / tris
+173k (geometry adds cost ~0, as the fill-bound profile predicts). Cache-busters: **scene-core v58,
+scene-decor v57, scene-car v58, trackgen v24, physics v29**.
+
+**Still open:** human playtest of wall-slide + track-smoothness feel; e2e golden re-baseline on host
+(`node tests/e2e_runner.js -u` — trackgen geometry + visuals moved); `apk-build/sync.bat`. Deferred
+by design: DoF, SSAO (fill-heavy).
+
+---
+
 ## Resolved this pass — integration gaps (2026-06-23)
 
 Audit of "exists in code but never reaches the screen / never fires." Fixed:
