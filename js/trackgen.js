@@ -198,6 +198,7 @@
         let minDistSq = 1e18;
         let nearestSample = null;
         let clampY = 1e9;
+        let deckCapY = 1e9; // hard under-deck ceiling — applied LAST, even after the carve
         for (let sIdx = 0; sIdx < samples.length; sIdx += 2) {
           const s = samples[sIdx];
           const dx = x - s.p[0];
@@ -206,6 +207,9 @@
           if (dSq < minDistSq) { minDistSq = dSq; nearestSample = s; }
           const roadEdge = s.w / 2 + 1.0;
           const limitDist = roadEdge + 10.0;
+          if (!s.gap && dSq < roadEdge * roadEdge) {
+            deckCapY = Math.min(deckCapY, s.p[1] - Math.abs(s.r[1]) * (s.w / 2) - 0.08);
+          }
           if (dSq < limitDist * limitDist) {
             if (s.gap) {
               clampY = Math.min(clampY, s.p[1] - 12.0); // chasm under gaps
@@ -217,10 +221,19 @@
               // (nearest sample, exact) shapes apron terrain; allow up to 1.5 m above each
               // sample's own edge so neighbours can't re-ledge the shelf. apronReach = flag
               // blurred ±12 samples (the clamp radius), full strength.
-              let drop = 1.25;
               const ap = s.apronReach || 0;
-              if (ap && ((dx * s.r[0] + dz * s.r[2]) * ap > 0 || dSq < roadEdge * roadEdge)) drop = -1.5;
-              clampY = Math.min(clampY, minRoadY - drop); // clear road edges on banking
+              if (ap && (dx * s.r[0] + dz * s.r[2]) * ap > 0) {
+                // apron SIDE: relaxed for the flush shelf, capped at the LOCAL road max
+                // (apronCapY) so bumpA troughs can't re-ledge their crest neighbours' shelf —
+                // but never above this road's own deck line
+                clampY = Math.min(clampY, s.apronCapY);
+              } else if (ap && dSq < roadEdge * roadEdge) {
+                // UNDER the deck near an apron: flush against this sample's own edge (kills the
+                // bilinear bleed on narrow decks) but never above the deck surface itself
+                clampY = Math.min(clampY, minRoadY - 0.08);
+              } else {
+                clampY = Math.min(clampY, minRoadY - 1.25); // clear road edges on banking
+              }
             }
           }
         }
@@ -318,6 +331,10 @@
             }
           }
         }
+
+        // absolute deck-footprint ceiling — NOTHING (conform, relax, carve) may end above a
+        // deck's underside. This is the invariant Tibba's "terrain clips into the road" broke.
+        if (deckCapY < 1e9) h = Math.min(h, deckCapY);
 
         heights[j * RES + i] = h;
         hMin = Math.min(hMin, h); hMax = Math.max(hMax, h);
@@ -826,6 +843,18 @@
             const s = samples[k];
             if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || s.p[1] - minTrackY > 8.0) { ok = false; break; }
           }
+          // no aprons where ANOTHER stretch of track runs close by (closure beside the opening
+          // straight, near-parallel passes): the flush shelf would sit in the other road's space
+          if (ok) {
+            const mid = samples[(a0 + a1) >> 1];
+            for (let j = 0; j < samples.length; j += 4) {
+              let di = Math.abs(j - ((a0 + a1) >> 1));
+              if (closed) di = Math.min(di, samples.length - di);
+              if (di < 40) continue;
+              const ddx = mid.p[0] - samples[j].p[0], ddz = mid.p[2] - samples[j].p[2];
+              if (ddx * ddx + ddz * ddz < 34 * 34) { ok = false; break; }
+            }
+          }
           if (!ok) continue;
           // sweepers: apron goes on the OUTSIDE of the turn (curv>0 turns toward +r → outside -r)
           const dyaw = DD.angleDiff(samples[a0].yaw, samples[a1 - 1].yaw);
@@ -846,22 +875,24 @@
        skipped), chord clear of unrelated track geometry, sane length ratio + slope. The whole
        corner inside gets apron flags so the mouths are flush and the safety clamp lifts. */
     const shortcuts = [];
+    const cutStats = { corners: 0, minRad: 0, span: 0, ckpt: 0, gapNear: 0, bank: 0, chord: 0, basin: 0, clear: 0, cands: 0 };
     if (!isMenu) {
       const rngS = DD.makeRng(seedStr + '::shortcut');
       const n = samples.length;
       const cands = [];
       for (const c of corners) {
-        if (c.minRad > 65) continue; // hairpins/tightens only — sweepers aren't worth cutting
+        cutStats.corners++;
+        if (c.minRad > 95) { cutStats.minRad++; continue; } // anything genuinely cornering; long sweepers excluded
         const e0 = Math.max(c.entry - 6, startIdx + 30);
         const e1 = Math.min(c.end + 6, finishIdx - 30);
-        if (e1 - e0 < 20) continue;
-        if (checkpoints.some(k => k > e0 && k <= e1)) continue; // checkpoint audit
+        if (e1 - e0 < 20) { cutStats.span++; continue; }
+        if (checkpoints.some(k => k > e0 && k <= e1)) { cutStats.ckpt++; continue; } // checkpoint audit
         const sA = samples[e0], sB = samples[e1];
-        if (sA.gap || sB.gap) continue;
-        if (Math.abs(sA.bank) > 0.06 || Math.abs(sB.bank) > 0.06) continue;
+        if (sA.gap || sB.gap) { cutStats.gapNear++; continue; }
+        if (Math.abs(sA.bank) > 0.10 || Math.abs(sB.bank) > 0.10) { cutStats.bank++; continue; }
         let spanOk = true;
         for (let j = e0; j <= e1; j++) { if (samples[j].gap || samples[j].surf !== 0) { spanOk = false; break; } }
-        if (!spanOk) continue;
+        if (!spanOk) { cutStats.gapNear++; continue; }
         const side = c.insideSign;
         const a = V.addS(V.clone(sA.p), sA.r, side * (sA.w / 2 + 2.0));
         const b = V.addS(V.clone(sB.p), sB.r, side * (sB.w / 2 + 2.0));
@@ -869,16 +900,18 @@
         b[1] = sB.p[1] - Math.abs(sB.r[1]) * (sB.w / 2) - 0.15;
         const chord = Math.hypot(b[0] - a[0], b[2] - a[2]);
         const arc = (e1 - e0) * DS;
-        if (chord < 30 || chord > 160 || chord > arc * 0.72) continue; // must be a real cut
-        if (Math.abs(b[1] - a[1]) / chord > 0.12) continue;            // dirt ramp too steep
+        // a cut pays off via distance AND entry speed (the corner brakes to ~26-30 m/s, the
+        // chord doesn't) — near-par chords are still a real line choice on sharp corners
+        if (chord < 20 || chord > 160 || chord > arc * 0.92) { cutStats.chord++; continue; }
+        if (Math.abs(b[1] - a[1]) / chord > 0.12) { cutStats.chord++; continue; }            // dirt ramp too steep
         // deep-basin check: the carve blends over ~22 m — a chord across a natural drop much
         // deeper than that leaves cliff walls at grid scale. Probe the noise field mid-chord.
         let basinOk = true;
         for (const tq of [0.3, 0.5, 0.7]) {
           const qx = a[0] + (b[0] - a[0]) * tq, qz = a[2] + (b[2] - a[2]) * tq;
-          if (DD.lerp(a[1], b[1], tq) - natH(qx, qz, DD.lerp(a[1], b[1], tq) + 0.15) > 16) { basinOk = false; break; }
+          if (DD.lerp(a[1], b[1], tq) - natH(qx, qz, DD.lerp(a[1], b[1], tq) + 0.15) > 20) { basinOk = false; break; }
         }
-        if (!basinOk) continue;
+        if (!basinOk) { cutStats.basin++; continue; }
         // clearance: the chord must not pass near UNRELATED track geometry
         const abx = b[0] - a[0], abz = b[2] - a[2], len2 = chord * chord;
         // adjacent gap pieces poison the corridor: their chasm clamp (p[1]-12) digs a hole in
@@ -895,11 +928,12 @@
           const near2 = samples[j].gap ? 26 * 26 : 15 * 15; // gap chasms reach further
           if (dx * dx + dz * dz < near2 && Math.abs(sp[1] - DD.lerp(a[1], b[1], t)) < 14) { clear = false; break; }
         }
-        if (!clear) continue;
+        if (!clear) { cutStats.clear++; continue; }
+        cutStats.cands++;
         cands.push({ entry: e0, exit: e1, side, a, b, len2 });
       }
       if (cands.length) {
-        const want = 1 + (rngS.chance(0.35) ? 1 : 0);
+        const want = Math.min(2, cands.length); // Tibba: shortcuts were too rare to find
         const first = rngS.int(0, cands.length - 1);
         for (let o = 0; o < cands.length && shortcuts.length < want; o++) {
           const cand = cands[(first + o) % cands.length];
@@ -928,18 +962,25 @@
       const n = samples.length;
       const REACH = 12;
       const reach = new Float32Array(n);
+      const capY = new Float32Array(n);
       for (let i = 0; i < n; i++) {
-        let best = 0;
+        let best = 0, hi = -1e9;
         for (let o = -REACH; o <= REACH; o++) {
           let j = i + o;
           if (closed) j = ((j % n) + n) % n;
           else if (j < 0 || j >= n) continue;
           const a = samples[j].apron || 0;
           if (Math.abs(a) > Math.abs(best)) best = a;
+          hi = Math.max(hi, samples[j].p[1]);
         }
         reach[i] = best === 0 ? 0 : Math.sign(best);
+        // absolute ceiling for the relaxed clamp: the local road maximum minus a hair. High
+        // enough that undulation (bumpA) troughs can't re-ledge their crest neighbours' shelf,
+        // but NEVER above this road's own deck — so a second road passing legally close (e.g.
+        // the closure beside the opening straight) can't have terrain conformed through it.
+        capY[i] = hi - 0.08;
       }
-      for (let i = 0; i < n; i++) { if (reach[i]) samples[i].apronReach = reach[i]; }
+      for (let i = 0; i < n; i++) { if (reach[i]) { samples[i].apronReach = reach[i]; samples[i].apronCapY = capY[i]; } }
     }
 
     const track = {
@@ -955,6 +996,7 @@
       overlapForced,
       theme
     };
+    track._cutStats = cutStats; // shortcut-candidate funnel (debug/telemetry, deterministic)
     track.terrain = buildTerrainData(samples, seedStr, theme, shortcuts);
 
     // apron audit — CLOSED LOOP: the conform/clamp interplay on a 10-13 m grid can still miss
@@ -1019,10 +1061,14 @@
         if (!nearCore) samples[i].apron = 0;
       }
       // surviving apron samples on RAILED pieces open the rail on the apron side — a gateway
-      // break in the fence (physics clamp + rail render both key on wallOpen)
+      // break in the fence (physics clamp + rail render both key on wallOpen). Every surviving
+      // apron edge is KERBED (Tibba: flush spans should read as kerbs instead of fence — mark
+      // the creative line, rumble on crossing). Corner kerbs win where both apply.
       for (let i = 0; i < n; i++) {
         const s = samples[i];
-        if (s.apron && s.wall && !s.cut) s.wallOpen = Math.sign(s.apron);
+        if (!s.apron) continue;
+        if (s.wall && !s.cut) s.wallOpen = Math.sign(s.apron);
+        if (!s.kerb) s.kerb = Math.sign(s.apron);
       }
     }
     return track;

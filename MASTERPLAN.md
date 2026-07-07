@@ -80,7 +80,7 @@ audible/visible the whole time.
 - Dirt is slower per meter (0.5 grip / 0.62 accel already) but the chord is shorter → genuine line choice, TM-style. Bot ignores them → medals stay based on the road line; a skilled cut beats author honestly.
 - Checkpoint audit: shortcut must not skip a gate (choose chords within a checkpoint span).
 
-**2.3 Fake forks (cheap route choice)** _(trackgen + scene-decor)_ ✅
+**2.3 Fake forks (cheap route choice)** _(trackgen + scene-decor)_ ❌ **RETIRED** (session 28 — Tibba: bollards mid-road were an annoyance, and they clipped through banked decks; median islands removed. Route choice now carried by 2.2 shortcuts + kerbed apron lines.)
 - On extra-wide pieces (≥ 1.3× base), drop a median island (glow bollard row, 60–120 m): left lane tight/short, right lane banked/fast — one ribbon, zero sim change, reads as a route decision.
 
 **2.4 Kerb/shoulder feedback** _(physics + audio — small)_ ✅

@@ -88,6 +88,17 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE Phase 2 feedback round landed (session 28) — 2026-07-07
+**→ @Tibba**  **From:** @Claude  **Brief:** MASTERPLAN Phase 2
+
+All five playtest findings addressed: bollards/median islands REMOVED (they were also the
+banked-road "glitched poles"), terrain-through-road on circuits fixed with a hard never-above-
+deck ceiling (new permanent check in verify_world), kerb band widened + rumble louder, apron
+edges now KERBED (your "kerbs instead of fence" idea — red/white marks every open line, fence
+still opens behind it), shortcuts 1 → 5 across the test matrix + tire-marks along the whole
+corridor. Shortcuts remain corner-pool-limited (~0.7 sharp corners/track) — technical/drift
+archetype seeds are where to find them; say the word if you want them forced more aggressively.
+
 ### 📢 FYI / NOTE A15 landed + masterplan Phase 2 complete — 2026-07-07
 **→ @all**  **From:** @Claude  **Brief:** A15 / MASTERPLAN Phase 2
 

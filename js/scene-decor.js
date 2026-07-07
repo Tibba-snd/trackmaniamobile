@@ -612,12 +612,12 @@
     return mesh;
   }
 
-  /* ---------------- CORNER KERBS — biome-coloured rumble strips on the apex edges ----------------
-     Alternating white / biome-accent stripes laid flat just off the inside edge through each corner.
-     MeshBasic + vertex colours so they read bright at night (like retroreflective kerbs). 1 draw call. */
+  /* ---------------- KERBS — biome-coloured rumble strips on flagged edges ----------------
+     Alternating white / accent stripes laid flat just off the edge. FLAG-DRIVEN (s.kerb, set by
+     trackgen): corner apex inside edges AND kerbed apron/shortcut edges — the kerb marks every
+     "creative line" a fence doesn't guard. MeshBasic + vertex colours. 1 draw call. */
   function buildKerbs(track, theme) {
     const ss = track.samples;
-    if (!track.corners || !track.corners.length) return null;
     // classic red/white rumble kerb — instantly legible and contrasts against every biome's neon edge.
     const stripe = [1.0, 0.22, 0.16];
     const white = [0.9, 0.9, 0.92];
@@ -628,19 +628,17 @@
       [a, b, c, d].forEach(p => { pos.push(p[0], p[1], p[2]); colArr.push(cc[0], cc[1], cc[2]); });
       idx.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2); vi += 4;
     };
-    for (const c of track.corners) {
-      const side = c.insideSign;
-      for (let i = Math.max(2, c.entry - 3); i < Math.min(ss.length - 1, c.end + 3); i++) {
-        const s = ss[i], sN = ss[i + 1];
-        if (!s || !sN || s.gap || sN.gap) continue;
-        // inner edge sits on the deck; outer edge lifts ~0.12 so the kerb is a beveled 3D rumble
-        // strip (catches light on its slope) instead of a flat painted sticker.
-        const e1 = V.addS(V.addS(s.p, s.r, side * (s.w / 2)), s.u, DD.DECAL.kerb);
-        const o1 = V.addS(V.addS(e1, s.r, side * kerbW), s.u, 0.12);
-        const e2 = V.addS(V.addS(sN.p, sN.r, side * (sN.w / 2)), sN.u, DD.DECAL.kerb);
-        const o2 = V.addS(V.addS(e2, sN.r, side * kerbW), sN.u, 0.12);
-        addQuad(e1, o1, e2, o2, (i % 2 === 0) ? white : stripe);
-      }
+    for (let i = 2; i < ss.length - 1; i++) {
+      const s = ss[i], sN = ss[i + 1];
+      if (!s.kerb || sN.kerb !== s.kerb || s.gap || sN.gap) continue;
+      const side = s.kerb;
+      // inner edge sits on the deck; outer edge lifts ~0.12 so the kerb is a beveled 3D rumble
+      // strip (catches light on its slope) instead of a flat painted sticker.
+      const e1 = V.addS(V.addS(s.p, s.r, side * (s.w / 2)), s.u, DD.DECAL.kerb);
+      const o1 = V.addS(V.addS(e1, s.r, side * kerbW), s.u, 0.12);
+      const e2 = V.addS(V.addS(sN.p, sN.r, side * (sN.w / 2)), sN.u, DD.DECAL.kerb);
+      const o2 = V.addS(V.addS(e2, sN.r, side * kerbW), sN.u, 0.12);
+      addQuad(e1, o1, e2, o2, (i % 2 === 0) ? white : stripe);
     }
     if (!pos.length) return null;
     const geo = new THREE.BufferGeometry();
@@ -2182,14 +2180,23 @@
             cones.setMatrixAt(ci++, m4);
           }
         }
-        // tire-mark decal: dark 9 m quad hugging the terrain into the mouth
-        for (const [dPerp, dAlong] of [[-1.3, 1.0], [1.3, 1.0], [-1.3, 10.0], [1.3, 10.0]]) {
-          const mx = end[0] + perp[0] * dPerp + dir[0] * sgn * dAlong;
-          const mz = end[2] + perp[2] * dPerp + dir[2] * sgn * dAlong;
+      }
+      // tire-mark decal chain along the WHOLE corridor (findability — mouth-only marks were
+      // invisible from the road): dark segmented strip hugging the terrain, a-to-b
+      const len = Math.sqrt(cut.len2);
+      const segN = Math.max(3, Math.round(len / 8));
+      for (let si = 0; si <= segN; si++) {
+        const t = si / segN;
+        const cx = cut.a[0] + (cut.b[0] - cut.a[0]) * t;
+        const cz = cut.a[2] + (cut.b[2] - cut.a[2]) * t;
+        for (const dPerp of [-1.3, 1.3]) {
+          const mx = cx + perp[0] * dPerp, mz = cz + perp[2] * dPerp;
           markPos.push(mx, DD.terrainAt(T, mx, mz) + 0.06, mz);
         }
-        markIdx.push(mvi, mvi + 1, mvi + 2, mvi + 1, mvi + 3, mvi + 2);
-        mvi += 4;
+        if (si > 0) {
+          markIdx.push(mvi - 2, mvi - 1, mvi, mvi - 1, mvi + 1, mvi);
+        }
+        mvi += 2;
       }
     }
     cones.count = ci;
@@ -2209,58 +2216,8 @@
     return group;
   }
 
-  /* ---------------- FAKE FORKS (masterplan 2.3) ----------------
-     Median island on extra-wide pieces: a glow-bollard row + dark median strip down the centre
-     of 60-120 m spans. One ribbon, ZERO sim change — it just reads as a route decision. */
-  function buildForkIslands(track, theme) {
-    const ss = track.samples;
-    const wBase = DD.lerp(20, 14, ((track.tier || 1) - 1) / 4);
-    const okName = (n) => n === 'straight' || n === 'sweeper' || n === 'banked';
-    const runs = [];
-    let r0 = -1;
-    for (let i = 0; i < ss.length; i++) {
-      const s = ss[i];
-      const ok = !s.gap && s.surf === 0 && okName(s.pieceName) && s.w >= wBase * 1.28 && !s.kerb;
-      if (ok && r0 < 0) r0 = i;
-      if ((!ok || i === ss.length - 1) && r0 >= 0) {
-        if (i - r0 >= 30) runs.push([r0, Math.min(i, r0 + 60)]); // 60-120 m
-        r0 = -1;
-      }
-    }
-    if (!runs.length) return null;
-    const group = new THREE.Group();
-    let total = 0;
-    for (const [a, b] of runs) total += Math.floor((b - a - 8) / 3) + 1;
-    const geo = new THREE.CylinderGeometry(0.13, 0.16, 1.1, 6); // origin at centre; instances offset +h/2
-    const mat = new THREE.MeshStandardMaterial({
-      color: col([0.05, 0.05, 0.07]), roughness: 0.5, metalness: 0.4,
-      emissive: col(theme.accent), emissiveIntensity: 1.6
-    });
-    const inst = new THREE.InstancedMesh(geo, mat, total);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
-    let bi = 0;
-    const islandIdx = new Set();
-    for (const [a, b] of runs) {
-      for (let i = a + 4; i <= b - 4; i++) islandIdx.add(i);
-      for (let i = a + 4; i <= b - 4; i += 3) {
-        const s = ss[i];
-        m4.compose(pos.set(s.p[0], s.p[1] + 0.55, s.p[2]), q, one);
-        inst.setMatrixAt(bi++, m4);
-      }
-    }
-    inst.count = bi;
-    inst.instanceMatrix.needsUpdate = true;
-    inst.frustumCulled = false;
-    group.add(inst);
-    // dark median slab under the row (kerb-height rung — below the centre dashes)
-    const median = buildStrip(track, theme, (s, i) => {
-      if (!islandIdx.has(i)) return null;
-      const c = V.addS(s.p, s.u, 0.045);
-      return [V.addS(c, s.r, -0.9), V.addS(c, s.r, 0.9)];
-    }, [0.02, 0.02, 0.03], 0.9, THREE.NormalBlending);
-    if (median) group.add(median);
-    return group;
-  }
+  // (fake-fork median islands removed after Tibba playtest — bollards mid-road were an
+  //  annoyance and clipped through banked decks; masterplan 2.3 retired in session 28)
 
   // Register on DD._sceneShared
   DD._sceneShared.buildSky = buildSky;
@@ -2273,7 +2230,6 @@
   DD._sceneShared.buildKerbs = buildKerbs;
   DD._sceneShared.buildAprons = buildAprons;
   DD._sceneShared.buildShortcutDecor = buildShortcutDecor;
-  DD._sceneShared.buildForkIslands = buildForkIslands;
   DD._sceneShared.buildCornerSigns = buildCornerSigns;
   DD._sceneShared.buildGates = buildGates;
   DD._sceneShared.buildDecor = buildDecor;

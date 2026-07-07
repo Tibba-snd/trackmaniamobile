@@ -365,8 +365,6 @@
     { const aprons = DD._sceneShared.buildAprons(track, theme); if (aprons) root.add(aprons); }
     // dirt shortcut gates + tire-mark mouths (masterplan 2.2)
     { const cuts = DD._sceneShared.buildShortcutDecor(track, theme); if (cuts) root.add(cuts); }
-    // fake-fork median islands on extra-wide pieces (masterplan 2.3 — decor only)
-    { const forks = DD._sceneShared.buildForkIslands(track, theme); if (forks) root.add(forks); }
 
     // dashed glowing centre line — breaks up the flat asphalt and reads as speed/motion.
     // Dashes via skipping alternating sample runs (offsetFn returns null on the gaps).

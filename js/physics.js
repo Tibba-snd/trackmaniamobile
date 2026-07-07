@@ -565,16 +565,16 @@
       car.vel = V.addS(car.vel, gf.r, -Math.sign(gf.lat) * P.shoulderPush * dt);
     }
 
-    // ---- kerb feedback (masterplan 2.4): riding the corner kerb band excites the springs ----
-    // Band mirrors buildKerbs geometry: from ~0.9 m inside the deck edge to the kerb's outer lip.
-    // Stripe cadence scales with speed (2 m stripes); car.kerb feeds the rumble sfx.
+    // ---- kerb feedback (masterplan 2.4): riding the kerb band excites the springs ----
+    // Band: outer ~1.8 m of the deck through the kerb's outer lip (corner kerbs AND kerbed
+    // apron edges). Stripe cadence scales with speed (2 m stripes); car.kerb feeds rumble sfx.
     car.kerb = 0;
     if (gf.mode === 'ribbon' && gf.kerb && Math.sign(gf.lat) === Math.sign(gf.kerb)) {
       const aLat = Math.abs(gf.lat);
-      if (aLat > gf.halfW - 1.3 && aLat < gf.halfW + 0.9) {
+      if (aLat > gf.halfW - 2.2 && aLat < gf.halfW + 0.9) {
         car.kerb = DD.clamp(speed / 25, 0.2, 1);
         car.kerbPhase += speed * dt * Math.PI; // 2 m stripe wavelength
-        car.suspV += Math.sin(car.kerbPhase) * 2.6 * car.kerb;
+        car.suspV += Math.sin(car.kerbPhase) * 4.2 * car.kerb;
       }
     }
 

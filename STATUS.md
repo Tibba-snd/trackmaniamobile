@@ -94,7 +94,39 @@ These are real today (the code, not the marketing). Roughly high→low impact.
 
 ---
 
-## Resolved this pass — Phase 2 world: re-entry aprons, dirt shortcuts, kerb feedback, fake forks (2026-07-07, session 27)
+## Resolved this pass — Phase 2 feedback round: Tibba playtest fixes (2026-07-07, session 28)
+
+Tibba playtested session 27's Phase 2 drop. Five findings, all addressed:
+
+1. **Bollards mid-road = annoyance** (+ they were the "glitched gate-like poles" on banked
+   roads — world-Y cylinders clipping through tilted decks). **Fake forks (2.3) retired** —
+   `buildForkIslands` deleted; route choice is carried by shortcuts + kerbed apron lines.
+2. **Terrain clipping through the road on a closed 2-lap track** — two real holes in the
+   session-27 clamp relaxation: (a) the under-deck "-1.5 above edge" allowance let terrain
+   conform through a SECOND road passing legally close (the closure runs beside the opening
+   straight — `closureCollides` permits it); (b) the shortcut carve (after the clamp) could
+   graze the corner's own deck underside. Fixed three ways: apron eligibility rejects spans with
+   index-far-but-spatially-near track (< 34 m), the relaxed clamp is capped at the local road
+   max on the shelf side / own edge under the deck (`apronCapY`), and a new absolute
+   `deckCapY` ceiling (min deck footprint − 0.08) is applied LAST — after everything incl. the
+   carve. New permanent invariant in `verify_world`: terrain never above any deck, 3 lateral
+   probes per sample across the whole matrix (32 closed circuits live-scanned clean).
+3. **Kerbs unfeelable** — band widened (outer 2.2 m of deck + kerb lip), suspension excitation
+   2.6 → 4.2, rumble gain matched to dirt (0.3).
+4. **"Flush spans should read as kerbs instead of fence"** (Tibba idea) — folded in: every
+   surviving apron core is kerb-flagged (`s.kerb = apron side`), `buildKerbs` is now FLAG-driven
+   (corners + apron/shortcut edges uniformly), so the red/white kerb marks every creative line
+   and rumbles on crossing. Railed spans still open the fence (`wallOpen`) behind the kerb.
+5. **Shortcuts unfindable** — funnel instrumented (`track._cutStats`): the pool is only ~27
+   detected corners across 40 tracks and most rejections are legitimate (checkpoint spans,
+   banked mouths, deep basins). Gates relaxed where honest (minRad < 95, chord ≤ 0.92·arc — a
+   chord also wins on ENTRY SPEED, not just distance; basin 20), `want` = always 2 when
+   candidates allow: 1 → 5 shortcuts across the matrix (contract ≥ 3). Findability: tire-mark
+   decal now runs the WHOLE corridor, not just the mouths.
+
+---
+
+## Resolved earlier this day — Phase 2 world: re-entry aprons, dirt shortcuts, kerb feedback, fake forks (2026-07-07, session 27)
 
 Masterplan Phase 2 ("a world with reasons") landed in full, plus Antigravity's A15 drop
 (road-decal height ladder — `DD.DECAL` in `js/core.js` + `polygonOffset(-1,-1)` on every

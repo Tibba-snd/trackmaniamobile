@@ -163,7 +163,7 @@
     n.screechFilt.frequency.setTargetAtTime(1100 + slide * 600 + speed * 3, ctx.currentTime, 0.06);
     // rumble serves dirt AND the corner kerb band (kerb slightly quieter, same noise loop)
     const rumble = onDirt ? DD.clamp(speed / 35, 0, 1) * 0.3
-      : DD.clamp(kerb || 0, 0, 1) * DD.clamp(speed / 35, 0, 1) * 0.22;
+      : DD.clamp(kerb || 0, 0, 1) * DD.clamp(speed / 35, 0, 1) * 0.3;
     n.rumbleGain.gain.setTargetAtTime(rumble * A.volumes.sfx, ctx.currentTime, 0.07);
 
     // ---- wall scrape: grinding bandpass noise while hitWall & speed > 5 ----

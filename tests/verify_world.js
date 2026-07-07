@@ -79,6 +79,33 @@ console.log('[1] apron/shortcut/kerb generation contract');
       if (apronFull > 0) tracksWithAprons++;
       if (apronFlushBad > 0) check(seed + ' t' + tier + ' apron flush', false, apronFlushBad + '/' + apronFull + ' spans outside window');
 
+      // GLOBAL invariant (Tibba playtest, session 28: terrain clipped through the road on a
+      // closed 2-lap track): terrain must NEVER rise above any deck, anywhere — incl. where a
+      // second stretch of road passes close to an apron span (closure beside opening straight)
+      {
+        let aboveDeck = 0, worstAbove = 0;
+        for (let i = 2; i < ss.length - 2; i += 2) {
+          const s = ss[i];
+          if (s.gap) continue;
+          for (const lat of [0, -s.w / 4, s.w / 4]) {
+            const q = V.addS(V.clone(s.p), s.r, lat);
+            const deckY = s.p[1] + s.r[1] * lat;
+            const over = DD.terrainAt(track.terrain, q[0], q[2]) - (deckY - 0.05);
+            if (over > 0) { aboveDeck++; worstAbove = Math.max(worstAbove, over); }
+          }
+        }
+        if (aboveDeck > 0) check(seed + ' t' + tier + ' terrain never above deck', false, aboveDeck + ' pts, worst +' + worstAbove.toFixed(2) + 'm');
+      }
+
+      // kerbed apron edges: every surviving apron core is marked (kerb visual + rumble band)
+      for (let i = 0; i < ss.length; i++) {
+        const s = ss[i];
+        if (s.apron && Math.abs(s.apron) >= 0.999 && !s.kerb) {
+          check(seed + ' t' + tier + ' apron edges kerbed', false, 'sample ' + i);
+          break;
+        }
+      }
+
       // the ledge is still a ledge away from aprons (flat, plain, non-apron samples)
       let ledgeChecked = 0, ledgeBad = 0;
       for (let i = 40; i < ss.length - 40; i += 7) {
@@ -127,7 +154,7 @@ console.log('[1] apron/shortcut/kerb generation contract');
   }
   check('aprons appear on most tracks (>=60%)', tracksWithAprons >= tracksTotal * 0.6, tracksWithAprons + '/' + tracksTotal);
   console.log('  (info) shortcuts generated across the matrix: ' + shortcutsTotal);
-  check('shortcuts exist somewhere in the matrix', shortcutsTotal > 0, shortcutsTotal + ' total');
+  check('shortcuts appear across the matrix (>=3)', shortcutsTotal >= 3, shortcutsTotal + ' total');
 }
 
 /* 2 — drivability: leave over an apron, come back, re-ground on the ribbon */
