@@ -156,6 +156,35 @@ select track 5 → DRIVE → finish → REPLAY → same track reloads (not track
 ## A14 — Campaign polish + progression feel  🟢 LANDED (session 24, folded into A13)
 **Depends on: A13 landed.**
 
+## A15 — Road-decal height ladder (z-fight elimination)  🔴 (MASTERPLAN.md Phase 1.3, session 26)
+
+_Tibba: "track elements visually clip into each other — two planes on the exact same level and the
+graphics can't decide which to show."_ Claude already landed the two structural halves (camera near
+0.1→0.35 in `game.js`, circuit seam stitch in `scene-decor.js`, session 26). What remains is
+mechanical: every flat overlay on the road sits at an ad-hoc height and several share levels.
+
+**Verified current offsets (all along `s.u` above the ribbon):** kerbs 0.035
+(`scene-decor.js:614`), centre dashes 0.05 + rail2 0.05/0.06 + edge strips 0.06 (`scene-core.js:
+340-370`), glass shine 0.07 (`scene-core.js:378`), a decor plate at 0.09 (`scene-decor.js:813`).
+Boost pads / landing pads / start plates: audit `buildBoostPads`, `buildLandingPads`, `buildGates`
+for their own constants.
+
+**The change:**
+1. Add `DD.DECAL = { kerb: 0.03, glass: 0.05, centre: 0.07, edge: 0.09, rail2: 0.10, boost: 0.11,
+   landing: 0.13 }` in `js/core.js` (single source of truth, same spirit as `DD.GLOW`).
+2. Replace every literal offset above with its `DD.DECAL.*` entry — one unique height per overlay
+   type, nothing shares a level with anything it overlaps.
+3. Every NormalBlending road decal material gets `polygonOffset: true, polygonOffsetFactor: -1,
+   polygonOffsetUnits: -1`. (Additive `depthWrite:false` strips don't z-fight but DO pop when
+   coplanar — they just get their ladder height, no polygonOffset needed.)
+4. Do NOT touch the ribbon itself, the road body, guardrail walls (they're vertical), or anything
+   in `physics.js` — heights here are visual only.
+
+**DoD:** all suites green (this is render-only — `drivability`/`verify_slide` must be untouched);
+game launched, one race per biome eyeballed at distance for flicker (dune + neon minimum);
+`?v=` bumps for every touched js file. e2e goldens will shift a pixel or two where decals moved
+up — flag it in the walkthrough, Claude decides on re-baseline.
+
 ---
 
 # TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)
