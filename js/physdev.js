@@ -59,12 +59,20 @@
         { key: 'slideCoupling', min: 0.0, max: 16.0, step: 0.5, desc: 'Anti-understeer: how hard velocity follows the nose in a fast slide. HIGHER = tighter line, less wall-plow. 0 = off (pure model).' },
         { key: 'slideRotFree', min: 0.0, max: 1.0, step: 0.05, desc: 'Rotation freedom in a fast slide (relaxes the anti-spin counter so the nose rotates through the corner). HIGHER = rotates more before the assist catches it.' },
         // Speed window: below Lo the brake-tap just grips (grip stays fastest); above Hi full slide assist.
-        { key: 'slideAssistVLo', min: 20.0, max: 80.0, step: 1.0, desc: 'Slide-assist START speed (m/s; 45≈162 km/h). Below this a brake-tap just grips — grip stays the fast line.' },
-        { key: 'slideAssistVHi', min: 30.0, max: 100.0, step: 1.0, desc: 'Slide-assist FULL speed (m/s; 62≈223 km/h). At/above this the brake-slide gets full rotation + anti-understeer.' },
+        { key: 'slideAssistVLo', min: 20.0, max: 80.0, step: 1.0, desc: 'Slide-assist START speed (m/s; 38≈137 km/h). Below this a brake-tap just grips — grip stays the fast line.' },
+        { key: 'slideAssistVHi', min: 30.0, max: 100.0, step: 1.0, desc: 'Slide-assist FULL speed (m/s; 58≈209 km/h). At/above this the brake-slide gets full rotation + anti-understeer.' },
         // Stability: how the slide settles and recovers.
         { key: 'slideYawDamp', min: 0.2, max: 5.0, step: 0.1, desc: 'Slide yaw damping. HIGHER = slide settles/recovers faster; LOWER = looser, holds rotation longer.' },
         { key: 'counterAssist', min: 0.0, max: 40.0, step: 0.5, desc: 'Auto-countersteer (anti-spin on ANY slide). HIGHER = catches spins harder. This is what slideRotFree relaxes at speed.' },
-        { key: 'slideRearMul', min: 0.2, max: 1.2, step: 0.02, desc: 'Rear grip once sliding. LOWER = rear stays looser through the slide.' }
+        { key: 'slideRearMul', min: 0.2, max: 1.2, step: 0.02, desc: 'Rear grip once sliding. LOWER = rear stays looser through the slide.' },
+        // Entry/exit shaping — the powerslide feel pass (2026-07-07).
+        { key: 'slideBetaRate', min: 0.5, max: 6.0, step: 0.1, desc: 'How fast the slide angle BUILDS and releases (rad/s). LOWER = slower, more readable entry; higher = snappier.' },
+        { key: 'slideEntryWin', min: 0.0, max: 0.8, step: 0.05, desc: 'Entry window (s) where brake decel is capped — the tap reads as weight transfer, not an anchor.' },
+        { key: 'slideEntryBrakeCap', min: 0.2, max: 1.0, step: 0.05, desc: 'Max effective brake decel inside the entry window. 1.0 = no cap (back to the old entry shunt).' },
+        { key: 'regimeBlendT', min: 0.05, max: 0.6, step: 0.05, desc: 'Grip↔slide dynamics crossfade time (s). HIGHER = softer morph into/out of the slide.' },
+        { key: 'slideHoldThr', min: 0.0, max: 1.0, step: 0.05, desc: 'How much THROTTLE deepens/holds the slide angle — the power in powerslide.' },
+        { key: 'slideHoldCoast', min: 0.0, max: 1.0, step: 0.05, desc: 'Angle fraction held at ZERO throttle — lifting shallows the slide toward this.' },
+        { key: 'exitBoostA', min: 0.0, max: 6.0, step: 0.5, desc: 'Clean-exit reward accel (m/s²) for a moment after releasing the angle under throttle.' }
       ]
     },
     {
@@ -74,7 +82,11 @@
         { key: 'vmax', min: 20.0, max: 180.0, step: 1.0, desc: 'Top speed limit on normal road (m/s).' },
         { key: 'brakeDec', min: 10.0, max: 80.0, step: 1.0, desc: 'Brake force deceleration.' },
         { key: 'dragK', min: 0.0001, max: 0.002, step: 0.00005, desc: 'Aero drag coefficient. Higher = drops top-end acceleration.' },
-        { key: 'rollDrag', min: 0.0, max: 2.0, step: 0.05, desc: 'Rolling friction coefficient. Higher = rolls to stop faster.' }
+        { key: 'rollDrag', min: 0.0, max: 2.0, step: 0.05, desc: 'Rolling friction coefficient. Higher = rolls to stop faster.' },
+        // Walls — impulse-based contact (2026-07-07).
+        { key: 'wallMu', min: 0.0, max: 1.0, step: 0.05, desc: 'Wall scrape friction per impact strength. Grazes nearly free; square hits cost real speed.' },
+        { key: 'wallBounce', min: 0.0, max: 0.5, step: 0.02, desc: 'Wall restitution. Higher = bouncier walls.' },
+        { key: 'wallYawKick', min: 0.0, max: 0.1, step: 0.005, desc: 'Nose-away deflection on a FRONT wall hit. Higher = the wall sheds the car instead of magnet-holding it.' }
       ]
     }
   ];

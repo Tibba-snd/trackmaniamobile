@@ -94,6 +94,48 @@ These are real today (the code, not the marketing). Roughly high→low impact.
 
 ---
 
+## Resolved this pass — Phase 1 physics: powerslide rework + impulse walls + grounding rules (2026-07-07, session 26)
+
+Masterplan session (see the new [`MASTERPLAN.md`](MASTERPLAN.md) — track/terrain/car-feel roadmap,
+Tibba-directed). This pass landed Phase 1.1/1.2/1.5, all Claude-owned physics:
+
+**Powerslide rework** (`js/physics.js`) — the brake-tap slide was "a shunt, then a snap to a
+sharp-cornering rail" (Tibba). Root causes fixed:
+- Entry brake decel capped (`slideEntryWin` 0.30 s / `slideEntryBrakeCap` 0.55) — the tap is weight
+  transfer, not an anchor. Grip modifiers still see the raw brake, so the rear breaks loose as before.
+- Commanded slide angle now SLEWS (`car.slideBeta`, `slideBetaRate` 2.2 rad/s) instead of the
+  stabiliser seeking full angle instantly; `slideStab` 3.5 → 2.2. Entry builds, release bleeds off.
+- Grip↔slide is a 0.20 s CROSSFADE (`car.regimeMix`, both models evaluated + mixed) instead of a
+  one-tick personality swap. Glass snaps to full slide mix (surface regime — preserves the ice-glide
+  momentum contract in `drivability [13]`).
+- Throttle is the POWER in powerslide: held angle = `slideHoldCoast 0.45 + 0.55·throttle +
+  0.30·brake` — throttle sustains/deepens, lift shallows, brake digs in.
+- `slideCoupling` 2.2 → 1.2 and `slideRearMul` 0.68 → 0.80: cornering now comes mostly from real
+  rear force at the held angle, not the velocity-magnet.
+- Speed gate softened 45→62 to 38→58 m/s (mid-speed taps give small, learnable slides).
+- `sdBoost` (hold-a-shallow-slide exploit) replaced by a clean-EXIT reward (`exitBoostA` 2.0 m/s²
+  for 0.5 s when the angle is released under throttle, rear gathered).
+
+**Impulse walls** (`js/physics.js` `postWallClamp`) — two-point capsule (front/rear axle points,
+each vs its own nearest sample; no more nose clip-through), scrape cost proportional to normal
+impulse EXCESS over a graze band (`wallMu` 0.25, `wallGraze` 0.6 m/s) instead of the old per-tick
+whole-velocity multiply (which cost ~84%/s in any sustained scrape), and a front-hit nose-away
+deflection (`wallYawKick`). `car.wallImpact` exposed for FX scaling. `wallFriction` param removed.
+
+**Grounding rules** (`js/physics.js` `stepCar`) — re-ground window is now asymmetric: deck
+continuity keeps −2.0 m, falling keeps −2.0 m (tunneling protection), but arriving from terrain or
+rising under a deck only re-grounds at −0.45 m (kills the "side clip teleports the car up onto the
+road" snap), and the invisible shoulder band no longer catches cars from dirt or air (continuity
+strip only).
+
+**Acceptance suite:** new `tests/verify_slide.js` (26 checks) encodes the slide design contract —
+no-shunt entry, progressive angle, slide out-rotates grip ≥1.25× at 60 m/s, grip untouched on
+gentle steer + below the gate, clean exit, graze-cheap/hit-expensive walls, no-teleport grounding,
+bit-identical determinism. Full suite green (drivability 45/45 incl. ice glide, determinism,
+colors, m2, camera, sky_stars); 21 seed×tier `buildValidTrack` runs, 0 fallbacks. Physdev SLIDE tab
+gained sliders for every new param; `?v=` bumped (physics 30, physdev 4). Boot-verified in browser
+(menu → countdown, live-track physics stepped in-page, zero console errors).
+
 ## Resolved this pass — efficient-graphics batch + track feel (2026-07-07)
 
 Agenda premise (see [[driftdream-perf-profile]]): the game is **GPU/fill-rate bound**, not geometry
