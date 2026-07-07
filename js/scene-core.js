@@ -336,11 +336,12 @@
     root.add(DD._sceneShared.buildRibbon(track, theme));
     { const body = DD._sceneShared.buildRoadBody(track, theme); if (body) root.add(body); }
 
-    // edge glow strips
+    // edge glow strips — apron spans GAP the glow (the border opens = the invitation to leave)
     const edge = (side) => DD._sceneShared.buildStrip(track, theme,
       (s) => {
         if (s.gap) return null;
-        const c = V.addS(V.addS(s.p, s.r, side * (s.w / 2 - 0.18)), s.u, 0.06);
+        if (s.apron && s.apron * side > 0 && Math.abs(s.apron) > 0.5) return null;
+        const c = V.addS(V.addS(s.p, s.r, side * (s.w / 2 - 0.18)), s.u, DD.DECAL.edge);
         return [V.addS(c, s.r, -0.22 * side), V.addS(c, s.r, 0.22 * side)];
       }, theme.accent, 0.9, THREE.AdditiveBlending);
     root.add(edge(1)); root.add(edge(-1));
@@ -350,7 +351,8 @@
     const rail2 = (side) => DD._sceneShared.buildStrip(track, theme,
       (s) => {
         if (s.gap) return null;
-        const c = V.addS(V.addS(s.p, s.r, side * (s.w / 2 + 0.34)), s.u, 0.05);
+        if (s.apron && s.apron * side > 0 && Math.abs(s.apron) > 0.5) return null;
+        const c = V.addS(V.addS(s.p, s.r, side * (s.w / 2 + 0.34)), s.u, DD.DECAL.rail2);
         return [V.addS(c, s.r, -0.1 * side), V.addS(c, s.r, 0.1 * side)];
       }, theme.accent2, 0.6, THREE.AdditiveBlending);
     { const a = rail2(1), b = rail2(-1); if (a) root.add(a); if (b) root.add(b); }
@@ -359,12 +361,19 @@
     const kerbs = DD._sceneShared.buildKerbs(track, theme);
     if (kerbs) root.add(kerbs);
 
+    // re-entry apron wedges (masterplan 2.1) — faint glow ramps onto the flush terrain
+    { const aprons = DD._sceneShared.buildAprons(track, theme); if (aprons) root.add(aprons); }
+    // dirt shortcut gates + tire-mark mouths (masterplan 2.2)
+    { const cuts = DD._sceneShared.buildShortcutDecor(track, theme); if (cuts) root.add(cuts); }
+    // fake-fork median islands on extra-wide pieces (masterplan 2.3 — decor only)
+    { const forks = DD._sceneShared.buildForkIslands(track, theme); if (forks) root.add(forks); }
+
     // dashed glowing centre line — breaks up the flat asphalt and reads as speed/motion.
     // Dashes via skipping alternating sample runs (offsetFn returns null on the gaps).
     const centre = DD._sceneShared.buildStrip(track, theme,
       (s, i) => {
         if (s.gap || (i % 8) >= 4) return null; // ~4-on / 4-off dash pattern
-        const c = V.addS(s.p, s.u, 0.05);
+        const c = V.addS(s.p, s.u, DD.DECAL.centre);
         return [V.addS(c, s.r, -0.13), V.addS(c, s.r, 0.13)];
       }, V.lerp(theme.accent2, [1, 1, 1], 0.45), 0.42, THREE.AdditiveBlending);
     if (centre) root.add(centre);
@@ -375,17 +384,18 @@
 
     // glass shine overlay
     const glass = DD._sceneShared.buildStrip(track, theme,
-      (s) => s.surf === DD.SURF.GLASS ? [V.addS(V.addS(s.p, s.u, 0.07), s.r, -s.w / 2), V.addS(V.addS(s.p, s.u, 0.07), s.r, s.w / 2)] : null,
+      (s) => s.surf === DD.SURF.GLASS ? [V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, -s.w / 2), V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, s.w / 2)] : null,
       theme.glassColor, 0.28, THREE.AdditiveBlending);
     if (glass) root.add(glass);
 
-    // guardrails: solid wall + bright top rail
+    // guardrails: solid wall + bright top rail. Shortcut mouths OPEN the inside rail
+    // (s.wallOpen — mirrors the physics clamp skip, so what you see is what collides).
     const railWall = (side) => DD._sceneShared.buildStrip(track, theme,
-      (s) => s.wall && !s.gap ? [V.addS(s.p, s.r, side * s.w / 2), V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85)] : null,
+      (s) => s.wall && !s.gap && s.wallOpen !== side ? [V.addS(s.p, s.r, side * s.w / 2), V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85)] : null,
       theme.accent2, 1.0, THREE.NormalBlending);
     const railTop = (side) => DD._sceneShared.buildStrip(track, theme,
       (s) => {
-        if (!s.wall || s.gap) return null;
+        if (!s.wall || s.gap || s.wallOpen === side) return null;
         const c = V.addS(V.addS(s.p, s.r, side * s.w / 2), s.u, 0.85);
         return [V.addS(c, s.r, -0.1 * side), V.addS(c, s.r, 0.1 * side)];
       }, theme.accent2, 0.85, THREE.AdditiveBlending);

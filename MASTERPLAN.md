@@ -30,7 +30,7 @@ hard invariants._
 - Upward snap hysteresis: allow `ha >= -2.0` re-ground only if ribbon-grounded last tick; otherwise `ha >= -0.9`. Kills the side-clip teleport-up.
 - Shoulder honesty: give the 2.2 m shoulder real geometry (beveled strip, −0.35 slope, painted) so physics band = visible surface; no more hovering on air.
 
-**1.3 Z-fight elimination** _(scene files — delegable)_
+**1.3 Z-fight elimination** _(scene files — delegable)_ ✅ **DONE** (camera near + seam stitch session 26; `DD.DECAL` ladder + polygonOffset = A15, landed session 27)
 - Camera near 0.1 → 0.35 (chase cam never closer than ~2 m; verify garage cam).
 - `DD.DECAL` height ladder — one constant per overlay (kerb .03 / glass .05 / centre .07 / edge .09 / boost .11 / landing .13), all offsets read from it; `polygonOffset(-1,-1)` on every NormalBlending road decal; additive strips raised onto the ladder too.
 - Stitch the closed-circuit ribbon seam (last→first quad when `track.closed`, incl. road body + edge strips).
@@ -69,21 +69,21 @@ audible/visible the whole time.
   by ≥ 0.2 s), long sweeper (grip must win), slow hairpin (grip/lift must win). Tuning is done when
   all three hold; no more feel-only regressions.
 
-## PHASE 2 — A world with reasons (off-track purpose + re-entry)
+## PHASE 2 — A world with reasons (off-track purpose + re-entry) ✅ **DONE** (session 27 — see STATUS.md; contract in `tests/verify_world.js`)
 
-**2.1 Re-entry aprons** _(trackgen + physics)_
+**2.1 Re-entry aprons** _(trackgen + physics)_ ✅
 - New per-sample flag `s.apron` (derived rng stream `::apron`): outside edges of straights/sweepers get periodic 20–30 m spans where the embankment conform target blends from −0.85 to −0.10 (flush). Drive off, drive back on. Visual: painted apron wedge + edge glow dims across the span so it reads as an invitation.
 - Respawn stays for chasms/void; aprons make *casual* off-tracks recoverable without ⚑.
 
-**2.2 Dirt shortcuts (risk/reward off-track)** _(trackgen + scene-decor)_
+**2.2 Dirt shortcuts (risk/reward off-track)** _(trackgen + scene-decor)_ ✅
 - Generator picks 1–2 corner chords per track (hairpin/tighten with clear terrain between entry/exit): carve a smoothed dirt corridor in the heightfield (own rng stream), clear decor along it, mark entry/exit with cone gates + tire-mark decal.
 - Dirt is slower per meter (0.5 grip / 0.62 accel already) but the chord is shorter → genuine line choice, TM-style. Bot ignores them → medals stay based on the road line; a skilled cut beats author honestly.
 - Checkpoint audit: shortcut must not skip a gate (choose chords within a checkpoint span).
 
-**2.3 Fake forks (cheap route choice)** _(trackgen + scene-decor)_
+**2.3 Fake forks (cheap route choice)** _(trackgen + scene-decor)_ ✅
 - On extra-wide pieces (≥ 1.3× base), drop a median island (glow bollard row, 60–120 m): left lane tight/short, right lane banked/fast — one ribbon, zero sim change, reads as a route decision.
 
-**2.4 Kerb/shoulder feedback** _(physics + audio — small)_
+**2.4 Kerb/shoulder feedback** _(physics + audio — small)_ ✅
 - Driving the kerb band excites `suspY` + rumble sfx; apron/shoulder gets distinct surface sound. Sells all of the above.
 
 ## PHASE 3 — Track depth, variety, looks

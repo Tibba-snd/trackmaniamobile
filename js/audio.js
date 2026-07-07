@@ -154,14 +154,17 @@
     n.windFilt.frequency.setTargetAtTime(300 + speed * 14, ctx.currentTime, 0.1);
   };
 
-  /* slide intensity 0..1, dirt flag, hitWall flag — call each frame */
-  DD.updateSurfaceAudio = function (slide, speed, onDirt, hitWall) {
+  /* slide intensity 0..1, dirt flag, hitWall flag, kerb intensity 0..1 — call each frame */
+  DD.updateSurfaceAudio = function (slide, speed, onDirt, hitWall, kerb) {
     if (!A.started) return;
     const ctx = A.ctx, n = A.nodes;
     const sc = DD.clamp(slide, 0, 1) * DD.clamp(speed / 30, 0, 1);
     n.screechGain.gain.setTargetAtTime(sc * 0.22 * A.volumes.sfx, ctx.currentTime, 0.04);
     n.screechFilt.frequency.setTargetAtTime(1100 + slide * 600 + speed * 3, ctx.currentTime, 0.06);
-    n.rumbleGain.gain.setTargetAtTime((onDirt ? DD.clamp(speed / 35, 0, 1) * 0.3 : 0) * A.volumes.sfx, ctx.currentTime, 0.07);
+    // rumble serves dirt AND the corner kerb band (kerb slightly quieter, same noise loop)
+    const rumble = onDirt ? DD.clamp(speed / 35, 0, 1) * 0.3
+      : DD.clamp(kerb || 0, 0, 1) * DD.clamp(speed / 35, 0, 1) * 0.22;
+    n.rumbleGain.gain.setTargetAtTime(rumble * A.volumes.sfx, ctx.currentTime, 0.07);
 
     // ---- wall scrape: grinding bandpass noise while hitWall & speed > 5 ----
     const active = !!hitWall && speed > 5;

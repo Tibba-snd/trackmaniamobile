@@ -101,6 +101,20 @@
   DD.duration = null;
   DD.mockKeys = null;
 
+  // decal height ladder
+  DD.DECAL = {
+    kerb: 0.03,
+    glass: 0.05,
+    start: 0.06,
+    centre: 0.07,
+    finish: 0.08,
+    edge: 0.09,
+    rail2: 0.10,
+    boost: 0.11,
+    landing: 0.13,
+    decor: 0.14
+  };
+
   // ---- storage ----
   const SAVE_KEY = 'driftdream_v1';
   // Bump when campaign tracks change in a way that invalidates old PBs/medals (re-rolled layouts,

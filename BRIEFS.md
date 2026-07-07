@@ -156,7 +156,7 @@ select track 5 → DRIVE → finish → REPLAY → same track reloads (not track
 ## A14 — Campaign polish + progression feel  🟢 LANDED (session 24, folded into A13)
 **Depends on: A13 landed.**
 
-## A15 — Road-decal height ladder (z-fight elimination)  🔴 (MASTERPLAN.md Phase 1.3, session 26)
+## A15 — Road-decal height ladder (z-fight elimination)  🟢 LANDED (drop reviewed clean + committed by Claude, session 27 — `DD.DECAL` in core.js, polygonOffset on NormalBlending decals, ?v= bumped)
 
 _Tibba: "track elements visually clip into each other — two planes on the exact same level and the
 graphics can't decide which to show."_ Claude already landed the two structural halves (camera near

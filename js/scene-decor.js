@@ -598,10 +598,14 @@
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     geo.setIndex(idx);
+    const isNormal = !blending || blending === THREE.NormalBlending;
     const mat = new THREE.MeshBasicMaterial({
       color: col(color), transparent: opacity < 1, opacity,
       blending: blending || THREE.NormalBlending, side: THREE.DoubleSide,
-      depthWrite: (blending === THREE.NormalBlending || !blending)
+      depthWrite: isNormal,
+      polygonOffset: isNormal,
+      polygonOffsetFactor: isNormal ? -1 : 0,
+      polygonOffsetUnits: isNormal ? -1 : 0
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
@@ -631,9 +635,9 @@
         if (!s || !sN || s.gap || sN.gap) continue;
         // inner edge sits on the deck; outer edge lifts ~0.12 so the kerb is a beveled 3D rumble
         // strip (catches light on its slope) instead of a flat painted sticker.
-        const e1 = V.addS(V.addS(s.p, s.r, side * (s.w / 2)), s.u, 0.035);
+        const e1 = V.addS(V.addS(s.p, s.r, side * (s.w / 2)), s.u, DD.DECAL.kerb);
         const o1 = V.addS(V.addS(e1, s.r, side * kerbW), s.u, 0.12);
-        const e2 = V.addS(V.addS(sN.p, sN.r, side * (sN.w / 2)), sN.u, 0.035);
+        const e2 = V.addS(V.addS(sN.p, sN.r, side * (sN.w / 2)), sN.u, DD.DECAL.kerb);
         const o2 = V.addS(V.addS(e2, sN.r, side * kerbW), sN.u, 0.12);
         addQuad(e1, o1, e2, o2, (i % 2 === 0) ? white : stripe);
       }
@@ -643,7 +647,13 @@
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colArr), 3));
     geo.setIndex(idx);
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
     return mesh;
@@ -830,7 +840,7 @@
         const s = ss[bi];
         if (!s || s.gap || bi < 2) continue;
         const bar = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.96, 1.1), barMat);
-        const p = V.addS(s.p, s.u, 0.09);
+        const p = V.addS(s.p, s.u, DD.DECAL.decor);
         bar.position.set(p[0], p[1], p[2]);
         const m = new THREE.Matrix4().makeBasis(
           new THREE.Vector3(s.r[0], s.r[1], s.r[2]),
@@ -1086,8 +1096,16 @@
         }
 
         const gridPad = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.96, 12),
-          new THREE.MeshBasicMaterial({ map: getStartGridTexture(theme), transparent: true, opacity: 0.82, fog: false }));
-        const padPos = new THREE.Vector3(s.p[0] + up.x * 0.05, s.p[1] + up.y * 0.05, s.p[2] + up.z * 0.05);
+          new THREE.MeshBasicMaterial({
+            map: getStartGridTexture(theme),
+            transparent: true,
+            opacity: 0.82,
+            fog: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+          }));
+        const padPos = new THREE.Vector3(s.p[0] + up.x * DD.DECAL.start, s.p[1] + up.y * DD.DECAL.start, s.p[2] + up.z * DD.DECAL.start);
         gridPad.position.copy(padPos);
         gridPad.lookAt(new THREE.Vector3(padPos.x + up.x, padPos.y + up.y, padPos.z + up.z));
         group.add(gridPad);
@@ -1131,11 +1149,19 @@
 
         const finishPos = new THREE.Vector3(s.p[0], s.p[1], s.p[2]);
         const stripe = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.95, 1.6),
-          new THREE.MeshBasicMaterial({ map: getCheckeredTexture(), transparent: true, opacity: 0.85, fog: false }));
+          new THREE.MeshBasicMaterial({
+            map: getCheckeredTexture(),
+            transparent: true,
+            opacity: 0.85,
+            fog: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+          }));
         stripe.position.set(
-          finishPos.x + up.x * 0.08,
-          finishPos.y + up.y * 0.08,
-          finishPos.z + up.z * 0.08
+          finishPos.x + up.x * DD.DECAL.finish,
+          finishPos.y + up.y * DD.DECAL.finish,
+          finishPos.z + up.z * DD.DECAL.finish
         );
         stripe.lookAt(new THREE.Vector3(
           finishPos.x + up.x,
@@ -1512,6 +1538,16 @@
       }
       if (!cleared) { off += 18.0; p = V.addS(V.clone(s.p), s.r, sign * off); }
 
+      // keep landmarks out of shortcut corridors — shove outboard if the pick sits in a cut
+      if (track.shortcuts) {
+        for (const cut of track.shortcuts) {
+          const abx = cut.b[0] - cut.a[0], abz = cut.b[2] - cut.a[2];
+          const t = DD.clamp(((p[0] - cut.a[0]) * abx + (p[2] - cut.a[2]) * abz) / cut.len2, 0, 1);
+          const dx = p[0] - (cut.a[0] + abx * t), dz = p[2] - (cut.a[2] + abz * t);
+          if (dx * dx + dz * dz < 14 * 14) { off += 34.0; p = V.addS(V.clone(s.p), s.r, sign * off); break; }
+        }
+      }
+
       const gy = groundY(p[0], p[2]);
       const [w, h] = sizeFor();
       const facing = V.norm([-sign * s.r[0], 0, -sign * s.r[2]]);
@@ -1583,6 +1619,8 @@
     for (let i = step; i < ss.length - step; i += step) {
       const s = ss[i];
       if (s.gap) continue;
+      // never plant a pole in a re-entry apron / shortcut mouth (it IS the drive-off path)
+      if (s.apron && s.apron * side > 0) { side = -side; continue; }
       places.push({ s, side });
       side = -side; // alternate verges
     }
@@ -2094,6 +2132,136 @@
   }
 
 
+  /* ---------------- RE-ENTRY APRONS (masterplan 2.1) ----------------
+     Faint glow wedge ramping from the deck edge onto the flush terrain — widens with apron
+     strength so the span reads as an invitation (the edge glow itself gaps in scene-core). */
+  function buildAprons(track, theme) {
+    const T = track.terrain;
+    if (!T) return null;
+    const group = new THREE.Group();
+    for (const side of [1, -1]) {
+      const strip = buildStrip(track, theme, (s) => {
+        if (s.gap || !s.apron || s.apron * side <= 0) return null;
+        const k = Math.abs(s.apron);
+        const inner = V.addS(V.addS(s.p, s.r, side * (s.w / 2 + 0.2)), s.u, 0.04);
+        const oP = V.addS(s.p, s.r, side * (s.w / 2 + 0.5 + 3.4 * k));
+        return [inner, [oP[0], DD.terrainAt(T, oP[0], oP[2]) + 0.07, oP[2]]];
+      }, V.lerp(theme.accent, [1, 1, 1], 0.2), 0.28, THREE.AdditiveBlending);
+      if (strip) group.add(strip);
+    }
+    return group.children.length ? group : null;
+  }
+
+  /* ---------------- DIRT SHORTCUTS (masterplan 2.2) ----------------
+     Cone gates flanking each corridor mouth + a dark tire-mark decal leading in. The corridor
+     itself is carved into the heightfield by trackgen; this is just the signage. */
+  function buildShortcutDecor(track, theme) {
+    const cuts = track.shortcuts;
+    const T = track.terrain;
+    if (!cuts || !cuts.length || !T) return null;
+    const group = new THREE.Group();
+    const coneGeo = new THREE.ConeGeometry(0.42, 1.15, 7); // origin at centre; instances offset +h/2
+    const coneMat = new THREE.MeshStandardMaterial({
+      color: col([0.08, 0.07, 0.1]), roughness: 0.6, metalness: 0.1,
+      emissive: col(theme.accent2), emissiveIntensity: 1.4
+    });
+    const cones = new THREE.InstancedMesh(coneGeo, coneMat, cuts.length * 8);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+    let ci = 0;
+    const markPos = [], markIdx = [];
+    let mvi = 0;
+    for (const cut of cuts) {
+      const dir = V.norm([cut.b[0] - cut.a[0], 0, cut.b[2] - cut.a[2]]);
+      const perp = [-dir[2], 0, dir[0]];
+      for (const [end, sgn] of [[cut.a, 1], [cut.b, -1]]) {
+        for (const pSide of [1, -1]) {
+          for (const along of [2.0, 8.0]) {
+            const px = end[0] + perp[0] * pSide * 5.2 + dir[0] * sgn * along;
+            const pz = end[2] + perp[2] * pSide * 5.2 + dir[2] * sgn * along;
+            m4.compose(pos.set(px, DD.terrainAt(T, px, pz) + 0.575, pz), q, one);
+            cones.setMatrixAt(ci++, m4);
+          }
+        }
+        // tire-mark decal: dark 9 m quad hugging the terrain into the mouth
+        for (const [dPerp, dAlong] of [[-1.3, 1.0], [1.3, 1.0], [-1.3, 10.0], [1.3, 10.0]]) {
+          const mx = end[0] + perp[0] * dPerp + dir[0] * sgn * dAlong;
+          const mz = end[2] + perp[2] * dPerp + dir[2] * sgn * dAlong;
+          markPos.push(mx, DD.terrainAt(T, mx, mz) + 0.06, mz);
+        }
+        markIdx.push(mvi, mvi + 1, mvi + 2, mvi + 1, mvi + 3, mvi + 2);
+        mvi += 4;
+      }
+    }
+    cones.count = ci;
+    cones.instanceMatrix.needsUpdate = true;
+    cones.frustumCulled = false;
+    group.add(cones);
+    const markGeo = new THREE.BufferGeometry();
+    markGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(markPos), 3));
+    markGeo.setIndex(markIdx);
+    const markMat = new THREE.MeshBasicMaterial({
+      color: col([0.02, 0.02, 0.03]), transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+    });
+    const marks = new THREE.Mesh(markGeo, markMat);
+    marks.frustumCulled = false;
+    group.add(marks);
+    return group;
+  }
+
+  /* ---------------- FAKE FORKS (masterplan 2.3) ----------------
+     Median island on extra-wide pieces: a glow-bollard row + dark median strip down the centre
+     of 60-120 m spans. One ribbon, ZERO sim change — it just reads as a route decision. */
+  function buildForkIslands(track, theme) {
+    const ss = track.samples;
+    const wBase = DD.lerp(20, 14, ((track.tier || 1) - 1) / 4);
+    const okName = (n) => n === 'straight' || n === 'sweeper' || n === 'banked';
+    const runs = [];
+    let r0 = -1;
+    for (let i = 0; i < ss.length; i++) {
+      const s = ss[i];
+      const ok = !s.gap && s.surf === 0 && okName(s.pieceName) && s.w >= wBase * 1.28 && !s.kerb;
+      if (ok && r0 < 0) r0 = i;
+      if ((!ok || i === ss.length - 1) && r0 >= 0) {
+        if (i - r0 >= 30) runs.push([r0, Math.min(i, r0 + 60)]); // 60-120 m
+        r0 = -1;
+      }
+    }
+    if (!runs.length) return null;
+    const group = new THREE.Group();
+    let total = 0;
+    for (const [a, b] of runs) total += Math.floor((b - a - 8) / 3) + 1;
+    const geo = new THREE.CylinderGeometry(0.13, 0.16, 1.1, 6); // origin at centre; instances offset +h/2
+    const mat = new THREE.MeshStandardMaterial({
+      color: col([0.05, 0.05, 0.07]), roughness: 0.5, metalness: 0.4,
+      emissive: col(theme.accent), emissiveIntensity: 1.6
+    });
+    const inst = new THREE.InstancedMesh(geo, mat, total);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+    let bi = 0;
+    const islandIdx = new Set();
+    for (const [a, b] of runs) {
+      for (let i = a + 4; i <= b - 4; i++) islandIdx.add(i);
+      for (let i = a + 4; i <= b - 4; i += 3) {
+        const s = ss[i];
+        m4.compose(pos.set(s.p[0], s.p[1] + 0.55, s.p[2]), q, one);
+        inst.setMatrixAt(bi++, m4);
+      }
+    }
+    inst.count = bi;
+    inst.instanceMatrix.needsUpdate = true;
+    inst.frustumCulled = false;
+    group.add(inst);
+    // dark median slab under the row (kerb-height rung — below the centre dashes)
+    const median = buildStrip(track, theme, (s, i) => {
+      if (!islandIdx.has(i)) return null;
+      const c = V.addS(s.p, s.u, 0.045);
+      return [V.addS(c, s.r, -0.9), V.addS(c, s.r, 0.9)];
+    }, [0.02, 0.02, 0.03], 0.9, THREE.NormalBlending);
+    if (median) group.add(median);
+    return group;
+  }
+
   // Register on DD._sceneShared
   DD._sceneShared.buildSky = buildSky;
   DD._sceneShared.buildStars = buildStars;
@@ -2103,6 +2271,9 @@
   DD._sceneShared.buildRoadBody = buildRoadBody;
   DD._sceneShared.buildStrip = buildStrip;
   DD._sceneShared.buildKerbs = buildKerbs;
+  DD._sceneShared.buildAprons = buildAprons;
+  DD._sceneShared.buildShortcutDecor = buildShortcutDecor;
+  DD._sceneShared.buildForkIslands = buildForkIslands;
   DD._sceneShared.buildCornerSigns = buildCornerSigns;
   DD._sceneShared.buildGates = buildGates;
   DD._sceneShared.buildDecor = buildDecor;
@@ -2162,7 +2333,10 @@
       roughness: 0.5,
       metalness: 0.8,
       transparent: true,
-      opacity: 0.9
+      opacity: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     const chevronMat = new THREE.MeshBasicMaterial({
@@ -2189,7 +2363,7 @@
       const endP = ss[run.end].p;
       const dist = V.dist(startP, endP);
 
-      pos.set(sMid.p[0], sMid.p[1] + 0.04, sMid.p[2]);
+      pos.set(sMid.p[0], sMid.p[1] + DD.DECAL.boost, sMid.p[2]);
 
       const yaw = Math.atan2(sMid.f[0], sMid.f[2]);
       const pitch = Math.asin(sMid.f[1]);
@@ -2256,7 +2430,10 @@
       roughness: 0.6,
       metalness: 0.6,
       transparent: true,
-      opacity: 0.85
+      opacity: 0.85,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     const targetMat = new THREE.MeshBasicMaterial({
@@ -2290,7 +2467,7 @@
       const endP = ss[run.end].p;
       const dist = V.dist(startP, endP);
 
-      pos.set(sMid.p[0], sMid.p[1] + 0.03, sMid.p[2]);
+      pos.set(sMid.p[0], sMid.p[1] + DD.DECAL.landing, sMid.p[2]);
 
       const yaw = Math.atan2(sMid.f[0], sMid.f[2]);
       const pitch = Math.asin(sMid.f[1]);
@@ -2304,7 +2481,7 @@
       for (let k = run.start; k <= run.end; k++) {
         if ((k - run.start) % 3 === 0 && ai < totalArrows) {
           const s = ss[k];
-          pos.set(s.p[0], s.p[1] + 0.05, s.p[2]);
+          pos.set(s.p[0], s.p[1] + (DD.DECAL.landing + 0.02), s.p[2]);
           const kYaw = Math.atan2(s.f[0], s.f[2]);
           const kPitch = Math.asin(s.f[1]);
           const kRoll = Math.atan2(s.r[1], s.r[0]);
@@ -2510,7 +2687,7 @@
         const ry = sA.r[1] + (sB.r[1] - sA.r[1]) * fraction;
         const rz = sA.r[2] + (sB.r[2] - sA.r[2]) * fraction;
 
-        pos.set(px, py + 0.07, pz);
+        pos.set(px, py + (DD.DECAL.boost + 0.03), pz);
 
         const yaw = Math.atan2(fx, fz);
         const pitch = Math.asin(fy);

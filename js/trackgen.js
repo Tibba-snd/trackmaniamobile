@@ -175,7 +175,7 @@
   // height and may rise to/above track level once it's laterally clear of the racing corridor
   const TERRAIN_RISE = { dune: 20, neon: 6, canyon: 48, frozen: 32 };
 
-  function buildTerrainData(samples, seedStr, theme) {
+  function buildTerrainData(samples, seedStr, theme, shortcuts) {
     const seed = DD.hashSeed(seedStr + '::terrain');
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, minY = 1e9;
     for (const s of samples) { minX = Math.min(minX, s.p[0]); maxX = Math.max(maxX, s.p[0]); minZ = Math.min(minZ, s.p[2]); maxZ = Math.max(maxZ, s.p[2]); minY = Math.min(minY, s.p[1]); }
@@ -211,7 +211,16 @@
               clampY = Math.min(clampY, s.p[1] - 12.0); // chasm under gaps
             } else {
               const minRoadY = s.p[1] - Math.abs(s.r[1]) * (s.w / 2);
-              clampY = Math.min(clampY, minRoadY - 1.25); // clear road edges on banking
+              // apron spans (masterplan 2.1): on the apron SIDE the safety clamp steps aside —
+              // the clamp is a MIN over ±~9 samples, so on undulating (bumpA) straights trough
+              // samples would drag crest-side shelf cells ~1 m below flush. The conform target
+              // (nearest sample, exact) shapes apron terrain; allow up to 1.5 m above each
+              // sample's own edge so neighbours can't re-ledge the shelf. apronReach = flag
+              // blurred ±12 samples (the clamp radius), full strength.
+              let drop = 1.25;
+              const ap = s.apronReach || 0;
+              if (ap && ((dx * s.r[0] + dz * s.r[2]) * ap > 0 || dSq < roadEdge * roadEdge)) drop = -1.5;
+              clampY = Math.min(clampY, minRoadY - drop); // clear road edges on banking
             }
           }
         }
@@ -250,27 +259,65 @@
         if (theme.terraced) h = Math.round(h / 9) * 9 + (h - Math.round(h / 9) * 9) * 0.25;
 
         // embankment conforming: raise terrain up to just under the road where it passes close
-        // (unchanged behavior; only ever RAISES toward the road underside)
+        // (only ever RAISES toward the road underside). On apron spans the conform target blends
+        // from -0.85 (permanent ledge) to -0.10 (flush) on the apron side — drive off, drive back on.
         if (!nearestSample.gap) {
           const minRoadY = roadY - Math.abs(nearestSample.r[1]) * (nearestSample.w / 2);
-          const targetH = minRoadY - 0.85;
+          let conf = 0.85, flushExt = 0;
+          if (nearestSample.apron) {
+            const sdx = x - nearestSample.p[0], sdz = z - nearestSample.p[2];
+            const sideMatch = (sdx * nearestSample.r[0] + sdz * nearestSample.r[2]) * nearestSample.apron > 0;
+            // under-deck cells flush on BOTH halves (invisible below the deck): on narrow decks
+            // the bilinear footprint of an off-half -0.85 cell bleeds into the apron edge
+            if (sideMatch || dist < roadEdgeN) {
+              conf = DD.lerp(0.85, 0.10, Math.abs(nearestSample.apron));
+              // widen the fully-flush shelf past the deck edge — the terrain grid is ~10-13 m
+              // per cell, so without this the bilinear falloff smears back into the mouth and
+              // the re-ground window (-0.45) is missed at the edge
+              // shelf must span >= ~1 grid cell (10-13 m) or bilinear falloff eats the mouth
+              flushExt = sideMatch ? 12.0 * Math.abs(nearestSample.apron) : 0;
+            }
+          }
+          const targetH = minRoadY - conf;
           const heightDiff = targetH - h;
           if (heightDiff > 0) {
-            const maxEmbankmentHeight = 16.0;
+            // apron shelves may build a taller local berm (24) — the apron pass only fires on
+            // near-ground spans (elev <= 6), so worst-case noise valleys still reach flush
+            const maxEmbankmentHeight = flushExt > 0 ? 24.0 : 16.0;
             const clampTargetH = Math.min(targetH, h + maxEmbankmentHeight);
-            if (dist < roadEdgeN) {
+            if (dist < roadEdgeN + flushExt) {
               h = clampTargetH;
-            } else if (dist < roadEdgeN + 32.0) {
-              const t = (dist - roadEdgeN) / 32.0;
+            } else if (dist < roadEdgeN + flushExt + 32.0) {
+              const t = (dist - roadEdgeN - flushExt) / 32.0;
               const smoothT = t * t * (3 - 2 * t);
               h = DD.lerp(clampTargetH, h, smoothT);
             }
           }
         }
 
-        // hard safety clamp LAST — nothing (uplift, terrace, embankment) may violate road
-        // clearance or fill a gap chasm
+        // hard safety clamp — nothing (uplift, terrace, embankment) may violate road clearance
+        // or fill a gap chasm
         if (clampY < 1e9) h = Math.min(h, clampY);
+
+        // dirt shortcut corridors (masterplan 2.2) — AFTER the clamp: the carve is a deliberate
+        // cut whose safety the candidate filter already guarantees (no gap pieces near the span,
+        // no unrelated geometry within 15 m at |Δy| < 14, banked mouths rejected). Left before
+        // the clamp, banked/lower NEIGHBOUR samples' contributions re-dig the mouths.
+        if (shortcuts) {
+          for (let sc = 0; sc < shortcuts.length; sc++) {
+            const cut = shortcuts[sc];
+            const abx = cut.b[0] - cut.a[0], abz = cut.b[2] - cut.a[2];
+            const t = DD.clamp(((x - cut.a[0]) * abx + (z - cut.a[2]) * abz) / cut.len2, 0, 1);
+            const px = cut.a[0] + abx * t, pz = cut.a[2] + abz * t;
+            const dC = Math.hypot(x - px, z - pz);
+            const HALF = 10.0, FEATHER = 12.0; // grid cells are 10-13 m — blend must span cells
+            if (dC < HALF + FEATHER) {
+              const hC = DD.lerp(cut.a[1], cut.b[1], DD.smoothstep(t));
+              const wC = dC < HALF ? 1 : 1 - DD.smoothstep((dC - HALF) / FEATHER);
+              h = DD.lerp(h, hC, wC);
+            }
+          }
+        }
 
         heights[j * RES + i] = h;
         hMin = Math.min(hMin, h); hMax = Math.max(hMax, h);
@@ -718,19 +765,266 @@
       }
     }
 
+    const checkpoints = ckpts.filter(c => c > startIdx + 20 && c < finishIdx - 20);
+
+    // --- kerb band flags (masterplan 2.4) — mirrors buildKerbs' span exactly (entry-3 .. end+3,
+    // inside edge) so the physics rumble band IS the visible kerb. Pure layout, no rng.
+    for (const c of corners) {
+      for (let i = Math.max(2, c.entry - 3); i < Math.min(samples.length - 1, c.end + 3); i++) {
+        if (!samples[i].gap) samples[i].kerb = c.insideSign;
+      }
+    }
+
+    /* --- re-entry aprons (masterplan 2.1) ---
+       s.apron ∈ [-1,1]: sign = side (+1 = +r), magnitude = flush strength (ramped at span ends).
+       Periodic 20-30 m spans on the outside edges of rail-free, flat straights/sweepers; the
+       terrain conform target blends -0.85 → -0.10 there so casual off-tracks are recoverable.
+       Derived rng stream — the main rng's draw sequence is untouched. */
+    // natural-terrain probe: the SAME base-field math buildTerrainData uses. Used by the apron
+    // pass (only flag where the embankment can actually reach flush) and the shortcut pass
+    // (reject chords over deep basins the carve can't hide at grid scale). Deterministic —
+    // reads the noise field, draws nothing from any rng.
+    let minTrackY = 1e9;
+    for (const s of samples) minTrackY = Math.min(minTrackY, s.p[1]);
+    const tSeed = DD.hashSeed(seedStr + '::terrain');
+    const natH = (x, z, roadY) => {
+      const elevN = Math.max(0, roadY - minTrackY);
+      const ceil = roadY - 8 - elevN * 0.55;
+      const floor = ceil - theme.terrainAmp * 2.2;
+      const xr = (x * 0.809 + z * 0.588) / 110, zr = (-x * 0.588 + z * 0.809) / 110;
+      const nz = valueNoise(tSeed, x / 240, z / 240) * 0.7 + valueNoise(tSeed ^ 0x9e37, xr, zr) * 0.3;
+      return floor + nz * (ceil - floor);
+    };
+
+    {
+      const rngA = DD.makeRng(seedStr + '::apron');
+      const RAMP = 4; // samples (8 m) of strength ramp at each span end
+      const shelfReachable = (idx, side) => {
+        const s = samples[idx];
+        for (const off of [3, 8]) {
+          const q = V.addS(V.clone(s.p), s.r, side * (s.w / 2 + off));
+          if (s.p[1] - 0.10 - natH(q[0], q[2], s.p[1]) > 21) return false;
+        }
+        return true;
+      };
+      for (const span of pieceSpans) {
+        if (span.name !== 'straight' && span.name !== 'sweeper') continue;
+        let i = span.start + 2;
+        const end = span.end - 2;
+        while (i < end) {
+          const gapN = rngA.int(6, 12);   // 12-24 m between apron spans
+          const apN = rngA.int(10, 18);   // 20-36 m apron span
+          const sidePick = rngA.sign();   // used when the span has no curvature (straights)
+          const a0 = i + gapN, a1 = Math.min(a0 + apN, end);
+          i = a1;
+          if (a1 - a0 < RAMP * 2) continue;
+          // eligibility: flat, plain surface, NEAR GROUND LEVEL (elevated decks can't be
+          // conformed flush — embankment cap). Railed spans are allowed: the audit's survivors
+          // OPEN the rail there (wallOpen), reading as gateway breaks in the fence.
+          let ok = true;
+          for (let k = a0; k < a1; k++) {
+            const s = samples[k];
+            if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || s.p[1] - minTrackY > 8.0) { ok = false; break; }
+          }
+          if (!ok) continue;
+          // sweepers: apron goes on the OUTSIDE of the turn (curv>0 turns toward +r → outside -r)
+          const dyaw = DD.angleDiff(samples[a0].yaw, samples[a1 - 1].yaw);
+          const side = Math.abs(dyaw) > 0.02 ? -Math.sign(dyaw) : sidePick;
+          // the noise field must actually allow a flush shelf here (probe both ends + middle)
+          if (!shelfReachable(a0, side) || !shelfReachable((a0 + a1) >> 1, side) || !shelfReachable(a1 - 1, side)) continue;
+          for (let k = a0; k < a1; k++) {
+            const strength = Math.min(1, (k - a0 + 1) / RAMP, (a1 - k) / RAMP);
+            samples[k].apron = side * strength;
+          }
+        }
+      }
+    }
+
+    /* --- dirt shortcuts (masterplan 2.2) ---
+       1-2 corner chords: a carved smooth dirt corridor across the inside of a sharp corner.
+       Own derived rng stream. Constraints: no checkpoint inside the span (gates can't be
+       skipped), chord clear of unrelated track geometry, sane length ratio + slope. The whole
+       corner inside gets apron flags so the mouths are flush and the safety clamp lifts. */
+    const shortcuts = [];
+    if (!isMenu) {
+      const rngS = DD.makeRng(seedStr + '::shortcut');
+      const n = samples.length;
+      const cands = [];
+      for (const c of corners) {
+        if (c.minRad > 65) continue; // hairpins/tightens only — sweepers aren't worth cutting
+        const e0 = Math.max(c.entry - 6, startIdx + 30);
+        const e1 = Math.min(c.end + 6, finishIdx - 30);
+        if (e1 - e0 < 20) continue;
+        if (checkpoints.some(k => k > e0 && k <= e1)) continue; // checkpoint audit
+        const sA = samples[e0], sB = samples[e1];
+        if (sA.gap || sB.gap) continue;
+        if (Math.abs(sA.bank) > 0.06 || Math.abs(sB.bank) > 0.06) continue;
+        let spanOk = true;
+        for (let j = e0; j <= e1; j++) { if (samples[j].gap || samples[j].surf !== 0) { spanOk = false; break; } }
+        if (!spanOk) continue;
+        const side = c.insideSign;
+        const a = V.addS(V.clone(sA.p), sA.r, side * (sA.w / 2 + 2.0));
+        const b = V.addS(V.clone(sB.p), sB.r, side * (sB.w / 2 + 2.0));
+        a[1] = sA.p[1] - Math.abs(sA.r[1]) * (sA.w / 2) - 0.15;
+        b[1] = sB.p[1] - Math.abs(sB.r[1]) * (sB.w / 2) - 0.15;
+        const chord = Math.hypot(b[0] - a[0], b[2] - a[2]);
+        const arc = (e1 - e0) * DS;
+        if (chord < 30 || chord > 160 || chord > arc * 0.72) continue; // must be a real cut
+        if (Math.abs(b[1] - a[1]) / chord > 0.12) continue;            // dirt ramp too steep
+        // deep-basin check: the carve blends over ~22 m — a chord across a natural drop much
+        // deeper than that leaves cliff walls at grid scale. Probe the noise field mid-chord.
+        let basinOk = true;
+        for (const tq of [0.3, 0.5, 0.7]) {
+          const qx = a[0] + (b[0] - a[0]) * tq, qz = a[2] + (b[2] - a[2]) * tq;
+          if (DD.lerp(a[1], b[1], tq) - natH(qx, qz, DD.lerp(a[1], b[1], tq) + 0.15) > 16) { basinOk = false; break; }
+        }
+        if (!basinOk) continue;
+        // clearance: the chord must not pass near UNRELATED track geometry
+        const abx = b[0] - a[0], abz = b[2] - a[2], len2 = chord * chord;
+        // adjacent gap pieces poison the corridor: their chasm clamp (p[1]-12) digs a hole in
+        // any cell within ~22 m — reject anchors with a gap anywhere near the span
+        let clear = true;
+        for (let j = Math.max(0, e0 - 20); j <= Math.min(n - 1, e1 + 20); j++) {
+          if (samples[j].gap) { clear = false; break; }
+        }
+        if (clear) for (let j = 0; j < n; j += 2) {
+          if (j >= e0 - 20 && j <= e1 + 20) continue;
+          const sp = samples[j].p;
+          const t = DD.clamp(((sp[0] - a[0]) * abx + (sp[2] - a[2]) * abz) / len2, 0, 1);
+          const dx = sp[0] - (a[0] + abx * t), dz = sp[2] - (a[2] + abz * t);
+          const near2 = samples[j].gap ? 26 * 26 : 15 * 15; // gap chasms reach further
+          if (dx * dx + dz * dz < near2 && Math.abs(sp[1] - DD.lerp(a[1], b[1], t)) < 14) { clear = false; break; }
+        }
+        if (!clear) continue;
+        cands.push({ entry: e0, exit: e1, side, a, b, len2 });
+      }
+      if (cands.length) {
+        const want = 1 + (rngS.chance(0.35) ? 1 : 0);
+        const first = rngS.int(0, cands.length - 1);
+        for (let o = 0; o < cands.length && shortcuts.length < want; o++) {
+          const cand = cands[(first + o) % cands.length];
+          if (shortcuts.some(sc => Math.min(cand.exit, sc.exit) + 20 > Math.max(cand.entry, sc.entry))) continue;
+          shortcuts.push(cand);
+          // flush the corner inside: apron flags across the whole span (shortcut wins over any
+          // weaker straight/sweeper apron). The INSIDE rail opens (wallOpen — physics clamp and
+          // rail render skip that side); the outside rail stays as crash protection.
+          const RAMP = 4;
+          for (let k = cand.entry; k <= cand.exit; k++) {
+            const strength = Math.min(1, (k - cand.entry + 1) / RAMP, (cand.exit - k + 1) / RAMP);
+            if (Math.abs(samples[k].apron || 0) < strength) samples[k].apron = cand.side * strength;
+            samples[k].wallOpen = cand.side;
+            samples[k].cut = 1; // exempts the span from the apron audit (mouths are carved exact)
+          }
+        }
+      }
+    }
+
+    // clamp-relaxation reach: the terrain safety clamp is RADIAL (roadEdge+10 ≈ 18-22 m ≈ ±11
+    // samples), so ANY sample within that radius carrying a partial/absent apron drop would cap
+    // the span's cells back toward the ledge. Any sample within ±12 of an apron span carries the
+    // FULL relaxation sign (the conform's per-sample ramp still shapes the visual taper — the
+    // clamp just steps aside for the whole span + margin). Wrap-aware on circuits.
+    {
+      const n = samples.length;
+      const REACH = 12;
+      const reach = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        let best = 0;
+        for (let o = -REACH; o <= REACH; o++) {
+          let j = i + o;
+          if (closed) j = ((j % n) + n) % n;
+          else if (j < 0 || j >= n) continue;
+          const a = samples[j].apron || 0;
+          if (Math.abs(a) > Math.abs(best)) best = a;
+        }
+        reach[i] = best === 0 ? 0 : Math.sign(best);
+      }
+      for (let i = 0; i < n; i++) { if (reach[i]) samples[i].apronReach = reach[i]; }
+    }
+
     const track = {
       seed: seedStr, tier, archetype,
       samples, ds: DS,
-      checkpoints: ckpts.filter(c => c > startIdx + 20 && c < finishIdx - 20),
+      checkpoints,
       startIdx, finishIdx,
       closed, laps,
       length: dist,
       pieceSpans,
       corners,
+      shortcuts,
       overlapForced,
       theme
     };
-    track.terrain = buildTerrainData(samples, seedStr, theme);
+    track.terrain = buildTerrainData(samples, seedStr, theme, shortcuts);
+
+    // apron audit — CLOSED LOOP: the conform/clamp interplay on a 10-13 m grid can still miss
+    // flush in odd noise/undulation spots. Re-measure every apron span against the ACTUAL grid
+    // and demote spans that can't deliver the re-ground window; "flagged apron ⇒ drivable" is a
+    // construction guarantee, not a hope. Shortcut spans (wallOpen) are exempt — their mouths
+    // are carved to exact heights. The already-built shelf terrain stays (harmless berm).
+    {
+      const T = track.terrain;
+      const n = samples.length;
+      // physics-consistent measure: terrain height expressed in the NEAREST sample's plane —
+      // exactly what re-grounding (ha >= -0.45) will see when the car arrives from the shelf
+      const haAt = (q, aroundIdx) => {
+        let best = aroundIdx, bestD = Infinity;
+        for (let k = Math.max(0, aroundIdx - 10); k <= Math.min(n - 1, aroundIdx + 10); k++) {
+          const ddx = q[0] - samples[k].p[0], ddz = q[2] - samples[k].p[2];
+          const d = ddx * ddx + ddz * ddz;
+          if (d < bestD) { bestD = d; best = k; }
+        }
+        const sN = samples[best];
+        const terrY = DD.terrainAt(T, q[0], q[2]);
+        return (q[0] - sN.p[0]) * sN.u[0] + (terrY - sN.p[1]) * sN.u[1] + (q[2] - sN.p[2]) * sN.u[2];
+      };
+      // per-SAMPLE trim (not whole-span demotion): road undulation (bumpA) vs the 10-13 m grid
+      // means most spans miss the line somewhere — keep exactly the drivable subset. Only the
+      // RE-GROUND LINE binds: the car rides terrain continuously (dirt stick band) up any gentle
+      // shelf slope; what must sit inside the -0.45 window is the terrain where |lat| crosses
+      // halfW. Flag surgery only — the terrain is already built.
+      const keep = new Uint8Array(n); // 0 = strip, 1 = kept core, 2 = ramp (conditional)
+      for (let i = 0; i < n; i++) {
+        const s = samples[i];
+        if (!s.apron || s.cut) continue; // shortcut spans exempt (mouths carved exact)
+        if (Math.abs(s.apron) < 0.999) { keep[i] = 2; continue; } // ramp: keep iff near kept core
+        const side = Math.sign(s.apron);
+        let ok = true;
+        for (const off of [0.6, 1.2]) {
+          const q = V.addS(V.clone(s.p), s.r, side * (s.w / 2 + off));
+          const ha = haAt(q, i);
+          if (ha < -0.42 || ha > 0.75) { ok = false; break; }
+        }
+        keep[i] = ok ? 1 : 0;
+      }
+      // drop cores shorter than 6 samples (12 m — too small to read or use as a mouth)
+      for (let i = 0; i < n;) {
+        if (keep[i] !== 1) { i++; continue; }
+        let j = i;
+        while (j < n && keep[j] === 1) j++;
+        if (j - i < 6) for (let k = i; k < j; k++) keep[k] = 0;
+        i = j;
+      }
+      // ramps survive only within 3 samples of a kept core; everything else is stripped
+      for (let i = 0; i < n; i++) {
+        if (!samples[i].apron || samples[i].cut) continue;
+        if (keep[i] === 1) continue;
+        let nearCore = false;
+        if (keep[i] === 2) {
+          for (let o = -3; o <= 3 && !nearCore; o++) {
+            const k = i + o;
+            if (k >= 0 && k < n && keep[k] === 1) nearCore = true;
+          }
+        }
+        if (!nearCore) samples[i].apron = 0;
+      }
+      // surviving apron samples on RAILED pieces open the rail on the apron side — a gateway
+      // break in the fence (physics clamp + rail render both key on wallOpen)
+      for (let i = 0; i < n; i++) {
+        const s = samples[i];
+        if (s.apron && s.wall && !s.cut) s.wallOpen = Math.sign(s.apron);
+      }
+    }
     return track;
   };
 

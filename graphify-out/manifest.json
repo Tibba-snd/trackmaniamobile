@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783270110.8317924,
+    "mtime": 1783320952.756686,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,22 +20,22 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783270110.804378,
+    "mtime": 1783320952.7214608,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783270110.812378,
+    "mtime": 1783320952.7325695,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783270110.8293927,
+    "mtime": 1783320952.7525496,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783270110.8293927,
+    "mtime": 1783320952.7540607,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/carspec.js": {
-    "mtime": 1783269904.7020242,
-    "ast_hash": "9e4eb4dfd80ca8db44bf864da288f01e",
+    "mtime": 1783271548.0282674,
+    "ast_hash": "8dee2c48b7a84762fd08dc45c3a3db30",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/core.js": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/game.js": {
-    "mtime": 1783270042.3561642,
-    "ast_hash": "778129c87d667a66f313d768d030e7bc",
+    "mtime": 1783320857.8727002,
+    "ast_hash": "5e9de16b1878f4d27dd02be83852997a",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/input.js": {
@@ -110,13 +110,13 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/physics.js": {
-    "mtime": 1783259922.7411633,
-    "ast_hash": "ab7c1a081e25e01e94d5abb004bb11b0",
+    "mtime": 1783319930.5097885,
+    "ast_hash": "d6659ca1a5c7611fbdbf75f8e50610b2",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-car.js": {
-    "mtime": 1783262330.5398512,
-    "ast_hash": "e12613e345b6e7adce4e75cdcecff647",
+    "mtime": 1783320691.555048,
+    "ast_hash": "dd26fb2c976e5e40983f25f884c209fe",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-core.js": {
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783270110.8317924,
+    "mtime": 1783320952.756686,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },
@@ -200,23 +200,23 @@
     "semantic_hash": ""
   },
   "js/audio.js": {
-    "mtime": 1783183237.1347394,
-    "ast_hash": "1e6b7d757a700b780510764fd535a394",
+    "mtime": 1783424929.0586097,
+    "ast_hash": "b93fcfff3bda28d07fee23838fcfd9ad",
     "semantic_hash": ""
   },
   "js/carspec.js": {
-    "mtime": 1783269904.7020242,
-    "ast_hash": "9e4eb4dfd80ca8db44bf864da288f01e",
+    "mtime": 1783354422.0215838,
+    "ast_hash": "6cda51d8c3d1022371415c082a47795d",
     "semantic_hash": ""
   },
   "js/core.js": {
-    "mtime": 1783241032.4643455,
-    "ast_hash": "5517645fe2ac5d6732400b75c1b794d0",
+    "mtime": 1783424542.9409266,
+    "ast_hash": "9b423daf0c5a4dd155e0fce2825b0f3f",
     "semantic_hash": ""
   },
   "js/game.js": {
-    "mtime": 1783270042.3561642,
-    "ast_hash": "778129c87d667a66f313d768d030e7bc",
+    "mtime": 1783424943.9890943,
+    "ast_hash": "a097421e036850f1b0d31583192be3eb",
     "semantic_hash": ""
   },
   "js/input.js": {
@@ -270,23 +270,23 @@
     "semantic_hash": ""
   },
   "js/physics.js": {
-    "mtime": 1783259922.7411633,
-    "ast_hash": "ab7c1a081e25e01e94d5abb004bb11b0",
+    "mtime": 1783424921.5428534,
+    "ast_hash": "9e84efafb587a37f818e2db9ab90486d",
     "semantic_hash": ""
   },
   "js/scene-car.js": {
-    "mtime": 1783262330.5398512,
-    "ast_hash": "e12613e345b6e7adce4e75cdcecff647",
+    "mtime": 1783417051.0069966,
+    "ast_hash": "e2fe3f67d26dfe0de3d51dc30de7800b",
     "semantic_hash": ""
   },
   "js/scene-core.js": {
-    "mtime": 1783201715.2221093,
-    "ast_hash": "623d3cc569fd6293cb30a53862402333",
+    "mtime": 1783425188.9633658,
+    "ast_hash": "cb5e5af96f87bc4e7d4aab3f25aec59e",
     "semantic_hash": ""
   },
   "js/scene-decor.js": {
-    "mtime": 1783203298.3375769,
-    "ast_hash": "2a5a4e5ef0196da241c98c3d60f8f439",
+    "mtime": 1783427434.4485655,
+    "ast_hash": "845e6b5896acf53100dd9fc681c9c2c1",
     "semantic_hash": ""
   },
   "js/scene-fx.js": {
@@ -295,18 +295,18 @@
     "semantic_hash": ""
   },
   "js/theme.js": {
-    "mtime": 1783064890.4627423,
-    "ast_hash": "06c638a85cc9770a5552e07b63b93c93",
+    "mtime": 1783417021.657787,
+    "ast_hash": "c9a9f4a9c276f76d713037ac5b2a7cbe",
     "semantic_hash": ""
   },
   "js/trackgen.js": {
-    "mtime": 1783238937.7472365,
-    "ast_hash": "49f9547e365ce0fa702f1ff2fa858ee6",
+    "mtime": 1783427290.4587233,
+    "ast_hash": "7216d737bfaa65076edf9ee01d68a950",
     "semantic_hash": ""
   },
   "tests/drivability.js": {
-    "mtime": 1783259813.8719501,
-    "ast_hash": "195c94670a8a093a3173d49698b7b436",
+    "mtime": 1783427456.9099956,
+    "ast_hash": "c966f56955b372caccfb48426b5c1ce4",
     "semantic_hash": ""
   },
   "tests/e2e_runner.js": {
@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "tests/verify_carspec.js": {
-    "mtime": 1783269933.2724733,
-    "ast_hash": "54740cab696d36796bee0285c502fd2e",
+    "mtime": 1783354422.709001,
+    "ast_hash": "aedabdbc4409c7c5128631ebf9d10a6e",
     "semantic_hash": ""
   },
   "tests/verify_colors.js": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783235013.5933774,
-    "ast_hash": "785e490491919b2f9581df25153054f8",
+    "mtime": 1783427794.4646876,
+    "ast_hash": "bea7f347ac7dd5fc606b9d37c396fa7c",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "STATUS.md": {
-    "mtime": 1783181515.8066094,
-    "ast_hash": "56eb6825998dd55aa962fbdd57ee3862",
+    "mtime": 1783427756.2783887,
+    "ast_hash": "863f657abcdd4119c70bda2c0d61bba6",
     "semantic_hash": ""
   },
   "apk-build/.github/workflows/android.yml": {
@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/index.html": {
-    "mtime": 1783270105.0827057,
-    "ast_hash": "9eb16284cebc4cdea8b5ba525bafb381",
+    "mtime": 1783320917.7798514,
+    "ast_hash": "b19bb7980af5b6957f06ed5e9fd1969e",
     "semantic_hash": ""
   },
   "docs/DESIGN_PROMPT.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1783270624.059565,
-    "ast_hash": "13f356bf395183888e4b0dcd94d3c63d",
+    "mtime": 1783425202.0338805,
+    "ast_hash": "922cf88a0e9865b9507474d5847a2162",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/res/drawable-land-hdpi/splash.png": {
@@ -680,497 +680,497 @@
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_airtime_t1.png": {
-    "mtime": 1782302735.9566536,
+    "mtime": 1783354420.7973864,
     "ast_hash": "0858c6c994e69a481a24e0346991d858",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_airtime_t2.png": {
-    "mtime": 1782302750.067461,
+    "mtime": 1783354420.8000731,
     "ast_hash": "8d0d1a090d65afd4efe5af7c8b3fbb2c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_airtime_t3.png": {
-    "mtime": 1782302765.1857722,
+    "mtime": 1783354420.8031404,
     "ast_hash": "3e269358ea03c051ce7154a69d42a59e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_airtime_t4.png": {
-    "mtime": 1782302781.3829608,
+    "mtime": 1783354420.8059134,
     "ast_hash": "cb01571b14404bc288682924e282f50c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_grounded_t1.png": {
-    "mtime": 1782302740.8942678,
+    "mtime": 1783354420.8099177,
     "ast_hash": "7bac53b0288029c093654fee5c54cbab",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_grounded_t2.png": {
-    "mtime": 1782302755.045114,
+    "mtime": 1783354420.8123257,
     "ast_hash": "f975af78264cae5c93a86faab22086c2",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_grounded_t3.png": {
-    "mtime": 1782302770.8838432,
+    "mtime": 1783354420.8153927,
     "ast_hash": "64b6252b5702ecb02f9ca0c39b38ee2c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_grounded_t4.png": {
-    "mtime": 1782302786.7875144,
+    "mtime": 1783354420.817837,
     "ast_hash": "6703152e537bd3b90cd012fbb6f94858",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_pitch_t1.png": {
-    "mtime": 1782302745.2772386,
+    "mtime": 1783354420.820887,
     "ast_hash": "b9a2ed7b743052fd628df17c1f8a01fd",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_pitch_t2.png": {
-    "mtime": 1782302759.8783736,
+    "mtime": 1783354420.8245587,
     "ast_hash": "d0b40828c43bdefb7340a82c8696055f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_pitch_t3.png": {
-    "mtime": 1782302776.3582094,
+    "mtime": 1783354420.8275714,
     "ast_hash": "86f438bceff3d12f764faf4fb59ac251",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/aerial_pitch_t4.png": {
-    "mtime": 1782302791.6984334,
+    "mtime": 1783354420.8295984,
     "ast_hash": "6176b5f9b4c45ea5390387a2e37b65c0",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/autodrive_checkpoint.png": {
-    "mtime": 1783184476.9631412,
+    "mtime": 1783354420.8347666,
     "ast_hash": "51174a7e24e3fd4b6a8e1c4f6c6edd7b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/boot_skip_menu.png": {
-    "mtime": 1783184457.494003,
+    "mtime": 1783354420.8402624,
     "ast_hash": "1d6f458dabd8ea0efbe0a88fea11c983",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_garage_t1.png": {
-    "mtime": 1782302806.742164,
+    "mtime": 1783354420.843632,
     "ast_hash": "23f256337183edca9ffa25a85c836a2e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_garage_t2.png": {
-    "mtime": 1782302822.8634737,
+    "mtime": 1783354420.8458622,
     "ast_hash": "aa48277d8cdf0affc4a07b4c2df819b5",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_garage_t3.png": {
-    "mtime": 1782302837.7792256,
+    "mtime": 1783354420.8493698,
     "ast_hash": "4cb601e366a4760b6d45877365b8ed29",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_garage_t4.png": {
-    "mtime": 1782302852.84269,
+    "mtime": 1783354420.8521612,
     "ast_hash": "ca3c4a01cda75b95da2c737b33a3fbea",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_save_t1.png": {
-    "mtime": 1782302796.3900256,
+    "mtime": 1783354420.8551624,
     "ast_hash": "71ce5021d92e24816a53a609a540452f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_save_t2.png": {
-    "mtime": 1782302811.9794214,
+    "mtime": 1783354420.8585675,
     "ast_hash": "61cc5733d6af492f508dbcda4c7cbbc6",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_save_t3.png": {
-    "mtime": 1782302827.709026,
+    "mtime": 1783354420.8619664,
     "ast_hash": "67d331b47d2a6ff2bdbd7b1a13864b84",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_save_t4.png": {
-    "mtime": 1782302843.0915723,
+    "mtime": 1783354420.8640082,
     "ast_hash": "a5d9c1e98c853724d8636b895e870297",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_settings_t1.png": {
-    "mtime": 1782302801.5045018,
+    "mtime": 1783354420.8671856,
     "ast_hash": "e4f63600ea8a8579678c16632688e873",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_settings_t2.png": {
-    "mtime": 1782302817.280478,
+    "mtime": 1783354420.8705928,
     "ast_hash": "d383c889ef8724049f4653d790aea407",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_settings_t3.png": {
-    "mtime": 1782302832.6909862,
+    "mtime": 1783354420.8729362,
     "ast_hash": "7cc7be6f2baa0389191365e09986ec52",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/camp_settings_t4.png": {
-    "mtime": 1782302847.937283,
+    "mtime": 1783354420.8768063,
     "ast_hash": "2b982802d949d596cdb941a83dee4a40",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_braketap_t1.png": {
-    "mtime": 1783184705.9241495,
+    "mtime": 1783354420.8827646,
     "ast_hash": "443af4fe28500afea9203eeb74239eb1",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_braketap_t2.png": {
-    "mtime": 1783184732.04869,
+    "mtime": 1783354420.8870616,
     "ast_hash": "5b9c027cb93ba9618ac6d39a26a4901f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_braketap_t3.png": {
-    "mtime": 1782302650.9715388,
+    "mtime": 1783354420.8908384,
     "ast_hash": "fcb592b56b9dfe7c2c452cde97d71703",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_braketap_t4.png": {
-    "mtime": 1782302669.282525,
+    "mtime": 1783354420.8938346,
     "ast_hash": "3e5e7a398cca3cdbf0a64a82e2123d7e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_flag_check_t1.png": {
-    "mtime": 1783184714.818427,
+    "mtime": 1783354420.8988552,
     "ast_hash": "2c3aece7875bdb94778769487ae14ddf",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_flag_check_t2.png": {
-    "mtime": 1782302638.9501624,
+    "mtime": 1783354420.9023306,
     "ast_hash": "41ca4c0a540f4240238f7d3e537cf020",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_flag_check_t3.png": {
-    "mtime": 1782302657.84879,
+    "mtime": 1783354420.9055812,
     "ast_hash": "2de8441be688245d617550bdac228f3f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_flag_check_t4.png": {
-    "mtime": 1782302675.6396186,
+    "mtime": 1783354420.9077616,
     "ast_hash": "3d2cd0ea9c749dad055ec2e67e9f3727",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_slip_t1.png": {
-    "mtime": 1783184697.6814837,
+    "mtime": 1783354420.9131722,
     "ast_hash": "c6c3c6e9f35a3ad9466d8b7b4168159a",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_slip_t2.png": {
-    "mtime": 1783184723.5930727,
+    "mtime": 1783354420.9186227,
     "ast_hash": "348b1d20174afac3bd48b55a2be3696c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_slip_t3.png": {
-    "mtime": 1782302645.10195,
+    "mtime": 1783354420.9220707,
     "ast_hash": "dae1e4864d512cbae678290fc18b0d7c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/drift_slip_t4.png": {
-    "mtime": 1782302663.5768077,
+    "mtime": 1783354420.9254768,
     "ast_hash": "cbd988db3578d81893630ccd28413a8b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/duration_timeout.png": {
-    "mtime": 1783184486.1747122,
+    "mtime": 1783354420.931053,
     "ast_hash": "a1d28147665107c48f64e0f1f227b586",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_rpm_t1.png": {
-    "mtime": 1783184603.9423773,
+    "mtime": 1783354420.9358916,
     "ast_hash": "f99c7fabbf702283fdcb1c13db863509",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_rpm_t2.png": {
-    "mtime": 1783184629.8663056,
+    "mtime": 1783354420.939806,
     "ast_hash": "b5f3042ea5da1ae5c105a010a8e0e2cf",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_rpm_t3.png": {
-    "mtime": 1783184655.8119705,
+    "mtime": 1783354420.9449205,
     "ast_hash": "3e63e13e65124cb8d461f04c22a9a2d3",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_rpm_t4.png": {
-    "mtime": 1783184681.2409074,
+    "mtime": 1783354420.9501815,
     "ast_hash": "383919953e11392f4921bec47dc40feb",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_shiftcut_t1.png": {
-    "mtime": 1783184613.0255208,
+    "mtime": 1783354420.9551215,
     "ast_hash": "3fdad5347e58ae0a83f07f239c265ff1",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_shiftcut_t2.png": {
-    "mtime": 1783184638.622427,
+    "mtime": 1783354420.9607272,
     "ast_hash": "52f3ad0e04b464ec87c0110ff1f6728b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_shiftcut_t3.png": {
-    "mtime": 1783184664.1055164,
+    "mtime": 1783354420.9658296,
     "ast_hash": "58577fd5abfb49ae9eccc3f043fab00a",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_shiftcut_t4.png": {
-    "mtime": 1783184689.3375986,
+    "mtime": 1783354420.9706862,
     "ast_hash": "1d33dac05a5b8d2f63b49081f8672c2b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_upshift_g2_t1.png": {
-    "mtime": 1783184595.7402875,
+    "mtime": 1783354420.9770646,
     "ast_hash": "3eb32c3aaa90ea8a6783e4c1a027f990",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_upshift_g2_t2.png": {
-    "mtime": 1783184621.73246,
+    "mtime": 1783354420.9813795,
     "ast_hash": "7465de3d9561f9aeab900fe819a6156a",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_upshift_g2_t3.png": {
-    "mtime": 1783184647.42176,
+    "mtime": 1783354420.9868245,
     "ast_hash": "e7f2fa6f21ee357aba0c499efc96973d",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/gear_upshift_g2_t4.png": {
-    "mtime": 1783184672.719411,
+    "mtime": 1783354420.993094,
     "ast_hash": "b019d37f2c04f00bfa81239c45edcdf1",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_accel_t1.png": {
-    "mtime": 1783184494.4552486,
+    "mtime": 1783354420.9980757,
     "ast_hash": "875695ebbf9fa0c24c35973d8ea6a12d",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_accel_t2.png": {
-    "mtime": 1783184519.8009777,
+    "mtime": 1783354421.003287,
     "ast_hash": "d1fe4efce315a8cafa4fa6c2e250db4f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_accel_t3.png": {
-    "mtime": 1783184545.134972,
+    "mtime": 1783354421.0085065,
     "ast_hash": "7a5f60d8754bd47536e8056312cd895c",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_accel_t4.png": {
-    "mtime": 1783184569.8803144,
+    "mtime": 1783354421.0138276,
     "ast_hash": "602370640af1ca149a01c82c84b63da2",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_l_t1.png": {
-    "mtime": 1783184511.3875716,
+    "mtime": 1783354421.0182247,
     "ast_hash": "83d79c615126f6e920fa3023f6e48a01",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_l_t2.png": {
-    "mtime": 1783184536.8597174,
+    "mtime": 1783354421.0258296,
     "ast_hash": "30db1de1f60a26d6e5075ba04947c24d",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_l_t3.png": {
-    "mtime": 1783184561.8051507,
+    "mtime": 1783354421.0308213,
     "ast_hash": "6662861f3c8c1fe77e31e62beb5ce857",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_l_t4.png": {
-    "mtime": 1783184586.7326474,
+    "mtime": 1783354421.0359647,
     "ast_hash": "c0e2819b1d8f9f0f0c9f52d505521132",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_r_t1.png": {
-    "mtime": 1783184503.0805206,
+    "mtime": 1783354421.041522,
     "ast_hash": "7f59455c579759b79c236e81e482c98a",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_r_t2.png": {
-    "mtime": 1783184527.9529939,
+    "mtime": 1783354421.0473573,
     "ast_hash": "f954b6f6a1920c3b64bb2a0f686a2afc",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_r_t3.png": {
-    "mtime": 1783184553.5326524,
+    "mtime": 1783354421.0527883,
     "ast_hash": "54f20801648c8b49f6a61ed50ae252f1",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/phys_steer_r_t4.png": {
-    "mtime": 1783184578.2207093,
+    "mtime": 1783354421.0599976,
     "ast_hash": "8ede4d9ed8ed0faa40302c60f7db4fbb",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_dirt_t1.png": {
-    "mtime": 1782302685.432401,
+    "mtime": 1783354421.063263,
     "ast_hash": "b4d77325e08dd558ff5e009f4b5fa43e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_dirt_t2.png": {
-    "mtime": 1782302698.5797255,
+    "mtime": 1783354421.066751,
     "ast_hash": "e89e6073c4a4c2c9c0987ab45e3629e8",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_dirt_t3.png": {
-    "mtime": 1782302712.494389,
+    "mtime": 1783354421.069064,
     "ast_hash": "b9d5ac9f75fbdaf33d8c168f56274a18",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_dirt_t4.png": {
-    "mtime": 1782302726.8309078,
+    "mtime": 1783354421.0732698,
     "ast_hash": "c41dc720b69a60f8b8448dd29fd76702",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_glass_t1.png": {
-    "mtime": 1782302689.7699077,
+    "mtime": 1783354421.0774264,
     "ast_hash": "67c67e73336513499b964e9aa7f19e0a",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_glass_t2.png": {
-    "mtime": 1782302703.107984,
+    "mtime": 1783354421.0804582,
     "ast_hash": "e28a47c6cb6f1cf8397ee692fd8830a0",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_glass_t3.png": {
-    "mtime": 1782302717.1054242,
+    "mtime": 1783354421.0834875,
     "ast_hash": "482a777ecc8dfde67ff577ba0a645ba9",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_glass_t4.png": {
-    "mtime": 1782302731.1432002,
+    "mtime": 1783354421.087846,
     "ast_hash": "32bc145d88b67be6be77ad2b5337d551",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_type_t1.png": {
-    "mtime": 1782302680.7868793,
+    "mtime": 1783354421.093439,
     "ast_hash": "b6f81f7b6c11cde5187db7b9ca6937b3",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_type_t2.png": {
-    "mtime": 1782302694.1823945,
+    "mtime": 1783354421.0966735,
     "ast_hash": "9fd368f6b5ac0d3c0b7e1d8b3082fc66",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_type_t3.png": {
-    "mtime": 1782302707.8709006,
+    "mtime": 1783354421.09991,
     "ast_hash": "60e9b3b3a902417fb88f93fdce6b15b7",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/surf_type_t4.png": {
-    "mtime": 1782302721.9386346,
+    "mtime": 1783354421.1034298,
     "ast_hash": "8718bc7369182a6e6ca0ca35b35522de",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_gear_t1.png": {
-    "mtime": 1782302863.2842267,
+    "mtime": 1783354421.107926,
     "ast_hash": "c2ea309380ff75787f8467ee2da65b07",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_gear_t2.png": {
-    "mtime": 1782302879.7965698,
+    "mtime": 1783354421.111925,
     "ast_hash": "69065056d4d71531444e9f5c361f7f1e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_gear_t3.png": {
-    "mtime": 1782302895.545978,
+    "mtime": 1783354421.1149235,
     "ast_hash": "a728aebba37b5a51fdaec7281f62b1cf",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_gear_t4.png": {
-    "mtime": 1782302911.5255103,
+    "mtime": 1783354421.1179228,
     "ast_hash": "b55e6250163b66fbee63aac6a9cc2c85",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_speed_t1.png": {
-    "mtime": 1782302858.0689774,
+    "mtime": 1783354421.1219246,
     "ast_hash": "f78d59fad292e29cb71ad367d9a74c64",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_speed_t2.png": {
-    "mtime": 1782302874.1244235,
+    "mtime": 1783354421.125925,
     "ast_hash": "17845e0e9f9b5e572f951402fc47845d",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_speed_t3.png": {
-    "mtime": 1782302890.5829194,
+    "mtime": 1783354421.129928,
     "ast_hash": "d2838ac98001f5e2056c935a6251e874",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_speed_t4.png": {
-    "mtime": 1782302905.9818835,
+    "mtime": 1783354421.1329236,
     "ast_hash": "fdf8f2c0d36a70ce85f4bd895e862dd8",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_time_t1.png": {
-    "mtime": 1782302868.7548265,
+    "mtime": 1783354421.1372814,
     "ast_hash": "c75d72bb06f618e5f640e805839bb371",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_time_t2.png": {
-    "mtime": 1782302885.4764721,
+    "mtime": 1783354421.1403115,
     "ast_hash": "eb2aae22b0de365aa83ce8aaab004648",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_time_t3.png": {
-    "mtime": 1782302900.649183,
+    "mtime": 1783354421.1445887,
     "ast_hash": "90cadb011f97b70e7ddc87622af502e3",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/ui_time_t4.png": {
-    "mtime": 1782302917.1385808,
+    "mtime": 1783354421.1475985,
     "ast_hash": "77a07031c9d4de97683f9a4a9b49f6f8",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_canvas_t1.png": {
-    "mtime": 1782302922.356961,
+    "mtime": 1783354421.1525967,
     "ast_hash": "7198adb9ee75b68ee6039cb347151961",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_canvas_t2.png": {
-    "mtime": 1782302937.4501607,
+    "mtime": 1783354421.156598,
     "ast_hash": "68559808ed336dff3fca35b14277b008",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_canvas_t3.png": {
-    "mtime": 1782302952.7868488,
+    "mtime": 1783354421.163598,
     "ast_hash": "41a80ae0f936241413c2aa01e6498318",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_canvas_t4.png": {
-    "mtime": 1781699376.218703,
+    "mtime": 1783354421.1686008,
     "ast_hash": "31bbc41f8af0adfea642b2319df04d29",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_car_mesh_t1.png": {
-    "mtime": 1782302932.6015785,
+    "mtime": 1783354421.1725855,
     "ast_hash": "f9b931471b47d9ef0fa33032677464e2",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_car_mesh_t2.png": {
-    "mtime": 1782302947.6255848,
+    "mtime": 1783354421.1770687,
     "ast_hash": "1dd0216e96c5b09ad595139249a5411b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_car_mesh_t3.png": {
-    "mtime": 1781699369.974205,
+    "mtime": 1783354421.181466,
     "ast_hash": "2952a3f6c02d22bcbc50a773185ed62b",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_car_mesh_t4.png": {
-    "mtime": 1781699385.3491304,
+    "mtime": 1783354421.1858132,
     "ast_hash": "71fb78bdc03a5dcbe75e086780546a7f",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_theme_t1.png": {
-    "mtime": 1782302927.433278,
+    "mtime": 1783354421.1898673,
     "ast_hash": "569c49cb8bbddebc4cb48072aef7397d",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_theme_t2.png": {
-    "mtime": 1782302942.4415317,
+    "mtime": 1783354421.1932514,
     "ast_hash": "731bf54cc038f220c68392f687726be5",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_theme_t3.png": {
-    "mtime": 1781699363.8704972,
+    "mtime": 1783354421.1983538,
     "ast_hash": "a13deaa842635650cfdb0c0e6039184e",
     "semantic_hash": ""
   },
   "tests/screenshots/golden/vis_theme_t4.png": {
-    "mtime": 1781699380.676321,
+    "mtime": 1783354421.2033775,
     "ast_hash": "be3b539991e299182ce440043bd8303d",
     "semantic_hash": ""
   },
@@ -1200,13 +1200,13 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/physdev.js": {
-    "mtime": 1783257806.3770428,
-    "ast_hash": "6d86b587237f13132e200ddad0d9d73c",
+    "mtime": 1783319948.2282805,
+    "ast_hash": "6acfdb7376a5b258d41ec6110e663371",
     "semantic_hash": ""
   },
   "js/physdev.js": {
-    "mtime": 1783257806.3770428,
-    "ast_hash": "6d86b587237f13132e200ddad0d9d73c",
+    "mtime": 1783415039.025341,
+    "ast_hash": "a1a2459bf8baff2bcd27c0de70bd7a50",
     "semantic_hash": ""
   },
   ".agents/rules/caveman.md": {
@@ -1237,6 +1237,26 @@
   "docs/GARAGE_ROOM_SPEC.md": {
     "mtime": 1783271104.8272266,
     "ast_hash": "af46e95956f618182b681525c7f4bb2d",
+    "semantic_hash": ""
+  },
+  "js/perfhud.js": {
+    "mtime": 1783355413.7702856,
+    "ast_hash": "06299b079a12164dd1883934788f057d",
+    "semantic_hash": ""
+  },
+  "tests/verify_slide.js": {
+    "mtime": 1783415251.2106602,
+    "ast_hash": "c02d6d203342f1c50ef16235c149214c",
+    "semantic_hash": ""
+  },
+  "MASTERPLAN.md": {
+    "mtime": 1783427774.814199,
+    "ast_hash": "9535ee4f5e0d96f6a814ab5d906e82a3",
+    "semantic_hash": ""
+  },
+  "tests/verify_world.js": {
+    "mtime": 1783427247.4009526,
+    "ast_hash": "5b9693c2a62d1eca2cdb0fa1cfe94df8",
     "semantic_hash": ""
   }
 }

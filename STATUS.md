@@ -94,7 +94,67 @@ These are real today (the code, not the marketing). Roughly high→low impact.
 
 ---
 
-## Resolved this pass — Phase 1 physics: powerslide rework + impulse walls + grounding rules (2026-07-07, session 26)
+## Resolved this pass — Phase 2 world: re-entry aprons, dirt shortcuts, kerb feedback, fake forks (2026-07-07, session 27)
+
+Masterplan Phase 2 ("a world with reasons") landed in full, plus Antigravity's A15 drop
+(road-decal height ladder — `DD.DECAL` in `js/core.js` + `polygonOffset(-1,-1)` on every
+NormalBlending road decal) reviewed clean and committed with this pass.
+
+**2.1 Re-entry aprons** (`js/trackgen.js` + `js/physics.js` + scene) — the old world had a
+permanent ledge at every road edge (conform target −0.85, and the hidden radial safety clamp
+actually made it −1.25), so leaving the road was unrecoverable. Now:
+- Per-sample `s.apron` ∈ [−1,1] (sign = side, magnitude = ramp strength) on periodic 20–36 m
+  spans of straights/sweepers, derived stream `seed + '::apron'` — main rng untouched, road
+  layouts byte-identical.
+- Terrain conform target blends −0.85 → −0.10 on the apron side, with a ≥ 1-grid-cell flush
+  shelf (`flushExt` 12 m) and the safety clamp stepping aside (`apronReach`, flag blurred ±12
+  samples to cover the clamp's radial reach; contribution −1.5 so undulating (`bumpA`) neighbours
+  can't re-ledge the shelf). Under-deck cells conform flush on BOTH halves (kills bilinear bleed
+  on narrow decks).
+- **Closed-loop audit**: after the terrain grid is built, every apron sample is re-measured with
+  the physics' own quantity (terrain in the NEAREST sample's plane at the re-ground line, window
+  −0.42) and failing samples are trimmed (min surviving core 6 samples). "Flagged apron ⇒
+  drivable" is a construction guarantee — the 10–13 m terrain grid and noise field can't be
+  fully predicted open-loop.
+- Railed spans participate: surviving apron samples OPEN the rail on the apron side
+  (`s.wallOpen` — physics wall clamp and rail strips both skip that side), reading as gateway
+  breaks in the fence.
+- Physics: the apron side of the shoulder is a free transition band (no `shoulderScrub`/
+  `shoulderPush`); re-grounding from the flush shelf sits inside session 26's −0.45 window.
+- Scene: edge glow + rail2 gap over apron spans (the border opens = the invitation), faint
+  additive wedge ramps onto the terrain (`buildAprons`), light poles skip apron sides.
+
+**2.2 Dirt shortcuts** (`js/trackgen.js` + `js/scene-decor.js`) — 1–2 corner chords per track
+where terrain allows (stream `seed + '::shortcut'`): sharp corners (minRad < 65) with no
+checkpoint inside the span (gates can't be skipped), no gap pieces within ±20 samples (their
+chasm clamp digs holes), chord clear of unrelated geometry, no deep basins (noise-field probe).
+The corridor is carved into the heightfield AFTER the safety clamp (its safety is established by
+the candidate filter; before it, banked neighbours re-dug the mouths) as a smooth lerp between
+mouth heights, 10 m half-width + 12 m feather (grid-cell scale). The whole corner inside gets
+apron flags (`s.cut` marks the span audit-exempt — mouths are carved exact) and the inside rail
+opens; the outside rail stays as crash protection. Decor: cone gates + tire-mark decals at both
+mouths (`buildShortcutDecor`); scatter/landmark placement avoids corridors. Bot ignores chords —
+medals stay road-line-based.
+
+**2.3 Fake forks** (`js/scene-decor.js` `buildForkIslands`) — extra-wide (≥ 1.28× tier base
+width) straight/sweeper/banked runs ≥ 60 m get a median island: glow-bollard row + dark median
+strip down the centre, 60–120 m. Pure decor, zero sim change.
+
+**2.4 Kerb/apron feedback** (`js/physics.js` + `js/audio.js` + `js/game.js`) — per-sample
+`s.kerb` mirrors `buildKerbs`' exact span (corner inside edge, entry−3..end+3, no rng). Riding
+the band excites `suspY` (speed-scaled 2 m stripe cadence via `car.kerbPhase`) and sets
+`car.kerb`, which drives the existing dirt-rumble noise loop at slightly lower gain.
+
+**Acceptance:** new `tests/verify_world.js` (14 checks) encodes the Phase 2 contract — apron
+flush at the re-ground line, ledge preserved away from aprons, shortcut checkpoint audit, carved
+corridor smoothness, kerb-band physics, e2e drive-off + re-entry, and 0 `buildValidTrack`
+fallbacks across a seeds×tiers matrix. `drivability [17]` narrowed knowingly (apron spans exempt
+from the 1.0 m clearance rule; they must only never rise above the deck). Full suite green:
+drivability 45, slide 26, determinism, colors, m2, camera, sky, world 14.
+
+---
+
+## Resolved earlier this day — Phase 1 physics: powerslide rework + impulse walls + grounding rules (2026-07-07, session 26)
 
 Masterplan session (see the new [`MASTERPLAN.md`](MASTERPLAN.md) — track/terrain/car-feel roadmap,
 Tibba-directed). This pass landed Phase 1.1/1.2/1.5, all Claude-owned physics:

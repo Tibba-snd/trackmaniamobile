@@ -130,6 +130,7 @@
       yawRate: 0,
       steerPos: 0,
       gear: 1, rpm01: 0, shiftCut: 0, suspY: 0, suspV: 0, lastPitch: 0, wheelAngle: 0,
+      kerb: 0, kerbPhase: 0,
       pitchVis: 0, rollVis: 0,
       grounded: true, onDirt: false,
       idx: track.startIdx,
@@ -266,7 +267,7 @@
       car.pos = V.addS(car.pos, s.u, -ha + 0.02);
       const vuNow = V.dot(car.vel, s.u);
       if (vuNow < 0) car.vel = V.addS(car.vel, s.u, -vuNow);
-      groundFrame = { u: s.u, pitch: s.pitch, bank: s.bank, surf: s.surf, mode: 'ribbon', wall: s.wall, lat, halfW, shoulder: onShoulder, r: s.r };
+      groundFrame = { u: s.u, pitch: s.pitch, bank: s.bank, surf: s.surf, mode: 'ribbon', wall: s.wall, lat, halfW, shoulder: onShoulder, r: s.r, apron: s.apron || 0, kerb: s.kerb || 0 };
     } else if (track.terrain) {
       const th = DD.terrainAt(track.terrain, car.pos[0], car.pos[2]);
       const ha2 = car.pos[1] - th;
@@ -557,9 +558,24 @@
     car.vel = V.addS(V.scale(fwd2, vLong), right2, vLat);
 
     // ---- shoulder & walls (ribbon only) ----
-    if (gf.mode === 'ribbon' && gf.shoulder) {
+    // apron spans (masterplan 2.1): the apron side is a free transition band — no scrub, no
+    // push-back — so driving off (and back on) reads as an invitation, not a fight
+    if (gf.mode === 'ribbon' && gf.shoulder && !(gf.apron && Math.sign(gf.lat) * gf.apron > 0)) {
       car.vel = V.scale(car.vel, P.shoulderScrub);
       car.vel = V.addS(car.vel, gf.r, -Math.sign(gf.lat) * P.shoulderPush * dt);
+    }
+
+    // ---- kerb feedback (masterplan 2.4): riding the corner kerb band excites the springs ----
+    // Band mirrors buildKerbs geometry: from ~0.9 m inside the deck edge to the kerb's outer lip.
+    // Stripe cadence scales with speed (2 m stripes); car.kerb feeds the rumble sfx.
+    car.kerb = 0;
+    if (gf.mode === 'ribbon' && gf.kerb && Math.sign(gf.lat) === Math.sign(gf.kerb)) {
+      const aLat = Math.abs(gf.lat);
+      if (aLat > gf.halfW - 1.3 && aLat < gf.halfW + 0.9) {
+        car.kerb = DD.clamp(speed / 25, 0.2, 1);
+        car.kerbPhase += speed * dt * Math.PI; // 2 m stripe wavelength
+        car.suspV += Math.sin(car.kerbPhase) * 2.6 * car.kerb;
+      }
     }
 
     car.pos = V.addS(car.pos, car.vel, dt);
@@ -575,6 +591,7 @@
 
   function stepAirborne(car, input, dt) {
     car.airTime += dt;
+    car.kerb = 0;
     car.vel[1] -= P.gravity * dt;
     // TM air control: brake instantly stabilises rotation; steer spins the car
     if (input.brake) {
@@ -611,6 +628,8 @@
       const lat = V.dot(rel, s.r);
       const lim = s.w / 2 - P.carHalfW;
       if (Math.abs(lat) <= lim) continue;
+      // shortcut mouths: the inside rail is OPEN on wallOpen's side — drive through freely
+      if (s.wallOpen && Math.sign(lat) === s.wallOpen) continue;
       // push the whole car by this point's overshoot
       car.pos = V.addS(car.pos, s.r, Math.sign(lat) * lim - lat);
       const vr = V.dot(car.vel, s.r);

@@ -410,10 +410,15 @@ console.log('[17] terrain landforms (C3 height policy)');
     for (const smp of t.samples) {
       const th = DD.terrainAt(T, smp.p[0], smp.p[2]);
       if (smp.gap) gapWorst = Math.min(gapWorst, smp.p[1] - th);
+      else if (smp.apron || smp.apronReach || smp.cut) {
+        // masterplan 2.1/2.2 (2026-07-07): apron/shortcut spans conform terrain FLUSH (-0.10)
+        // on purpose — there the contract narrows to "terrain never rises above the deck"
+        if ((smp.p[1] - Math.abs(smp.r[1]) * (smp.w / 2)) - th < -0.4) worstClear = Math.min(worstClear, -99);
+      }
       else worstClear = Math.min(worstClear, (smp.p[1] - Math.abs(smp.r[1]) * (smp.w / 2)) - th);
     }
   }
-  check('road always clears terrain', worstClear > 1.0, 'worst clearance ' + worstClear.toFixed(2) + 'm');
+  check('road always clears terrain (apron spans exempt, never above deck)', worstClear > 1.0, 'worst clearance ' + worstClear.toFixed(2) + 'm');
   check('gap chasms stay deep', gapWorst > 10, 'shallowest chasm ' + gapWorst.toFixed(1) + 'm');
   check('canyon walls rise above the old global ceiling', canyonRise > 20, '+' + canyonRise.toFixed(1) + 'm (CAMP-T3-01)');
 }
