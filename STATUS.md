@@ -128,6 +128,25 @@ rising under a deck only re-grounds at −0.45 m (kills the "side clip teleports
 road" snap), and the invisible shoulder band no longer catches cars from dirt or air (continuity
 strip only).
 
+**Ghost rework (Phase 1.4, same session)** (`js/game.js`, `js/scene-car.js`, `js/theme.js`) —
+- Motion: render-interpolated fractional playhead (tick accumulator alpha) + Catmull-Rom over 4
+  recorded frames — the ghost stepped on whole 60 Hz ticks while the player mesh interpolated,
+  hence the judder. 30 Hz save format unchanged.
+- Pose: ghost keeps its own ribbon cursor (`G.ghostIdx` → `trackQuery`) and takes the sample
+  normal for up (bank/pitch now real; was flat `[0,1,0]` with wheels buried on crests/banking);
+  airborne nose follows the recorded flight path.
+- Look: `DD.ghostifyCar` (scene-car.js) swaps every material on the built ghost for ONE shared
+  fresnel+scanline hologram shader (additive, depthWrite off, renderOrder 5, no shadows) — PB cyan
+  / author gold via `DD.GLOW.ghost`. Replaces ~20 transparent PBR mats at opacity 0.3 (sorting
+  artifacts + cost). `G.ghostMat.uniforms.uTime` ticked in the render loop for scan drift.
+
+**Z-fight quick wins (Phase 1.3 partial, same session)** — camera near 0.1 → 0.35 (game.js;
+near×far depth precision was starving distant road decals into z-fighting); closed-circuit SEAM
+stitched (scene-decor.js: `buildRibbon`, `buildRoadBody`, `buildStrip` now connect sample n-1 back
+to 0 when `track.closed`) — circuits had a literal 2 m hole in the deck at the start/finish line.
+Remaining 1.3 (DD.DECAL height ladder + polygonOffset across all overlays) is delegable — see
+MASTERPLAN.md.
+
 **Acceptance suite:** new `tests/verify_slide.js` (26 checks) encodes the slide design contract —
 no-shunt entry, progressive angle, slide out-rotates grip ≥1.25× at 60 m/s, grip untouched on
 gentle steer + below the gate, clean exit, graze-cheap/hit-expensive walls, no-teleport grounding,

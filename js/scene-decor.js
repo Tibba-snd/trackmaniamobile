@@ -487,6 +487,19 @@
         }
       }
     }
+    // closed circuits: stitch the last sample back to the first — the loop above stops at n-1,
+    // which left a literal 2 m hole in the deck at the start/finish seam
+    if (track.closed && !ss[n - 1].gap && !ss[0].gap) {
+      if (edgelit) {
+        const a = (n - 1) * 4;
+        idx.push(a, a + 1, 0, a + 1, 1, 0);
+        idx.push(a + 1, a + 2, 1, a + 2, 2, 1);
+        idx.push(a + 2, a + 3, 2, a + 3, 3, 2);
+      } else {
+        const a = (n - 1) * 2;
+        idx.push(a, a + 1, 0, a + 1, 1, 0);
+      }
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -522,9 +535,8 @@
     const pos = [], idx = [];
     let vi = 0;
     const push = (a) => { pos.push(a[0], a[1], a[2]); return vi++; };
-    for (let i = 0; i < n - 1; i++) {
-      const s = ss[i], s2 = ss[i + 1];
-      if (s.gap || s2.gap) continue;
+    const addSpan = (s, s2) => {
+      if (s.gap || s2.gap) return;
       const wl = s.w / 2, wl2 = s2.w / 2;
       // left side face
       const Lt = V.addS(s.p, s.r, -wl), Lb = V.addS(Lt, s.u, -depth);
@@ -534,7 +546,9 @@
       const Rt = V.addS(s.p, s.r, wl), Rb = V.addS(Rt, s.u, -depth);
       const Rt2 = V.addS(s2.p, s2.r, wl2), Rb2 = V.addS(Rt2, s2.u, -depth);
       { const e = push(Rt), f = push(Rb), g = push(Rt2), h = push(Rb2); idx.push(e, g, f, f, g, h); }
-    }
+    };
+    for (let i = 0; i < n - 1; i++) addSpan(ss[i], ss[i + 1]);
+    if (track.closed) addSpan(ss[n - 1], ss[0]); // circuit seam
     if (!pos.length) return null;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
@@ -573,6 +587,12 @@
         }
         runStart = i; vi += 2;
       } else runStart = -1;
+    }
+    // circuit seam: if the strip is live on both sides of the start/finish wrap, close it
+    // (verts 0,1 are pts[0]'s pair whenever pts[0] is non-null)
+    if (track.closed && pts[0] && pts[ss.length - 1]) {
+      const q = vi - 2;
+      idx.push(q, q + 1, 0, q + 1, 1, 0);
     }
     if (!pos.length) return null;
     const geo = new THREE.BufferGeometry();

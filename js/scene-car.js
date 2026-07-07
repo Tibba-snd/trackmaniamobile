@@ -715,6 +715,52 @@
     return DD.buildCarFromSpec(DD.resolveSpec(garage, customDesigns), { ghost: ghost, envMap: envMap, garage: garage });
   };
 
+  /* hologram ghost — swap EVERY material on a built car for ONE shared fresnel+scanline shader.
+     Replaces the old ghost look (~20 transparent PBR mats at opacity 0.3: sorting artifacts,
+     expensive, ugly). Geometry/groups untouched, so poseCar wheels/steer keep working. Constants
+     live in DD.GLOW.ghost; accent = [r,g,b] (PB cyan / author gold). Returns the material —
+     caller ticks uniforms.uTime for the scan drift. */
+  DD.ghostifyCar = function (group, accent) {
+    const GG = DD.GLOW.ghost;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(accent[0], accent[1], accent[2]) },
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec3 vN; varying vec3 vVP; varying float vWy;
+        void main() {
+          vN = normalMatrix * normal;
+          vec4 vp = modelViewMatrix * vec4(position, 1.0);
+          vVP = vp.xyz;
+          vWy = (modelMatrix * vec4(position, 1.0)).y;
+          gl_Position = projectionMatrix * vp;
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor; uniform float uTime;
+        varying vec3 vN; varying vec3 vVP; varying float vWy;
+        void main() {
+          float fres = pow(1.0 - abs(dot(normalize(vN), normalize(-vVP))), ${GG.fresPow.toFixed(1)});
+          float scan = 1.0 - ${GG.scanDepth.toFixed(2)} * (0.5 + 0.5 * sin(vWy * ${GG.scanFreq.toFixed(1)} - uTime * ${GG.scanSpeed.toFixed(1)}));
+          vec3 c = uColor * (${GG.baseGain.toFixed(2)} + fres * ${GG.fresGain.toFixed(2)}) * scan;
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    group.traverse((o) => {
+      if (o.isMesh) {
+        o.material = mat;
+        o.castShadow = false;
+        o.receiveShadow = false;
+        o.renderOrder = 5; // after the track decals — additive shell, never z-fights the deck
+      }
+    });
+    group.userData.holoMat = mat;
+    return mat;
+  };
+
   /* garage editor — Length-rings mode (P2 slice A): one grabbable handle per hull station, at its
      rightmost ring point. Mirrors buildHull's math exactly so a handle always sits on the surface it
      controls. Editor-only — never built for the race car, never touches the physics/contract. */

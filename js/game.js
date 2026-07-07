@@ -18,6 +18,8 @@
   let cachedHudMedals = null;
 
   const drawPosScratch = [0, 0, 0];
+  const ghostPosScratch = [0, 0, 0];
+  const upWorld = [0, 1, 0];
 
   const scratchColor = new THREE.Color();
 
@@ -144,8 +146,11 @@
 
     if (G.ghostData) {
       G.ghostMesh = DD.buildCar(G.save.garage, true, G.scene.environment, G.save.customDesigns);
+      // hologram look — one shared shader, accent by ghost type (PB cyan / author gold)
+      G.ghostMat = DD.ghostifyCar(G.ghostMesh, racedGhostType === 'author' ? DD.GLOW.ghost.author : DD.GLOW.ghost.pb);
+      G.ghostIdx = 0;
       G.scene.add(G.ghostMesh);
-    }
+    } else { G.ghostMat = null; }
     
     updateHudGhostTag();
   }
@@ -505,6 +510,7 @@
     G.recFrames = [];
     G.tickCount = 0;
     G.ghostPlayhead = 0;
+    G.ghostIdx = 0; // ghost's own ribbon cursor (track-pose lookup)
     G.prevPos = [G.car.pos[0], G.car.pos[1], G.car.pos[2]];
     G.prevYaw = G.car.yaw;
     G.camState = DD.makeCamState();
@@ -1154,22 +1160,38 @@
 
     // ghost playback
     if (G.ghostMesh && G.ghostData && (G.state === 'play')) {
-      const fi = Math.min(Math.floor(G.tickCount / G.recEvery), G.ghostData.length / 4 - 2);
-      if (fi >= 0) {
-        const a = fi * 4, b = (fi + 1) * 4;
-        const tt = (G.tickCount % G.recEvery) / G.recEvery;
-        const gp = [
-          DD.lerp(G.ghostData[a], G.ghostData[b], tt),
-          DD.lerp(G.ghostData[a + 1], G.ghostData[b + 1], tt),
-          DD.lerp(G.ghostData[a + 2], G.ghostData[b + 2], tt)
-        ];
-        const gy = G.ghostData[a + 3] + DD.angleDiff(G.ghostData[a + 3], G.ghostData[b + 3]) * tt;
-        // ghost wheels spin at the GHOST's own speed (distance between recorded frames), not the player's
-        const gdx = G.ghostData[b] - G.ghostData[a], gdz = G.ghostData[b + 2] - G.ghostData[a + 2];
-        const ghostSpd = Math.sqrt(gdx * gdx + gdz * gdz) / (G.recEvery * DD.TICK);
-        DD.poseCar(G.ghostMesh, gp, gy, [0, 1, 0], 0, 0, ghostSpd * dtReal * 2.2);
-        G.ghostMesh.visible = true;
+      const gd = G.ghostData;
+      const nF = gd.length / 4;
+      // fractional playhead in frames, RENDER-interpolated (tick accumulator alpha) — the ghost
+      // used to step on whole physics ticks while the player mesh interpolated, hence the judder
+      const ft = DD.clamp((G.tickCount + alpha) / G.recEvery, 0, nF - 1.001);
+      const i1 = Math.floor(ft), tt = ft - i1;
+      const i0 = Math.max(0, i1 - 1), i2 = Math.min(nF - 1, i1 + 1), i3 = Math.min(nF - 1, i1 + 2);
+      // Catmull-Rom over 4 recorded frames — 30 Hz samples spline into a smooth path
+      const t2 = tt * tt, t3 = t2 * tt;
+      const gp = ghostPosScratch;
+      for (let k = 0; k < 3; k++) {
+        const p0 = gd[i0 * 4 + k], p1 = gd[i1 * 4 + k], p2 = gd[i2 * 4 + k], p3 = gd[i3 * 4 + k];
+        gp[k] = 0.5 * (2 * p1 + (-p0 + p2) * tt + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
       }
+      const gy = gd[i1 * 4 + 3] + DD.angleDiff(gd[i1 * 4 + 3], gd[i2 * 4 + 3]) * tt;
+      // pose from the TRACK under the ghost (bank/pitch via the sample normal) instead of flat
+      // world-up — the old [0,1,0] left it flat on banking with wheels buried in crests
+      G.ghostIdx = DD.trackQuery(G.track, gp, G.ghostIdx || 0);
+      const gs = G.track.samples[G.ghostIdx];
+      const gdxp = gp[0] - gs.p[0], gdyp = gp[1] - gs.p[1], gdzp = gp[2] - gs.p[2];
+      const gh = gdxp * gs.u[0] + gdyp * gs.u[1] + gdzp * gs.u[2];   // height above deck plane
+      const glat = gdxp * gs.r[0] + gdyp * gs.r[1] + gdzp * gs.r[2]; // lateral offset
+      const onDeck = Math.abs(glat) <= gs.w / 2 + 2.5 && gh > -1.5 && gh < 1.2;
+      const gUp = onDeck ? gs.u : upWorld;
+      // airborne: pitch the nose along the recorded flight path
+      const gPitch = onDeck ? 0 : DD.clamp(Math.atan2(gd[i2 * 4 + 1] - gd[i1 * 4 + 1], Math.max(0.5, Math.hypot(gd[i2 * 4] - gd[i1 * 4], gd[i2 * 4 + 2] - gd[i1 * 4 + 2]))) * -0.6, -0.5, 0.5);
+      // ghost wheels spin at the GHOST's own speed (distance between recorded frames), not the player's
+      const gdx = gd[i2 * 4] - gd[i1 * 4], gdz = gd[i2 * 4 + 2] - gd[i1 * 4 + 2];
+      const ghostSpd = Math.sqrt(gdx * gdx + gdz * gdz) / (G.recEvery * DD.TICK);
+      DD.poseCar(G.ghostMesh, gp, gy, gUp, 0, gPitch, ghostSpd * dtReal * 2.2);
+      if (G.ghostMat) G.ghostMat.uniforms.uTime.value = (t % 100000) * 0.001; // scanline drift
+      G.ghostMesh.visible = true;
     } else if (G.ghostMesh) G.ghostMesh.visible = G.state === 'play';
 
     // audio
@@ -2236,7 +2258,9 @@
     if (DD.adaptiveDPR === undefined) DD.adaptiveDPR = false;
     if (DD.speedBlurMax === undefined) DD.speedBlurMax = 0.03; // peak radial speed-blur; tune live from console
     G.scene = new THREE.Scene();
-    G.camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 6000);
+    // near 0.35 (was 0.1): the chase/garage cams never get closer than ~2 m to geometry, and
+    // near×far depth precision is what the road-decal z-fighting at distance was starving on
+    G.camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.35, 6000);
     G.composer = DD.createComposer(G.renderer, G.scene, G.camera, G.save.settings.quality);
     DD.initInput(G.save.settings);
     DD.bindCanvasGestures(canvas);

@@ -210,7 +210,11 @@
     decor: { base: 1.15, amp: 0.22 },                 // was 1.90 ± 0.50
     boost: { base: 0.30, amp: 0.12 },                 // was 0.40 ± 0.25
     skid:  { drift: 0.70, straight: 0.2 },            // was 1.8 on drift — white-hot trails fed bloom hardest
-    archPool: 0.12                                    // was 0.35 — additive pools on the road under arches
+    archPool: 0.12,                                   // was 0.35 — additive pools on the road under arches
+    // hologram ghost (single shared shader on the whole ghost car — replaces ~20 transparent PBR
+    // mats at opacity 0.3 that sorted badly and fed bloom). Additive, so gains are kept modest.
+    ghost: { fresPow: 2.0, fresGain: 1.1, baseGain: 0.30, scanFreq: 9.0, scanSpeed: 4.0, scanDepth: 0.35,
+             pb: [0.30, 0.85, 1.0], author: [1.0, 0.72, 0.28] }
   };
 
   DD.TERRAIN_BAKE = {
