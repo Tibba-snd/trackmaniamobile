@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783938291.6690967,
+    "mtime": 1783939007.9728727,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,22 +20,22 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783938291.6372075,
+    "mtime": 1783939007.9417324,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783938291.6464438,
+    "mtime": 1783939007.9508483,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783938291.665578,
+    "mtime": 1783939007.968089,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783938291.665578,
+    "mtime": 1783939007.968089,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/java/com/driftdream/game/MainActivity.java": {
-    "mtime": 1783937620.659896,
-    "ast_hash": "c59c0a42fe8a728c7fdfcf2d3f84afd9",
+    "mtime": 1783941804.7671442,
+    "ast_hash": "35502a060669aee6b212bfa2c3eff18c",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783938291.6690967,
+    "mtime": 1783939007.9716198,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783924459.6523592,
-    "ast_hash": "e54957abac7bb0b3595921dfac33dc15",
+    "mtime": 1783941996.6334321,
+    "ast_hash": "bf9839ababc7c5adc6a650ff5598c250",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "INBOX.md": {
-    "mtime": 1783925229.534227,
-    "ast_hash": "1f1786c32b7a58fc5bb31628ae17e824",
+    "mtime": 1783942032.3125498,
+    "ast_hash": "3157f94050827bc65a3fcba0b6e9b11b",
     "semantic_hash": ""
   },
   "README.md": {
@@ -1297,6 +1297,11 @@
   ".github/workflows/android.yml": {
     "mtime": 1783933387.6385128,
     "ast_hash": "4c27472f99fa6d3a1b4c1300b7131643",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1783939421.338478,
+    "ast_hash": "41b83367a766e94c6884c407cd6f8ed2",
     "semantic_hash": ""
   }
 }

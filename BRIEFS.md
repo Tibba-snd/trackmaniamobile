@@ -187,7 +187,13 @@ up — flag it in the walkthrough, Claude decides on re-baseline.
 
 ---
 
-## A16 — Track dressing (MASTERPLAN 3.4, session 29)  🔴 OPEN
+## A16 — Track dressing (MASTERPLAN 3.4, session 29)  🟢 LANDED (retro-reviewed session 30)
+
+> **Review note (Claude, session 30):** the drop was accidentally committed inside the PWA commit
+> `885a187` (534 lines of scene-decor.js unlisted in the commit message) — another instance of the
+> session-23 sweep incident; `git status` before every commit, always. Retro red-flag scan clean:
+> all six items instanced/merged, no raw lights, no pool violations, decals on the `DD.DECAL`
+> ladder. Antigravity's walkthrough reported all suites green.
 
 _Corner furniture + race framing so the new Phase 3 pieces read at speed. Scene-decor only —
 zero trackgen/physics edits._
@@ -218,6 +224,92 @@ or gap/landing spans. Wrap modulo N for any sample scan when `track.closed`.
 **DoD:** all suites green (render-only — `drivability`/`verify_slide`/`verify_world` untouched);
 game launched + one track per biome eyeballed; `?v=` bumps for every touched js file; walkthrough
 in INBOX with screenshots.
+
+---
+
+# MOBILE UI PASS (Tibba-directed, 2026-07-13) — menus/screens must be playable on a phone
+
+_Context: the game now ships as an installable PWA (`manifest.json` + `sw.js`) and as a Capacitor
+APK (`apk-build/`, cloud-built by `.github/workflows/android.yml` on every push to master). The
+new `tap` control scheme (tap-steer + auto-gas, brake-only button) landed in `885a187`. What's
+left is making every non-race screen work at phone scale. **All of these are CSS/DOM-first briefs:
+zero physics, zero trackgen, zero renderer changes.**_
+
+**Shared rules for A17–A19:**
+- Test at **360×800 portrait** and **812×375 landscape** (Chrome devtools device toolbar), plus
+  one rotate mid-screen sanity check.
+- Touch targets ≥ 44px on coarse pointers (`@media (pointer: coarse)`).
+- **No `backdrop-filter` on anything visible during active racing** (menu-only screens may keep it).
+- **No CSS transitions on pseudo-elements** (`::before`/`::after` freeze on Android WebView).
+- Respect `env(safe-area-inset-*)` on every screen-edge-anchored element.
+- `?v=` bump for every touched js file; suites green; launch + eyeball before hand-off;
+  walkthrough with screenshots in INBOX.
+
+## A17 — Garage mobile layout  🔴 OPEN
+
+_Portrait: the 320px left sidebar covers most of the phone screen and the car showcase is
+invisible behind it. Landscape: workable but cramped._
+
+1. **Portrait ≤ 768px: sidebar becomes a bottom sheet.** `.garage-sidebar` → `width:100%`,
+   `height:52%`, anchored bottom (top border instead of right border, shadow up). Car showcase
+   (canvas) owns the top half. Keep the existing `@media (max-height:480px)` landscape compaction
+   as-is.
+2. **Tabs → one horizontally scrollable row** in the sheet (`overflow-x:auto`, no wrap,
+   `min-height:44px` per tab). Azeret 9px is too small on phones — bump to 11px on coarse pointers.
+3. **`.garage-instruction` ("drag to rotate")**: hide below 768px width — it overlaps the sheet
+   and phones don't need the mouse hint.
+4. **`#editModeBar`**: portrait → centered at top over the showcase (it currently offsets
+   `left:calc(50% + 160px)` assuming the desktop sidebar). Must not overlap the sheet.
+5. **`.gItem` rows ≥ 44px tall** on coarse pointers (currently 10px padding + 11px font).
+6. Orbit-drag on the showcase must keep working with the sheet up (drag region = top half).
+
+**Files:** `index.html` (CSS only, ideally). If a class toggle is unavoidable, smallest possible
+`game.js` hook + `?v=` bump.
+**DoD:** shared rules above; garage usable end-to-end (pick paint/finish/preset, save, back) on
+both test viewports.
+
+## A18 — Campaign / settings / finish mobile compaction  🔴 OPEN
+
+1. **Campaign portrait** (existing 55/45 split stays): compact `.campaign-left` padding
+   (`min(6vh,35px)` → 12px on ≤480w), `.trackBtn` ≥ 44px tall, DRIVE button always visible
+   without scrolling the details pane (sticky bottom inside `.details-content` if needed).
+2. **Campaign short-landscape (≤470h):** header row + subtitle compact so ≥ 2 tier cards visible.
+3. **Settings:** `.panel` → `max-height:78vh`; `.setRow` wraps to two lines on ≤380w (label row +
+   control row, range full width); every checkbox/range/select hit area ≥ 44px on coarse pointers.
+4. **Finish card ≤ 480w:** padding `20px 16px`, `#finTime` 40px, `.finRow` → 2-column grid,
+   buttons ≥ 44px tall. Card must fit 812×375 landscape without clipping.
+5. **Replay HUD ≤ 480w:** tighter padding, buttons ≥ 44px, slider thumb 20px.
+6. **Main menu polish:** `.mbtn` vertical padding +2px on coarse pointers; verify the short-
+   landscape scroll block (`@media (max-height:470px)`) still reaches every button with the seed row.
+
+**Files:** `index.html` CSS only.
+**DoD:** shared rules; full loop (menu → campaign → race → finish → replay → menu) on both test
+viewports without any clipped/unreachable control.
+
+## A19 — Tap-scheme polish (the new default mobile feel)  🔴 OPEN
+
+_The `tap` control scheme landed functional but raw. Known issues found in review:_
+
+1. **BUG — zones swallow the in-game buttons:** `.pad-zone` is full-height and `#touchControls`
+   paints after `#gameButtons` (both `z-index:6`), so restart/respawn/exit are unreachable in tap
+   mode. Fix: `#gameButtons { z-index:7 }` (buttons above zones; zone taps around them still steer).
+2. **Brake placement in tap mode:** `#padBrake` still sits at the old offset next to the (hidden)
+   gas pad. In tap mode move it to the bottom-right corner slot (`right:max(24px, env(...))`) and
+   enlarge to 112px — it's the only button, make it obvious. Body class exists? If not, toggle
+   `body.tap-mode` from `updateSteerPadsVisibility()` (`game.js`, tiny diff, `?v=` bump).
+3. **Steer feedback:** brief edge indicator while a zone is held — a slim (≤48px wide) static
+   gradient strip at the screen edge, toggled by class on touchstart/end. Class toggle + static
+   styles ONLY (no transitions on pseudo-elements, no repaint-heavy full-screen overlays).
+4. **First-run hint:** entering a race in tap mode → centered overlay "◀ tap left · right tap ▶ ·
+   hold to steer" for 2.5s, once per session (`sessionStorage`), `pointer-events:none`.
+5. **Two-finger restart gesture** (`bindCanvasGestures`) is dead in tap mode — zones eat canvas
+   touches. Either re-bind the gesture on the zones or accept the on-screen restart button as the
+   only path (your call; note it in the walkthrough).
+
+**Files:** `index.html`, `js/input.js`, `js/game.js` (small diffs each, bump all touched `?v=`).
+**DoD:** shared rules; drive a full race in tap mode in device emulation — steer, brake, restart,
+respawn, exit all reachable; hint shows once; suites green (`node tests/drivability.js` at
+minimum — input.js is sim-adjacent).
 
 ---
 
