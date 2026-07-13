@@ -283,7 +283,10 @@
       }
       G.track = track;
       applyCssTheme(track.theme);
-      const biomeText = track.theme.biome.toUpperCase() + ' // ' + track.theme.weather.toUpperCase();
+      // Show the track's full identity — biome/weather alone made distinct layouts read as "the
+      // same track" (archetype and circuit-vs-sprint are the real variety, make them VISIBLE).
+      const biomeText = track.theme.biome.toUpperCase() + ' // ' + track.theme.weather.toUpperCase()
+        + ' // ' + (track.archetype || '').toUpperCase() + (track.closed ? ' CIRCUIT' : ' SPRINT');
       dialInText($('loadBiomeHeader'), biomeText);
       if (DD.testMode) {
         console.log('[TEST] TRACK_LOAD: seed=' + seed + ', tier=' + tier);
@@ -2379,7 +2382,7 @@
     window.addEventListener('keydown', audioKick, { once: true });
 
     // menu buttons
-    $('btnDaily').onclick = async () => { DD.sfxClick(); await ensureTilt(); startTrack(DD.dailySeedString(), 3); };
+    $('btnDaily').onclick = async () => { DD.sfxClick(); await ensureTilt(); startTrack(DD.dailySeedString(), DD.dailyTier()); };
     $('btnRandom').onclick = async () => {
       DD.sfxClick(); await ensureTilt();
       startTrack(DD.randomSeedString(), parseInt($('randTier').value, 10));
@@ -2411,7 +2414,7 @@
     };
     document.querySelectorAll('.backBtn').forEach(b => b.onclick = () => { DD.sfxClick(); G.state = 'menu'; showScreen('menu'); });
 
-    $('dailyLabel').textContent = DD.dailySeedString();
+    $('dailyLabel').textContent = DD.dailySeedString() + ' · T' + DD.dailyTier();
 
     // finish buttons
     $('finRetry').onclick = () => { DD.sfxClick(); resetRun(true); };

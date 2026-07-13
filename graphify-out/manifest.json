@@ -270,8 +270,8 @@
     "semantic_hash": ""
   },
   "js/physics.js": {
-    "mtime": 1783448549.022609,
-    "ast_hash": "e74428a8dd0f66750d00ae6f25c45fa6",
+    "mtime": 1783947722.1897418,
+    "ast_hash": "b39c0a03a64ac9e58f8045d438f1c02b",
     "semantic_hash": ""
   },
   "js/scene-car.js": {
@@ -305,8 +305,8 @@
     "semantic_hash": ""
   },
   "tests/drivability.js": {
-    "mtime": 1783427456.9099956,
-    "ast_hash": "c966f56955b372caccfb48426b5c1ce4",
+    "mtime": 1783947772.1615586,
+    "ast_hash": "2e2a4eeacace4b02a262d52cefa5d7e2",
     "semantic_hash": ""
   },
   "tests/e2e_runner.js": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783947161.445027,
-    "ast_hash": "5814e4459d1ee1a535811c88f7e07639",
+    "mtime": 1783948081.0717342,
+    "ast_hash": "daf0c7684fecc8099a4354cab5e70daf",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "INBOX.md": {
-    "mtime": 1783947179.5048265,
-    "ast_hash": "c2a5cc901bc141b93ef358b0f903d451",
+    "mtime": 1783948095.391758,
+    "ast_hash": "72438d4155ecb35680ebdb42adfc24eb",
     "semantic_hash": ""
   },
   "README.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1783943012.0336134,
-    "ast_hash": "3b5188f314944458f9367ec6c7baf1b2",
+    "mtime": 1783947932.36715,
+    "ast_hash": "7b112871dac8036dd5ad0c84639383ba",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/res/drawable-land-hdpi/splash.png": {
@@ -1250,8 +1250,8 @@
     "semantic_hash": ""
   },
   "MASTERPLAN.md": {
-    "mtime": 1783947126.271542,
-    "ast_hash": "8e25726b0cee8d4c676a9b4806c9304d",
+    "mtime": 1783948057.8649528,
+    "ast_hash": "c08d1e45b5066bd05fcec655068ffdfb",
     "semantic_hash": ""
   },
   "tests/verify_world.js": {

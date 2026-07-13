@@ -57,6 +57,14 @@
     return 'DAILY-' + y + m + dd;
   };
 
+  // Daily tier rotates 2..5 with the date (was hardcoded 3 — every daily felt like the same
+  // mid-tier track). Same formula for everyone on a given day: the leaderboard/medal comparison
+  // per DAILY-seed stays apples-to-apples.
+  DD.dailyTier = function (date) {
+    const d = date || new Date();
+    return 2 + ((d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate()) % 4);
+  };
+
   // ---- Vec3 as [x,y,z] ----
   const V = DD.v = {
     add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],

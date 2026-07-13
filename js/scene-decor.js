@@ -699,6 +699,54 @@
     return true;
   }
 
+  // world-space clearance vs EVERY OTHER stretch of track: roadside furniture must never stand
+  // inside an adjacent leg (hairpin returns, overunder crossings, closure passes). Same pattern
+  // as the trackgen apron proximity scan — arc-distance-gated, wrapped on circuits.
+  function clearOfTrack(track, px, pz, ownIdx, minD) {
+    const ss = track.samples, N = ss.length;
+    const d2 = minD * minD;
+    for (let j = 0; j < N; j += 3) {
+      let di = Math.abs(j - ownIdx);
+      if (track.closed) di = Math.min(di, N - di);
+      if (di < 30) continue;
+      const dx = px - ss[j].p[0], dz = pz - ss[j].p[2];
+      if (dx * dx + dz * dz < d2) return false;
+    }
+    return true;
+  }
+
+  // corner/brake board eligibility — shared by the count pass and the place pass so instance
+  // counts always mirror placements exactly. Rejects: unsafe samples (aprons/gaps/shortcuts),
+  // board centers standing inside another track leg, and boards whose support posts would need
+  // >9 m stilts (elevated deck / crossing below — the "pole skewers the road" artifact).
+  function boardOk(track, bi, outside) {
+    if (bi < 2) return false;
+    const s = track.samples[bi];
+    if (!s || s.gap) return false;
+    if (!isSpawningSafe(bi, track)) return false;
+    const lat = outside * (s.w / 2 + 2.6);
+    const px = s.p[0] + s.r[0] * lat;
+    const pz = s.p[2] + s.r[2] * lat;
+    if (!clearOfTrack(track, px, pz, bi, 12)) return false;
+    if (track.terrain) {
+      const py = s.p[1] + s.r[1] * lat + s.u[1] * 2.0;
+      const g = DD.terrainAt(track.terrain, px, pz);
+      if (py - g > 9) return false;
+    }
+    return true;
+  }
+
+  // apex cone eligibility — cones sit on the INSIDE edge, which on hairpins points at the
+  // returning leg; keep them out of the other road's space.
+  function coneOk(track, c, idx) {
+    if (idx === -1) return false;
+    if (!isSpawningSafe(idx, track)) return false;
+    const s = track.samples[idx];
+    if (!s) return false;
+    const lat = c.insideSign * (s.w / 2 + 1.4);
+    return clearOfTrack(track, s.p[0] + s.r[0] * lat, s.p[2] + s.r[2] * lat, idx, 8);
+  }
+
   const colToHex = (c) => {
     const r = Math.round(c[0] * 255).toString(16).padStart(2, '0');
     const g = Math.round(c[1] * 255).toString(16).padStart(2, '0');
@@ -738,17 +786,29 @@
     const idx = [];
     let vi = 0;
 
+    // Every vertex is CONFORMED to the deck at its own arc position: the old code extruded the
+    // arrow planar from one sample's frame, so on a curving/banking tighten span the deck curved
+    // away underneath and the arrow floated/sank — the "translucent repeating glitch mid-curve".
+    const ds = track.ds || 2;
+    const deckPoint = (i, fOff, rOff) => {
+      const t = fOff / ds;
+      const j0 = Math.floor(t), frac = t - j0;
+      const ia = getWrappedIdx(i + j0, N, track.closed);
+      const ib = getWrappedIdx(i + j0 + 1, N, track.closed);
+      const a = ia !== -1 ? ss[ia] : ss[i];
+      const b = ib !== -1 ? ss[ib] : a;
+      const L = (k) => DD.lerp(a.p[k], b.p[k], frac) + DD.lerp(a.r[k], b.r[k], frac) * rOff + DD.lerp(a.u[k], b.u[k], frac) * DD.DECAL.centre;
+      return [L(0), L(1), L(2)];
+    };
     for (let i = 0; i < N; i++) {
       const s = ss[i];
       if (s.pieceName === 'tighten' && i % 4 === 0 && isSpawningSafe(i, track)) {
-        const p0 = V.addS(s.p, s.u, DD.DECAL.centre);
-
-        const v0 = V.addS(V.clone(p0), s.f, 1.5);
-        const v1 = V.addS(V.addS(p0, s.f, -0.5), s.r, -2.2);
-        const v2 = V.addS(V.addS(p0, s.f, -0.5), s.r, 2.2);
-        const v3 = V.addS(V.clone(p0), s.f, 0.8);
-        const v4 = V.addS(V.addS(p0, s.f, -1.2), s.r, -1.8);
-        const v5 = V.addS(V.addS(p0, s.f, -1.2), s.r, 1.8);
+        const v0 = deckPoint(i, 1.5, 0);
+        const v1 = deckPoint(i, -0.5, -2.2);
+        const v2 = deckPoint(i, -0.5, 2.2);
+        const v3 = deckPoint(i, 0.8, 0);
+        const v4 = deckPoint(i, -1.2, -1.8);
+        const v5 = deckPoint(i, -1.2, 1.8);
 
         pos.push(v0[0], v0[1], v0[2]);
         pos.push(v1[0], v1[1], v1[2]);
@@ -772,12 +832,14 @@
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     geo.setIndex(idx);
 
+    // depthWrite OFF: transparent decal writing depth fought the road plane + neighbouring
+    // ladder decals (sorting shimmer). polygonOffset + the DECAL ladder height do the layering.
     const mat = new THREE.MeshBasicMaterial({
       color: col(theme.accent),
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide,
-      depthWrite: true,
+      depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
@@ -905,6 +967,7 @@
     let totalBrake50 = 0;
 
     for (const c of track.corners) {
+      const outside = -c.insideSign;
       const numGlyphs = c.minRad < 40 ? 3 : (c.minRad < 70 ? 2 : 1);
       const startIdx = Math.max(2, c.entry - 20);
       const endIdx = Math.max(2, c.apex);
@@ -915,8 +978,7 @@
         endIdx
       ]));
       for (const bi of boardAt) {
-        const s = ss[bi];
-        if (!s || s.gap || bi < 2) continue;
+        if (!boardOk(track, bi, outside)) continue;
         totalBoards++;
         totalSlats += 4 + 2 * numGlyphs;
       }
@@ -924,10 +986,10 @@
       // Braking boards at -100m and -50m
       const bi100 = getWrappedIdx(c.entry - Math.round(100 / track.ds), N, track.closed);
       const bi50 = getWrappedIdx(c.entry - Math.round(50 / track.ds), N, track.closed);
-      if (bi100 !== -1 && isSpawningSafe(bi100, track)) {
+      if (bi100 !== -1 && boardOk(track, bi100, outside)) {
         totalBrake100++;
       }
-      if (bi50 !== -1 && isSpawningSafe(bi50, track)) {
+      if (bi50 !== -1 && boardOk(track, bi50, outside)) {
         totalBrake50++;
       }
     }
@@ -999,8 +1061,8 @@
         ]));
 
         for (const bi of boardAt) {
+          if (!boardOk(track, bi, outside)) continue;
           const s = ss[bi];
-          if (!s || s.gap || bi < 2) continue;
 
           const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
 
@@ -1101,9 +1163,8 @@
 
         for (const bInfo of brakeBIs) {
           const bi = bInfo.bi;
-          if (bi === -1 || !isSpawningSafe(bi, track)) continue;
+          if (bi === -1 || !boardOk(track, bi, outside)) continue;
           const s = ss[bi];
-          if (!s) continue;
 
           const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
 
@@ -1199,7 +1260,7 @@
     for (const c of track.corners) {
       for (const offset of [-3, -1, 1, 3]) {
         const idx = getWrappedIdx(c.apex + offset, N, track.closed);
-        if (idx !== -1 && isSpawningSafe(idx, track)) {
+        if (coneOk(track, c, idx)) {
           totalCones++;
         }
       }
@@ -1220,9 +1281,8 @@
         const insideSign = c.insideSign;
         for (const offset of [-3, -1, 1, 3]) {
           const idx = getWrappedIdx(c.apex + offset, N, track.closed);
-          if (idx === -1 || !isSpawningSafe(idx, track)) continue;
+          if (!coneOk(track, c, idx)) continue;
           const s = ss[idx];
-          if (!s) continue;
 
           const p = V.addS(s.p, s.r, insideSign * (s.w / 2 + 1.4));
 
@@ -1378,7 +1438,9 @@
     function placeGantry(idx, signText, signColor, isStart, isFinish, ckptIdx) {
       const s = ss[idx];
       if (!s) return;
-      const halfW = s.w * 0.5;
+      // +0.7: post columns used to be CENTERED on the road-edge line (±w/2) — half the column
+      // stood inside the drivable width and cars clipped through it. Clear of the kerb band now.
+      const halfW = s.w * 0.5 + 0.7;
       const postH = 4.2;
       const right = new THREE.Vector3(s.r[0], s.r[1], s.r[2]);
       const up = new THREE.Vector3(s.u[0], s.u[1], s.u[2]);
@@ -1464,7 +1526,7 @@
         s.p[1] + up.y * postH,
         s.p[2] + up.z * postH
       );
-      m.compose(barCenter1, quat, new THREE.Vector3(s.w * 1.02, 0.2, 0.2));
+      m.compose(barCenter1, quat, new THREE.Vector3(s.w * 1.02 + 1.4, 0.2, 0.2));
       barIM.setMatrixAt(gi++, m);
 
       const barCenter2 = new THREE.Vector3(
@@ -1472,7 +1534,7 @@
         s.p[1] + up.y * (postH - 0.5),
         s.p[2] + up.z * (postH - 0.5)
       );
-      m.compose(barCenter2, quat, new THREE.Vector3(s.w * 1.02, 0.15, 0.15));
+      m.compose(barCenter2, quat, new THREE.Vector3(s.w * 1.02 + 1.4, 0.15, 0.15));
       barIM.setMatrixAt(gi++, m);
 
       // neon vertical trims
@@ -1500,7 +1562,7 @@
         s.p[1] + up.y * (postH + 0.11),
         s.p[2] + up.z * (postH + 0.11)
       );
-      m.compose(hnPos, quat, new THREE.Vector3(s.w * 0.98, 0.04, 0.08));
+      m.compose(hnPos, quat, new THREE.Vector3(s.w * 0.98 + 1.4, 0.04, 0.08));
       barNeonIM.setMatrixAt(bni++, m);
       if (barNeonIM.setColorAt) barNeonIM.setColorAt(bni - 1, col(signColor));
 
@@ -2125,6 +2187,9 @@
       if (s.gap) continue;
       // never plant a pole in a re-entry apron / shortcut mouth (it IS the drive-off path)
       if (s.apron && s.apron * side > 0) { side = -side; continue; }
+      // pole foot must be clear of every OTHER leg — verge of span A can be the deck of span B
+      const edge = s.w / 2 + 2.0;
+      if (!clearOfTrack(track, s.p[0] + s.r[0] * side * edge, s.p[2] + s.r[2] * side * edge, i, 7)) { side = -side; continue; }
       places.push({ s, side });
       side = -side; // alternate verges
     }
@@ -2275,7 +2340,20 @@
       if (s.gap) continue;
       const gY = groundY(s.p[0], s.p[2]);
       const height = s.p[1] - gY - 0.2;
-      if (height > 4.5) piers.push({ s, gY, height });
+      if (height <= 4.5) continue;
+      // overunder guard: a pier for the UPPER deck must not skewer a lower deck it crosses —
+      // if any other-arc sample's deck sits between the ground and this deck within reach of
+      // the column, skip the pier (short unsupported bridge spans read fine).
+      let skewers = false;
+      for (let j = 0; j < ss.length && !skewers; j += 3) {
+        let di = Math.abs(j - i);
+        if (track.closed) di = Math.min(di, ss.length - di);
+        if (di < 30) continue;
+        const dx = s.p[0] - ss[j].p[0], dz = s.p[2] - ss[j].p[2];
+        if (dx * dx + dz * dz < 6 * 6 && ss[j].p[1] > gY + 0.5 && ss[j].p[1] < s.p[1] - 1.0) skewers = true;
+      }
+      if (skewers) continue;
+      piers.push({ s, gY, height });
     }
     if (piers.length === 0) return group;
     const N = piers.length;
@@ -2325,9 +2403,18 @@
     for (let i = 20; i < ss.length - 20; i += step) {
       const s = ss[i];
       if (s.gap) continue;
+      // straight-ish spans only: the arch is a rigid straight frame built off ONE sample —
+      // mid-curve the deck sweeps into its posts (the "pole in the middle of the road" bug)
+      const iA = Math.max(0, i - 4), iB = Math.min(ss.length - 1, i + 4);
+      if (Math.abs(DD.angleDiff(ss[iA].yaw, ss[iB].yaw)) > 0.14) continue;
+      if (!isSpawningSafe(i, track)) continue; // aprons/shortcut mouths are drive-off paths
+      // both post feet must be clear of every OTHER track leg (hairpin returns, crossings)
+      const hw = s.w / 2 + 0.6;
+      if (!clearOfTrack(track, s.p[0] + s.r[0] * hw, s.p[2] + s.r[2] * hw, i, 9)) continue;
+      if (!clearOfTrack(track, s.p[0] - s.r[0] * hw, s.p[2] - s.r[2] * hw, i, 9)) continue;
       candidates.push(s);
     }
-    
+
     if (candidates.length === 0) return group;
     
     const postGeo = new THREE.CylinderGeometry(0.14, 0.18, 8.5, 6);

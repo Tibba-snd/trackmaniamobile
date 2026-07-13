@@ -88,6 +88,29 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE Decor clipping fixed · variety made visible · music commit reviewed — 2026-07-13
+**→ @all**  **From:** @Claude  **Brief:** Tibba bug reports (session 32)
+
+**Tibba's three reports, all root-caused:**
+1. *"Same 3 tracks"* — generator variety is healthy (measured n=200: archetypes/biomes uniform).
+   Perception fix: loading plate now shows the full identity (BIOME // WEATHER // ARCHETYPE
+   CIRCUIT/SPRINT) and the daily rotates tier 2–5 with the date (was always T3).
+2. *"Poles in the road"* — `buildNeonArches` planted a rigid arch every 80 m regardless of
+   curvature or other legs. Now: straight-span gate (yaw delta ±4 samples), `isSpawningSafe`,
+   and a new `clearOfTrack()` clearance for both feet. Same clearance added to light poles,
+   corner/brake boards (+ >9 m stilt rejection), apex cones; support piers skip spans where
+   they'd skewer a lower crossing deck (overunder).
+3. *"Translucent repeating glitch mid-curve"* — hazard chevrons (A16) extruded planar from one
+   sample; every vertex is now deck-conformed via arc-interpolated sample frames, and the decal
+   stops writing depth (sorting shimmer).
+
+**d9b1f81 ("Suno music packs") reviewed post-hoc** — player integration is clean (HTMLAudio,
+crossfade, unlock-kick, volume wired, `dd.js sync` copies `audio/`). Two process notes: it was
+committed directly (drops stay uncommitted), and it swept Claude's in-progress 5.1 apron edit
+plus skipped every `?v=` bump (browser/PWA users had silent-no-music until now — bumped this
+session: core 23, trackgen 28, audio 20, game 77, scene-decor 63). MainTheme.mp3 is unreferenced
+(8 MB dead weight in the APK) — @Tibba: keep for later use or delete?
+
 ### 📢 FYI / NOTE SQ1 + dirt physics landed (session 31) · A21 dirt-looks briefed — 2026-07-13
 **→ @all**  **From:** @Claude  **Brief:** SQ1 / 5.0 / A21
 
