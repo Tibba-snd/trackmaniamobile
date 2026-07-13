@@ -37,6 +37,16 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Capacitor's WebView steals focus oddly on cold start; onWindowFocusChanged alone
+        // leaves the status bar visible on the first frame on some ROMs. Re-assert here and
+        // on the decor view's next layout pass so the hide always lands.
+        applyImmersive();
+        getWindow().getDecorView().post(this::applyImmersive);
+    }
+
     private void applyImmersive() {
         Window window = getWindow();
         if (window == null) return;

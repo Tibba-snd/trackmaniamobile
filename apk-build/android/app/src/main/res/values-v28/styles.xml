@@ -2,8 +2,12 @@
 <resources>
     <!-- shortEdges: render into the notch/camera cutout zone in landscape so the track isn't
          clipped to one side of a punch-hole camera. The game already pads its HUD with
-         env(safe-area-inset-*), so UI stays clear of the cutout. -->
+         env(safe-area-inset-*), so UI stays clear of the cutout. Applied to BOTH themes so the
+         launch frame and the runtime frame agree (avoids a jump on handoff). -->
     <style name="AppTheme.NoActionBar">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+    <style name="AppTheme.NoActionBarLaunch">
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 </resources>

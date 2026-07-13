@@ -144,15 +144,13 @@
 
   DD.createRenderer = function (canvas, quality) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality !== 'low', powerPreference: 'high-performance' });
-    // PERF: cap the device-pixel-ratio. 'high' used to render at DPR 2 (4x the pixels of native),
-    // which is brutal on laptop GPUs and the dominant fill-rate cost. 1.5 keeps edges crisp
-    // (an FXAA pass cleans up the rest — see DD.createComposer) at ~1.8x fewer pixels than DPR 2.
-    // PERF: cap the device-pixel-ratio — fill rate is the dominant cost. On very high-DPI screens
-    // (dpr>=2.5, e.g. 3x laptop/phone panels) the panel downsamples so hard that 1.15 is visually
-    // fine and holds a locked 60 with no dynamic-resolution hitches; lower-DPI screens keep 1.5.
-    // FXAA (see createComposer) cleans the edges. Live-tune with DD.setDPR(x) + the perf HUD.
+    // PERF: cap the device-pixel-ratio. Fill rate is the dominant cost, but the adaptive DPR
+    // system (game.js) already steps down on frame drops — so the static cap only needs to set a
+    // sane ceiling, not pre-emptively blur the image. 1.5 keeps edges crisp (FXAA cleans the rest)
+    // and lets the adaptive system manage real under-load tradeoffs. The old 1.15 floor for 3x
+    // panels was too aggressive — it pre-blurred screens that had headroom to spare.
     const _dpr = window.devicePixelRatio || 1;
-    const _cap = quality === 'high' ? (_dpr >= 2.5 ? 1.15 : 1.5) : 1.25;
+    const _cap = quality === 'high' ? 1.5 : 1.25;
     renderer.setPixelRatio(Math.min(_dpr, _cap));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
