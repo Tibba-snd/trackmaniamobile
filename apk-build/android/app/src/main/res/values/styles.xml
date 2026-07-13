@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
+    <!-- Base application theme. NoActionBar parent on purpose: this is the application-level
+         fallback theme, and any context that resolves it must never inflate an ActionBar. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 
+    <!-- IMPORTANT: never redefine this style in a values-vNN overlay without an explicit parent.
+         A `<style name="AppTheme.NoActionBar">` in values-v28 (no parent attr) implicitly parents
+         to AppTheme and REPLACES this whole definition on API 28+ — that was the purple
+         ActionBar-with-title bug: overlays replace, they do not merge. -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
@@ -17,6 +23,10 @@
         <item name="android:windowContentOverlay">@null</item>
         <!-- Black behind everything so the translucent system-bar / splash handoff never shows white. -->
         <item name="android:colorBackground">@color/black</item>
+        <!-- shortEdges: render into the notch/camera cutout in landscape so the track isn't
+             clipped beside a punch-hole camera. HUD already pads with env(safe-area-inset-*).
+             Attr is API 27+; older platforms ignore it at runtime (minSdk 22 is fine). -->
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
     </style>
 
 
@@ -33,6 +43,7 @@
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
         <!-- Kill the title/action bar. Theme.SplashScreen leaks an ActionBar on some AppCompat
              setups; its background is colorPrimary (purple #9d7bff) and it shows the activity
              label "DRIFTDREAM" white/left-aligned — exactly the ~10% purple band seen at the top. -->

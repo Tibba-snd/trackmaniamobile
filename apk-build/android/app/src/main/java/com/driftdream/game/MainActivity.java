@@ -26,6 +26,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Belt-and-braces: if any theme/overlay resolution still yields an ActionBar
+        // (see the values-v28 overlay incident in res/values/styles.xml), kill it at runtime.
+        if (getSupportActionBar() != null) getSupportActionBar().hide();
         applyImmersive();
     }
 
