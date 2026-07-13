@@ -17,15 +17,15 @@ hard invariants._
 | Ghosts jagged + ugly | Playback lerps on **integer physics tick** ([game.js:1156](js/game.js#L1156)) while the player mesh is render-interpolated — ghost steps at 60 Hz on a 120 Hz screen. Frames store pos+yaw only → ghost is always flat (no pitch/bank), wheels bury on crests/banking. Ghost build = full car at opacity 0.3 → transparent-sorting artifacts + expensive. |
 | Brake-tap slide = "shunt, then snap" | Entry is binary: `brake > 0.4` above 45 m/s latches the slide the same tick full `brakeDec` (34 m/s²) lands — the shunt is the brake pulse itself. Grip↔slide is a hard model swap ([physics.js:399](js/physics.js#L399)), the angle stabiliser *seeks* 0.6 rad at stiffness 3.5 with no ramp (car whips sideways), and `slideCoupling` 2.2/s drags the velocity vector onto the nose — rail-grab, not a slide. Throttle plays no role above `powerOversteerV` (45), so it isn't a *power*slide, and nothing (sfx/smoke/HUD) scales with slip angle, so the 45→62 m/s assist window is invisible — players can't perceive the state they're supposed to modulate. |
 
-## PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion)
+## PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion) ✅ **DONE** (1.1/1.2/1.5 session 26; 1.3 sessions 26–27/A15; 1.4 session 26 — hologram ghost + smooth playhead)
 
-**1.1 Wall physics rework** _(physics.js — Claude)_
+**1.1 Wall physics rework** _(physics.js — Claude)_ ✅
 - Two-point clamp: test front/rear axle points (`pos ± fwd·1.55`) each against their own nearest sample; resolve deepest first. Kills nose clip-through; angled hits push the correct end out.
 - Impulse-based scrape: replace whole-velocity multiply with tangential friction proportional to the normal impulse (μ ≈ 0.4), so cost scales with how hard you actually hit. Micro-contacts (< 0.15 m/s) free.
 - Yaw response: front-point hit nudges nose away from wall (small torque) instead of the "magnet wall" feel.
 - Keep bounce 0.08. Add spark burst + scrape loop scaled by normal impulse (audio hook exists via `car.hitWall`).
 
-**1.2 Collision box / grounding** _(physics.js — Claude)_
+**1.2 Collision box / grounding** _(physics.js — Claude)_ ✅
 - Four-point ground pose: sample road height at 2 axles (reuse neighbor samples, no extra trackQuery); pitch/roll from real contacts. Fixes crest nose-bury and fake landings.
 - Upward snap hysteresis: allow `ha >= -2.0` re-ground only if ribbon-grounded last tick; otherwise `ha >= -0.9`. Kills the side-clip teleport-up.
 - Shoulder honesty: give the 2.2 m shoulder real geometry (beveled strip, −0.35 slope, painted) so physics band = visible surface; no more hovering on air.
@@ -35,13 +35,13 @@ hard invariants._
 - `DD.DECAL` height ladder — one constant per overlay (kerb .03 / glass .05 / centre .07 / edge .09 / boost .11 / landing .13), all offsets read from it; `polygonOffset(-1,-1)` on every NormalBlending road decal; additive strips raised onto the ladder too.
 - Stitch the closed-circuit ribbon seam (last→first quad when `track.closed`, incl. road body + edge strips).
 
-**1.4 Ghost motion + look** _(game.js + scene-car — split: motion Claude, visuals delegable)_
+**1.4 Ghost motion + look** _(game.js + scene-car — split: motion Claude, visuals delegable)_ ✅
 - Smooth playhead: fractional frame index from the tick accumulator alpha; Catmull-Rom position over 4 frames; angle-lerp yaw. (30 Hz data splines fine — no format change needed.)
 - Real pose: ghost runs its own cheap `trackQuery` window → sample `u`/pitch/bank → `poseCar` with true up vector. Airborne: hold last up, pitch from velocity.
 - Hologram material: one ShaderMaterial for the whole ghost (fresnel rim + scanlines, accent by type: PB cyan / author gold), depthWrite off, no shadows/lights. Prettier AND cheaper than 20 transparent PBR mats. Optional thin fading trail ribbon.
 - Save format untouched (still pos+yaw @30 Hz). If jumps look wrong later, v2 = +pitch/roll floats behind a version byte.
 
-**1.5 Powerslide rework — from "shunt + snap" to a readable, throttle-held slide** _(physics.js — Claude; tune live via the physdev menu)_
+**1.5 Powerslide rework — from "shunt + snap" to a readable, throttle-held slide** _(physics.js — Claude; tune live via the physdev menu)_ ✅
 
 Design target (unchanged purpose, honest feel): slide is the fastest tool **only** in corners too
 sharp for the grip regime's yaw cap at speed; grip stays fastest on sweepers; lift-and-turn stays
@@ -102,7 +102,7 @@ audible/visible the whole time.
 **3.3 Elevation ambition** _(trackgen)_ ✅ **DONE** (session 29 — y-corridor 2..90 for vertical/speedway; TERRAIN_RISE scaling deferred until tracks actually reach the new ceiling)
 - Widen the soft y-corridor (2..55 → 2..90) for `vertical`/`speedway`; scale support pillars + `TERRAIN_RISE` accordingly. Tracks should earn skyline moments.
 
-**3.4 Track dressing** _(scene-decor — delegable)_ 🔴 **BRIEFED as A16** (session 29 — Antigravity)
+**3.4 Track dressing** _(scene-decor — delegable)_ ✅ **DONE** (A16, Antigravity — retro-reviewed + landed session 30; note: drop was swept into commit `885a187`)
 - Braking boards (100/50) before detected `corners[]`; apex cones; hazard chevron paint on `tighten`; start grid slab + gantry countdown lights; distance-to-finish boards each 25%; checkpoint ring variety per biome. All instanced/merged, decal ladder heights.
 
 ## PHASE 4 — Fun layer + true forks
