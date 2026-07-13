@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/java/com/driftdream/game/MainActivity.java": {
-    "mtime": 1783937098.7401052,
-    "ast_hash": "79157e061c18a5f4573633a72a3c7516",
+    "mtime": 1783937620.659896,
+    "ast_hash": "c59c0a42fe8a728c7fdfcf2d3f84afd9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
