@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783937313.9153192,
+    "mtime": 1783938291.6690967,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,22 +20,22 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783937313.885489,
+    "mtime": 1783938291.6372075,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783937313.8945813,
+    "mtime": 1783938291.6464438,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783937313.9119442,
+    "mtime": 1783938291.665578,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783937313.9129434,
+    "mtime": 1783938291.665578,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783937313.9153192,
+    "mtime": 1783938291.6690967,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },

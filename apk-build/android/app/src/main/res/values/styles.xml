@@ -38,5 +38,10 @@
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Kill the title/action bar. Theme.SplashScreen leaks an ActionBar on some AppCompat
+             setups; its background is colorPrimary (purple #9d7bff) and it shows the activity
+             label "DRIFTDREAM" white/left-aligned — exactly the ~10% purple band seen at the top. -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 </resources>
