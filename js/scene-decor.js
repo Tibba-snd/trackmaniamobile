@@ -736,15 +736,34 @@
     return true;
   }
 
-  // apex cone eligibility — cones sit on the INSIDE edge, which on hairpins points at the
-  // returning leg; keep them out of the other road's space.
+  // true off-deck test vs the LOCAL arc: on curves, a point laterally clear of its own sample
+  // can still sit over a sample 10-20 m along the bend (the chord pinches inside). Checks every
+  // sample in ±25 against that sample's own width.
+  function offDeck(track, px, pz, idx, margin) {
+    const ss = track.samples, N = ss.length;
+    for (let o = -25; o <= 25; o++) {
+      const j = getWrappedIdx(idx + o, N, track.closed);
+      if (j === -1) continue;
+      const s = ss[j];
+      const dx = px - s.p[0], dz = pz - s.p[2];
+      const min = s.w / 2 + margin;
+      if (dx * dx + dz * dz < min * min) return false;
+    }
+    return true;
+  }
+
+  // apex cone eligibility — cones sit on the INSIDE edge, which on hairpins points both at the
+  // returning leg AND into the pinched inside chord of the bend itself. If the cone can't stand
+  // truly off-deck there, skip it — kerbs already mark the apex.
   function coneOk(track, c, idx) {
     if (idx === -1) return false;
     if (!isSpawningSafe(idx, track)) return false;
     const s = track.samples[idx];
     if (!s) return false;
     const lat = c.insideSign * (s.w / 2 + 1.4);
-    return clearOfTrack(track, s.p[0] + s.r[0] * lat, s.p[2] + s.r[2] * lat, idx, 8);
+    const px = s.p[0] + s.r[0] * lat, pz = s.p[2] + s.r[2] * lat;
+    if (!offDeck(track, px, pz, idx, 0.7)) return false;
+    return clearOfTrack(track, px, pz, idx, 8);
   }
 
   const colToHex = (c) => {
@@ -2097,13 +2116,23 @@
         }
       }
 
-      let cleared = true;
-      for (let j = 0; j < ss.length; j += 6) {
-        const sp = ss[j].p; const dx = p[0] - sp[0], dz = p[2] - sp[2];
-        if (dx * dx + dz * dz < MIN_CLEAR * MIN_CLEAR) { cleared = false; break; }
-      }
-      if (!cleared) { off += 18.0; p = V.addS(V.clone(s.p), s.r, sign * off); }
-
+      // Clearance vs EVERY track sample — resolved ITERATIVELY. The old code shoved a failing
+      // pick 18 m outboard ONCE and never re-checked: the shoved spot regularly landed on a
+      // DIFFERENT leg (hairpin returns, crossings) — the giant translucent spike mid-road bug.
+      // Stride 3 (6 m): the old 12 m stride skipped past samples on tight curves. The vertical
+      // test kills the sibling artifact — a tall spike planted in a valley piercing an elevated
+      // deck above it ("cone peeking through the road").
+      const [w, h] = sizeFor();
+      const clearedAt = (pp) => {
+        const gy = groundY(pp[0], pp[2]);
+        for (let j = 0; j < ss.length; j += 3) {
+          const sp = ss[j].p; const dx = pp[0] - sp[0], dz = pp[2] - sp[2];
+          const d2 = dx * dx + dz * dz;
+          if (d2 < MIN_CLEAR * MIN_CLEAR) return false;
+          if (d2 < 26 * 26 && sp[1] > gy + 1.0 && sp[1] < gy + h + 3.0) return false;
+        }
+        return true;
+      };
       // keep landmarks out of shortcut corridors — shove outboard if the pick sits in a cut
       if (track.shortcuts) {
         for (const cut of track.shortcuts) {
@@ -2113,9 +2142,11 @@
           if (dx * dx + dz * dz < 14 * 14) { off += 34.0; p = V.addS(V.clone(s.p), s.r, sign * off); break; }
         }
       }
+      let shoves = 0;
+      while (!clearedAt(p) && shoves < 4) { off += 18.0; p = V.addS(V.clone(s.p), s.r, sign * off); shoves++; }
+      if (!clearedAt(p)) continue; // nowhere clean on this ray — skip the landmark entirely
 
       const gy = groundY(p[0], p[2]);
-      const [w, h] = sizeFor();
       const facing = V.norm([-sign * s.r[0], 0, -sign * s.r[2]]);
       const yaw = Math.atan2(facing[0], facing[2]);
       const registerLight = placedCount < 10 && off < s.w / 2 + 13.0 && quality !== 'low';

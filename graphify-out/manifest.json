@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783943067.8563464,
+    "mtime": 1783950413.7684052,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,28 +20,28 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783943067.8149116,
+    "mtime": 1783950413.7269535,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783943067.8271623,
+    "mtime": 1783950413.7396228,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783943067.8503208,
+    "mtime": 1783950413.7643533,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783943067.8503208,
+    "mtime": 1783950413.7653527,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/audio.js": {
-    "mtime": 1783446869.0696733,
-    "ast_hash": "cbf55a93690a22da767b9f60b855efb6",
+    "mtime": 1783950351.7355556,
+    "ast_hash": "37ffe60eccce30c249a2972b2306c707",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/carspec.js": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/game.js": {
-    "mtime": 1783942983.2173367,
-    "ast_hash": "9a064464624060d60c3a319bfab85330",
+    "mtime": 1783950363.0359676,
+    "ast_hash": "ffcf60665702d8ebc9393a4a5084124b",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/input.js": {
@@ -110,8 +110,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/physics.js": {
-    "mtime": 1783448549.022609,
-    "ast_hash": "e74428a8dd0f66750d00ae6f25c45fa6",
+    "mtime": 1783947722.1897418,
+    "ast_hash": "b39c0a03a64ac9e58f8045d438f1c02b",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-car.js": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/trackgen.js": {
-    "mtime": 1783924212.6149788,
-    "ast_hash": "90f6c5a8c29b4fc53e1b4ea8e34e923f",
+    "mtime": 1783948509.8832545,
+    "ast_hash": "742e2626551a0f2656377360068ce4a4",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/java/com/driftdream/game/MainActivity.java": {
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783943067.8533778,
+    "mtime": 1783950413.7673542,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },
@@ -195,13 +195,13 @@
     "semantic_hash": ""
   },
   "dd.js": {
-    "mtime": 1783925425.9742632,
-    "ast_hash": "82b960073ba9d1c27a1772d8f5890ac6",
+    "mtime": 1783950345.5163667,
+    "ast_hash": "3042263f9ea9b7f5f1bebd2bd0b451a6",
     "semantic_hash": ""
   },
   "js/audio.js": {
-    "mtime": 1783446869.0696733,
-    "ast_hash": "cbf55a93690a22da767b9f60b855efb6",
+    "mtime": 1783950351.7355556,
+    "ast_hash": "37ffe60eccce30c249a2972b2306c707",
     "semantic_hash": ""
   },
   "js/carspec.js": {
@@ -210,13 +210,13 @@
     "semantic_hash": ""
   },
   "js/core.js": {
-    "mtime": 1783942840.7630222,
-    "ast_hash": "f4ddb7bbc4db01f91a380e7ca1cb79c9",
+    "mtime": 1783967718.4284298,
+    "ast_hash": "9e240ff44e76a1142200f0838faeba6f",
     "semantic_hash": ""
   },
   "js/game.js": {
-    "mtime": 1783942983.2173367,
-    "ast_hash": "9a064464624060d60c3a319bfab85330",
+    "mtime": 1783967746.6972868,
+    "ast_hash": "2653a3b8b8ea067319e41b311140f0ac",
     "semantic_hash": ""
   },
   "js/input.js": {
@@ -285,8 +285,8 @@
     "semantic_hash": ""
   },
   "js/scene-decor.js": {
-    "mtime": 1783925165.2177012,
-    "ast_hash": "d72ddea001b08481e47709c822a64f82",
+    "mtime": 1783968139.1635349,
+    "ast_hash": "ea77d02ee58a9b0faaef926687ffbdb8",
     "semantic_hash": ""
   },
   "js/scene-fx.js": {
@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "js/trackgen.js": {
-    "mtime": 1783924212.6149788,
-    "ast_hash": "90f6c5a8c29b4fc53e1b4ea8e34e923f",
+    "mtime": 1783948509.8832545,
+    "ast_hash": "742e2626551a0f2656377360068ce4a4",
     "semantic_hash": ""
   },
   "tests/drivability.js": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "INBOX.md": {
-    "mtime": 1783948095.391758,
-    "ast_hash": "72438d4155ecb35680ebdb42adfc24eb",
+    "mtime": 1783968338.0984795,
+    "ast_hash": "7ce43a950f26a899307fe306abc2956e",
     "semantic_hash": ""
   },
   "README.md": {
@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/index.html": {
-    "mtime": 1783943012.0336134,
-    "ast_hash": "3b5188f314944458f9367ec6c7baf1b2",
+    "mtime": 1783947932.36715,
+    "ast_hash": "7b112871dac8036dd5ad0c84639383ba",
     "semantic_hash": ""
   },
   "docs/DESIGN_PROMPT.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1783947932.36715,
-    "ast_hash": "7b112871dac8036dd5ad0c84639383ba",
+    "mtime": 1783967760.0341258,
+    "ast_hash": "ebecf94eccd4594f2fb77f46277f9223",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/res/drawable-land-hdpi/splash.png": {
@@ -1270,8 +1270,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/sw.js": {
-    "mtime": 1783931520.5521252,
-    "ast_hash": "1516446e973283648bd6135540f84cd3",
+    "mtime": 1783944022.4863362,
+    "ast_hash": "9e5435ca719a9dc8033025df670497ac",
     "semantic_hash": ""
   },
   "manifest.json": {
@@ -1307,6 +1307,86 @@
   "SUNO_PROMPTS.md": {
     "mtime": 1783947082.747434,
     "ast_hash": "e9ff2cd623d95d5751e60d5230121847",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/Dune1.mp3": {
+    "mtime": 1783948927.1094277,
+    "ast_hash": "2604413832c0fdf57685c1964e8df3c5",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/Garage.mp3": {
+    "mtime": 1783948871.7658865,
+    "ast_hash": "a51f3512e2a1980f17c8ebac7d880211",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/MainMenu.mp3": {
+    "mtime": 1783948849.8129435,
+    "ast_hash": "efd5aab560467eb198b433637eeea67a",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/MainTheme.mp3": {
+    "mtime": 1783948768.7904937,
+    "ast_hash": "d3d4aea597437167beb513049e65ca57",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/canyon.mp3": {
+    "mtime": 1783949416.4587255,
+    "ast_hash": "4678eab12e758e84233fa5407769d082",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/frozen.mp3": {
+    "mtime": 1783949591.740791,
+    "ast_hash": "727d625920f1f734c7617b63c166b291",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/neon.mp3": {
+    "mtime": 1783949351.133274,
+    "ast_hash": "93e387d60ebef1c738c9be97906386cc",
+    "semantic_hash": ""
+  },
+  "apk-build/android/app/src/main/assets/public/audio/music/resultsfinish.mp3": {
+    "mtime": 1783948900.1694584,
+    "ast_hash": "affd3a0ed3d0162d92862f0f72c6a22d",
+    "semantic_hash": ""
+  },
+  "audio/music/Dune1.mp3": {
+    "mtime": 1783948927.1094277,
+    "ast_hash": "2604413832c0fdf57685c1964e8df3c5",
+    "semantic_hash": ""
+  },
+  "audio/music/Garage.mp3": {
+    "mtime": 1783948871.7658865,
+    "ast_hash": "a51f3512e2a1980f17c8ebac7d880211",
+    "semantic_hash": ""
+  },
+  "audio/music/MainMenu.mp3": {
+    "mtime": 1783948849.8129435,
+    "ast_hash": "efd5aab560467eb198b433637eeea67a",
+    "semantic_hash": ""
+  },
+  "audio/music/MainTheme.mp3": {
+    "mtime": 1783948768.7904937,
+    "ast_hash": "d3d4aea597437167beb513049e65ca57",
+    "semantic_hash": ""
+  },
+  "audio/music/canyon.mp3": {
+    "mtime": 1783949416.4587255,
+    "ast_hash": "4678eab12e758e84233fa5407769d082",
+    "semantic_hash": ""
+  },
+  "audio/music/frozen.mp3": {
+    "mtime": 1783949591.740791,
+    "ast_hash": "727d625920f1f734c7617b63c166b291",
+    "semantic_hash": ""
+  },
+  "audio/music/neon.mp3": {
+    "mtime": 1783949351.133274,
+    "ast_hash": "93e387d60ebef1c738c9be97906386cc",
+    "semantic_hash": ""
+  },
+  "audio/music/resultsfinish.mp3": {
+    "mtime": 1783948900.1694584,
+    "ast_hash": "affd3a0ed3d0162d92862f0f72c6a22d",
     "semantic_hash": ""
   }
 }
