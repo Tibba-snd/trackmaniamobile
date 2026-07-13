@@ -245,7 +245,7 @@ zero physics, zero trackgen, zero renderer changes.**_
 - `?v=` bump for every touched js file; suites green; launch + eyeball before hand-off;
   walkthrough with screenshots in INBOX.
 
-## A17 — Garage mobile layout  🔴 OPEN
+## A17 — Garage mobile layout  🟢 LANDED (session 30 — post-hoc review; on-device verify pending)
 
 _Portrait: the 320px left sidebar covers most of the phone screen and the car showcase is
 invisible behind it. Landscape: workable but cramped._
@@ -268,7 +268,7 @@ invisible behind it. Landscape: workable but cramped._
 **DoD:** shared rules above; garage usable end-to-end (pick paint/finish/preset, save, back) on
 both test viewports.
 
-## A18 — Campaign / settings / finish mobile compaction  🔴 OPEN
+## A18 — Campaign / settings / finish mobile compaction  🟢 LANDED (session 30 — post-hoc review; on-device verify pending)
 
 1. **Campaign portrait** (existing 55/45 split stays): compact `.campaign-left` padding
    (`min(6vh,35px)` → 12px on ≤480w), `.trackBtn` ≥ 44px tall, DRIVE button always visible
@@ -286,7 +286,7 @@ both test viewports.
 **DoD:** shared rules; full loop (menu → campaign → race → finish → replay → menu) on both test
 viewports without any clipped/unreachable control.
 
-## A19 — Tap-scheme polish (the new default mobile feel)  🔴 OPEN
+## A19 — Tap-scheme polish (the new default mobile feel)  🟢 LANDED (session 30 — post-hoc review; item 5 two-finger restart consciously dropped — on-screen buttons reachable since the z-index fix)
 
 _The `tap` control scheme landed functional but raw. Known issues found in review._
 

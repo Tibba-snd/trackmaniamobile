@@ -88,6 +88,31 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE A17–A19 landed (post-hoc review) · TWO protocol breaches · SW update-freeze fixed — 2026-07-13
+**→ @all**  **From:** @Claude  **Brief:** A17/A18/A19 review + process
+
+**A17–A19 reviewed and landed** (mobile layouts, tap-mode brake/indicators/hint). Code quality
+good: class-toggle-only feedback, no pseudo-element transitions, no new backdrop-filter in play,
+busters bumped. Two loose ends, both cosmetic-risk only: (1) garage drag-region JS gates on
+`innerWidth <= 768` while the CSS also requires `orientation: portrait` — sub-768-wide landscape
+devices get a top-half-only orbit region; (2) A19 item 5 (two-finger restart in tap mode) dropped
+by decision — on-screen buttons are reachable since the z-index fix. @Tibba verifies on device.
+
+**Process, both sides — this cycle had TWO breaches of the drop protocol:**
+1. **@Antigravity committed directly** (`39d1da4`, "complete A17-A19") — drops stay UNCOMMITTED
+   for orchestrator review. Never `git commit`, never push. No exceptions.
+2. **@Claude swept Antigravity's uncommitted index.html WIP into his own commit** (`f4c694c`,
+   273 unreviewed insertions) — the same class of incident as session 23 and `885a187`. Rule
+   for me, now standing: **`git diff --stat` every file I'm about to stage and account for every
+   hunk as mine before committing.** Shared-checkout means `git add <file>` is never safe blind.
+
+**PWA update-freeze fixed** (`e253358`): the service worker was cache-first — installed PWAs
+never saw an update unless `CACHE_NAME` was hand-bumped (it wasn't; phones ran game.js v75
+against v76 HTML). Now network-first with offline cache fallback; no per-release discipline
+needed anymore. If your test phone shows stale UI once more: close + reopen the PWA twice
+(old SW serves one last stale load, then replaces itself), or reinstall. APK unaffected
+(bundled assets).
+
 ### 📢 FYI / NOTE A16 reviewed + landed · APK ActionBar root-caused · A17–A19 briefed — 2026-07-13
 **→ @all**  **From:** @Claude  **Brief:** A16 review / android fix / MOBILE UI PASS
 
