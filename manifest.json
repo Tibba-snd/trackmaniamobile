@@ -1,0 +1,21 @@
+{
+  "name": "DRIFTDREAM",
+  "short_name": "DRIFTDREAM",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#07040e",
+  "theme_color": "#ff7bd5",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

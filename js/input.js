@@ -67,7 +67,7 @@
   DD.calibrateTilt = function () { state.tiltNeutral = state.tiltRaw; };
 
   DD.bindTouch = function (els) {
-    // els: { gas, brake, steerL, steerR }
+    // els: { gas, brake, steerL, steerR, zoneL, zoneR }
     const hold = (el, on, off) => {
       if (!el) return;
       el.addEventListener('touchstart', (e) => { e.preventDefault(); on(); }, { passive: false });
@@ -81,6 +81,8 @@
     hold(els.brake, () => state.touchBrake = true, () => state.touchBrake = false);
     hold(els.steerL, () => state.touchSteer = -1, () => { if (state.touchSteer < 0) state.touchSteer = 0; });
     hold(els.steerR, () => state.touchSteer = 1, () => { if (state.touchSteer > 0) state.touchSteer = 0; });
+    hold(els.zoneL, () => state.touchSteer = -1, () => { if (state.touchSteer < 0) state.touchSteer = 0; });
+    hold(els.zoneR, () => state.touchSteer = 1, () => { if (state.touchSteer > 0) state.touchSteer = 0; });
   };
 
   // two-finger tap = restart (on the canvas)
@@ -102,6 +104,11 @@
     const k = state.keys;
     let steer = 0, throttle = 0, brake = 0;
 
+    // auto-throttle for tap mode
+    if (settings && settings.controlMode === 'tap') {
+      throttle = 1;
+    }
+
     // keyboard (always active — desktop dev)
     if (k['ArrowLeft'] || k['KeyA']) steer -= 1;
     if (k['ArrowRight'] || k['KeyD']) steer += 1;
@@ -112,8 +119,13 @@
     if (state.touchGas) throttle = 1;
     if (state.touchBrake) brake = 1;
 
+    // auto-throttle override
+    if (settings && settings.controlMode === 'tap' && brake === 1) {
+      throttle = 0;
+    }
+
     // steering source
-    if (settings.controlMode === 'tilt' && state.tiltNeutral !== null) {
+    if (settings && settings.controlMode === 'tilt' && state.tiltNeutral !== null) {
       let d = (state.tiltRaw - state.tiltNeutral) * (settings.invertTilt ? -1 : 1);
       d = d / (22 / (settings.tiltSens || 1)); // ±22° = full lock at sens 1
       if (Math.abs(d) > Math.abs(steer)) steer = DD.clamp(d, -1, 1);

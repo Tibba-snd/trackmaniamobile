@@ -657,10 +657,241 @@
     return mesh;
   }
 
+  function getWrappedIdx(idx, N, closed) {
+    if (closed) {
+      return (idx % N + N) % N;
+    }
+    if (idx < 0 || idx >= N) return -1;
+    return idx;
+  }
+
+  function isSpawningSafe(idx, track) {
+    const N = track.samples.length;
+    const s = track.samples[(idx % N + N) % N];
+    if (!s) return false;
+    if (s.apron && Math.abs(s.apron) > 0.01) return false;
+    if (s.gap) return false;
+    if (s.landing) return false;
+
+    if (track.shortcuts && track.shortcuts.length) {
+      const px = s.p[0];
+      const pz = s.p[2];
+      for (const sc of track.shortcuts) {
+        const ax = sc.a[0];
+        const az = sc.a[2];
+        const bx = sc.b[0];
+        const bz = sc.b[2];
+        const abx = bx - ax;
+        const abz = bz - az;
+        const len2 = sc.len2 || (abx * abx + abz * abz);
+        if (len2 < 0.01) continue;
+        let t = ((px - ax) * abx + (pz - az) * abz) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const projx = ax + t * abx;
+        const projz = az + t * abz;
+        const dx = px - projx;
+        const dz = pz - projz;
+        if (dx * dx + dz * dz < 16 * 16) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  const colToHex = (c) => {
+    const r = Math.round(c[0] * 255).toString(16).padStart(2, '0');
+    const g = Math.round(c[1] * 255).toString(16).padStart(2, '0');
+    const b = Math.round(c[2] * 255).toString(16).padStart(2, '0');
+    return '#' + r + g + b;
+  };
+
+  const _textTexCache = {};
+  function getTextTexture(text, signColorHex, bgColorHex = '#0c0c10') {
+    const key = text + '|' + signColorHex + '|' + bgColorHex;
+    if (_textTexCache[key]) return _textTexCache[key];
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = bgColorHex;
+      ctx.fillRect(0, 0, 256, 128);
+      ctx.strokeStyle = signColorHex;
+      ctx.lineWidth = 12;
+      ctx.strokeRect(6, 6, 244, 116);
+      ctx.fillStyle = signColorHex;
+      ctx.font = 'bold 72px "Chakra Petch", "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 64);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    _textTexCache[key] = tex;
+    return tex;
+  }
+
+  function buildHazardChevrons(track, theme) {
+    const ss = track.samples;
+    const N = ss.length;
+    const pos = [];
+    const idx = [];
+    let vi = 0;
+
+    for (let i = 0; i < N; i++) {
+      const s = ss[i];
+      if (s.pieceName === 'tighten' && i % 4 === 0 && isSpawningSafe(i, track)) {
+        const p0 = V.addS(s.p, s.u, DD.DECAL.centre);
+
+        const v0 = V.addS(V.clone(p0), s.f, 1.5);
+        const v1 = V.addS(V.addS(p0, s.f, -0.5), s.r, -2.2);
+        const v2 = V.addS(V.addS(p0, s.f, -0.5), s.r, 2.2);
+        const v3 = V.addS(V.clone(p0), s.f, 0.8);
+        const v4 = V.addS(V.addS(p0, s.f, -1.2), s.r, -1.8);
+        const v5 = V.addS(V.addS(p0, s.f, -1.2), s.r, 1.8);
+
+        pos.push(v0[0], v0[1], v0[2]);
+        pos.push(v1[0], v1[1], v1[2]);
+        pos.push(v2[0], v2[1], v2[2]);
+        pos.push(v3[0], v3[1], v3[2]);
+        pos.push(v4[0], v4[1], v4[2]);
+        pos.push(v5[0], v5[1], v5[2]);
+
+        idx.push(vi + 0, vi + 1, vi + 4);
+        idx.push(vi + 0, vi + 4, vi + 3);
+        idx.push(vi + 0, vi + 5, vi + 2);
+        idx.push(vi + 0, vi + 3, vi + 5);
+
+        vi += 6;
+      }
+    }
+
+    if (pos.length === 0) return null;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setIndex(idx);
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: col(theme.accent),
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.frustumCulled = false;
+    return mesh;
+  }
+
+  function buildDistanceBoards(track, theme) {
+    const ss = track.samples;
+    const N = ss.length;
+    const group = new THREE.Group();
+
+    const targets = [
+      { ratio: 0.25, label: '75%' },
+      { ratio: 0.50, label: '50%' },
+      { ratio: 0.75, label: '25%' }
+    ];
+
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.9, roughness: 0.1 });
+    const panelGeo = new THREE.BoxGeometry(2.0, 1.3, 0.1);
+    const postGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.0, 6);
+    const textPlaneGeo = new THREE.PlaneGeometry(1.8, 1.1);
+
+    function isNearCheckpoint(idx) {
+      const gates = [...(track.checkpoints || [])];
+      if (track.startIdx !== undefined) gates.push(track.startIdx);
+      if (track.finishIdx !== undefined) gates.push(track.finishIdx);
+
+      const maxSampleDiff = Math.ceil(80 / track.ds);
+      for (const gateIdx of gates) {
+        let diff = Math.abs(idx - gateIdx);
+        if (track.closed) {
+          diff = Math.min(diff, N - diff);
+        }
+        if (diff <= maxSampleDiff) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    for (const tgt of targets) {
+      const idx = Math.round(N * tgt.ratio);
+      const wIdx = getWrappedIdx(idx, N, track.closed);
+      if (wIdx === -1 || !isSpawningSafe(wIdx, track) || isNearCheckpoint(wIdx)) continue;
+
+      const s = ss[wIdx];
+      const outside = 1;
+      const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.2)), s.u, 1.5);
+
+      const basis = new THREE.Matrix4();
+      if (basis.makeBasis) {
+        basis.makeBasis(
+          new THREE.Vector3(-s.r[0], -s.r[1], -s.r[2]),
+          new THREE.Vector3(s.u[0], s.u[1], s.u[2]),
+          new THREE.Vector3(-s.f[0], -s.f[1], -s.f[2])
+        );
+      }
+      const qBoard = new THREE.Quaternion().setFromRotationMatrix(basis);
+
+      const mBoard = new THREE.Matrix4();
+      mBoard.compose(new THREE.Vector3(p[0], p[1], p[2]), qBoard, new THREE.Vector3(1, 1, 1));
+
+      const panel = new THREE.Mesh(panelGeo, darkMat);
+      panel.position.copy(p);
+      panel.quaternion.copy(qBoard);
+      panel.castShadow = panel.receiveShadow = true;
+      group.add(panel);
+
+      const postTop = [p[0] - s.u[0] * 0.65, p[1] - s.u[1] * 0.65, p[2] - s.u[2] * 0.65];
+      const g = track.terrain ? DD.terrainAt(track.terrain, postTop[0], postTop[2]) : 0;
+      const height = Math.max(0.1, postTop[1] - g);
+      const yCenter = (postTop[1] + g) / 2;
+
+      const post = new THREE.Mesh(postGeo, darkMat);
+      post.position.set(postTop[0], yCenter, postTop[2]);
+      post.scale.set(1, height, 1);
+      post.castShadow = post.receiveShadow = true;
+      group.add(post);
+
+      const textMat = new THREE.MeshBasicMaterial({
+        map: getTextTexture(tgt.label, colToHex(theme.accent2)),
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        depthWrite: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      });
+
+      const textPlane = new THREE.Mesh(textPlaneGeo, textMat);
+      const sPos = new THREE.Vector3(0, 0, 0.06);
+      const sQuat = new THREE.Quaternion();
+      const sScl = new THREE.Vector3(1, 1, 1);
+      const mLocal = new THREE.Matrix4().compose(sPos, sQuat, sScl);
+      const mWorld = new THREE.Matrix4().multiplyMatrices(mBoard, mLocal);
+
+      textPlane.position.setFromMatrixPosition(mWorld);
+      textPlane.quaternion.copy(qBoard);
+      group.add(textPlane);
+    }
+
+    return group;
+  }
+
   /* ---------------- CORNER SIGNAGE: chevrons, brake bars, apex beacons ---------------- */
   function buildCornerSigns(track, theme) {
     const group = new THREE.Group();
     const ss = track.samples;
+    const N = ss.length;
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.9, roughness: 0.1, emissive: col(theme.accent2), emissiveIntensity: 0.06 });
     const chevMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     const barMat = new THREE.MeshBasicMaterial({ color: col(theme.accent2), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
@@ -670,6 +901,9 @@
     // First pass: count total boards and total slat instances for all corners
     let totalBoards = 0;
     let totalSlats = 0;
+    let totalBrake100 = 0;
+    let totalBrake50 = 0;
+
     for (const c of track.corners) {
       const numGlyphs = c.minRad < 40 ? 3 : (c.minRad < 70 ? 2 : 1);
       const startIdx = Math.max(2, c.entry - 20);
@@ -686,23 +920,71 @@
         totalBoards++;
         totalSlats += 4 + 2 * numGlyphs;
       }
+
+      // Braking boards at -100m and -50m
+      const bi100 = getWrappedIdx(c.entry - Math.round(100 / track.ds), N, track.closed);
+      const bi50 = getWrappedIdx(c.entry - Math.round(50 / track.ds), N, track.closed);
+      if (bi100 !== -1 && isSpawningSafe(bi100, track)) {
+        totalBrake100++;
+      }
+      if (bi50 !== -1 && isSpawningSafe(bi50, track)) {
+        totalBrake50++;
+      }
     }
 
-    if (totalBoards > 0) {
+    const totalAllPanels = totalBoards + totalBrake100 + totalBrake50;
+    const totalAllPosts = totalAllPanels * 2;
+
+    if (totalAllPanels > 0) {
       const panelGeo = new THREE.BoxGeometry(3.6, 2.4, 0.15);
       const postGeo = new THREE.CylinderGeometry(0.08, 0.11, 1.0, 6);
       const slatGeo = new THREE.PlaneGeometry(1.0, 1.0);
 
-      const panelIM = new THREE.InstancedMesh(panelGeo, darkMat, totalBoards);
-      const postIM = new THREE.InstancedMesh(postGeo, darkMat, totalBoards * 2);
+      const panelIM = new THREE.InstancedMesh(panelGeo, darkMat, totalAllPanels);
+      const postIM = new THREE.InstancedMesh(postGeo, darkMat, totalAllPosts);
       const slatIM = new THREE.InstancedMesh(slatGeo, chevMat, totalSlats);
 
       panelIM.castShadow = panelIM.receiveShadow = true;
       postIM.castShadow = postIM.receiveShadow = true;
 
+      let brake100IM = null;
+      let brake50IM = null;
+      if (totalBrake100 > 0) {
+        const brakePlaneGeo = new THREE.PlaneGeometry(3.4, 2.2);
+        const tex100 = getTextTexture('100', colToHex(theme.accent2));
+        const brake100Mat = new THREE.MeshBasicMaterial({
+          map: tex100,
+          transparent: true,
+          opacity: 0.95,
+          side: THREE.DoubleSide,
+          depthWrite: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
+        });
+        brake100IM = new THREE.InstancedMesh(brakePlaneGeo, brake100Mat, totalBrake100);
+      }
+      if (totalBrake50 > 0) {
+        const brakePlaneGeo = new THREE.PlaneGeometry(3.4, 2.2);
+        const tex50 = getTextTexture('50', colToHex(theme.accent2));
+        const brake50Mat = new THREE.MeshBasicMaterial({
+          map: tex50,
+          transparent: true,
+          opacity: 0.95,
+          side: THREE.DoubleSide,
+          depthWrite: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
+        });
+        brake50IM = new THREE.InstancedMesh(brakePlaneGeo, brake50Mat, totalBrake50);
+      }
+
       let boardIdx = 0;
       let postIdx = 0;
       let slatIdx = 0;
+      let b100Idx = 0;
+      let b50Idx = 0;
 
       for (const c of track.corners) {
         const outside = -c.insideSign;
@@ -720,10 +1002,8 @@
           const s = ss[bi];
           if (!s || s.gap || bi < 2) continue;
 
-          // Position of the board center (2m above the track surface)
           const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
 
-          // Build board orientation matrix (xAxis = -s.r, yAxis = s.u, zAxis = -s.f)
           const basis = new THREE.Matrix4();
           if (basis.makeBasis) {
             basis.makeBasis(
@@ -744,10 +1024,8 @@
             );
           }
 
-          // 1. Backing Panel
           panelIM.setMatrixAt(boardIdx++, mBoard);
 
-          // 2. Posts (left and right at bottom edge local y = -1.2)
           const postTops = [
             [
               p[0] + s.r[0] * 1.0 - s.u[0] * 1.2,
@@ -777,7 +1055,6 @@
             postIM.setMatrixAt(postIdx++, mPost);
           }
 
-          // 3. Slat matrix composition helper
           const placeSlat = (lx, ly, lz, rotZ, sx, sy) => {
             const sPos = new THREE.Vector3(lx, ly, lz);
             const sQuat = new THREE.Quaternion();
@@ -790,13 +1067,11 @@
             return mWorld;
           };
 
-          // Emissive Frame (4 slats)
           slatIM.setMatrixAt(slatIdx++, placeSlat(0, 1.15, 0.08, 0, 3.5, 0.08));
           slatIM.setMatrixAt(slatIdx++, placeSlat(0, -1.15, 0.08, 0, 3.5, 0.08));
           slatIM.setMatrixAt(slatIdx++, placeSlat(-1.75, 0, 0.08, 0, 0.08, 2.38));
           slatIM.setMatrixAt(slatIdx++, placeSlat(1.75, 0, 0.08, 0, 0.08, 2.38));
 
-          // Chevron Glyphs (1-3)
           let centers = [0];
           if (numGlyphs === 2) {
             centers = [-0.65, 0.65];
@@ -818,6 +1093,85 @@
             }
           }
         }
+
+        const brakeBIs = [
+          { bi: getWrappedIdx(c.entry - Math.round(100 / track.ds), N, track.closed), label: '100' },
+          { bi: getWrappedIdx(c.entry - Math.round(50 / track.ds), N, track.closed), label: '50' }
+        ];
+
+        for (const bInfo of brakeBIs) {
+          const bi = bInfo.bi;
+          if (bi === -1 || !isSpawningSafe(bi, track)) continue;
+          const s = ss[bi];
+          if (!s) continue;
+
+          const p = V.addS(V.addS(s.p, s.r, outside * (s.w / 2 + 2.6)), s.u, 2.0);
+
+          const basis = new THREE.Matrix4();
+          if (basis.makeBasis) {
+            basis.makeBasis(
+              new THREE.Vector3(-s.r[0], -s.r[1], -s.r[2]),
+              new THREE.Vector3(s.u[0], s.u[1], s.u[2]),
+              new THREE.Vector3(-s.f[0], -s.f[1], -s.f[2])
+            );
+          }
+          const qBoard = new THREE.Quaternion();
+          if (qBoard.setFromRotationMatrix) qBoard.setFromRotationMatrix(basis);
+
+          const mBoard = new THREE.Matrix4();
+          if (mBoard.compose) {
+            mBoard.compose(
+              new THREE.Vector3(p[0], p[1], p[2]),
+              qBoard,
+              new THREE.Vector3(1, 1, 1)
+            );
+          }
+
+          panelIM.setMatrixAt(boardIdx++, mBoard);
+
+          const postTops = [
+            [
+              p[0] + s.r[0] * 1.0 - s.u[0] * 1.2,
+              p[1] + s.r[1] * 1.0 - s.u[1] * 1.2,
+              p[2] + s.r[2] * 1.0 - s.u[2] * 1.2
+            ],
+            [
+              p[0] - s.r[0] * 1.0 - s.u[0] * 1.2,
+              p[1] - s.r[1] * 1.0 - s.u[1] * 1.2,
+              p[2] - s.r[2] * 1.0 - s.u[2] * 1.2
+            ]
+          ];
+
+          for (const postTop of postTops) {
+            const g = track.terrain ? DD.terrainAt(track.terrain, postTop[0], postTop[2]) : 0;
+            const height = Math.max(0.1, postTop[1] - g);
+            const yCenter = (postTop[1] + g) / 2;
+
+            const mPost = new THREE.Matrix4();
+            if (mPost.compose) {
+              mPost.compose(
+                new THREE.Vector3(postTop[0], yCenter, postTop[2]),
+                new THREE.Quaternion(),
+                new THREE.Vector3(1, height, 1)
+              );
+            }
+            postIM.setMatrixAt(postIdx++, mPost);
+          }
+
+          const sPos = new THREE.Vector3(0, 0, 0.08);
+          const sQuat = new THREE.Quaternion();
+          const sScl = new THREE.Vector3(1, 1, 1);
+          const mLocal = new THREE.Matrix4();
+          if (mLocal.compose) mLocal.compose(sPos, sQuat, sScl);
+          const mWorld = new THREE.Matrix4();
+          if (mWorld.multiplyMatrices) mWorld.multiplyMatrices(mBoard, mLocal);
+
+          if (bInfo.label === '100') {
+            brake100IM.setMatrixAt(b100Idx++, mWorld);
+          } else {
+            brake50IM.setMatrixAt(b50Idx++, mWorld);
+          }
+        }
       }
 
       panelIM.instanceMatrix.needsUpdate = true;
@@ -827,12 +1181,87 @@
       group.add(panelIM);
       group.add(postIM);
       group.add(slatIM);
+
+      if (brake100IM) {
+        brake100IM.instanceMatrix.needsUpdate = true;
+        brake100IM.frustumCulled = false;
+        group.add(brake100IM);
+      }
+      if (brake50IM) {
+        brake50IM.instanceMatrix.needsUpdate = true;
+        brake50IM.frustumCulled = false;
+        group.add(brake50IM);
+      }
     }
+
+    // Apex cones
+    let totalCones = 0;
+    for (const c of track.corners) {
+      for (const offset of [-3, -1, 1, 3]) {
+        const idx = getWrappedIdx(c.apex + offset, N, track.closed);
+        if (idx !== -1 && isSpawningSafe(idx, track)) {
+          totalCones++;
+        }
+      }
+    }
+    if (totalCones > 0) {
+      const coneGeo = new THREE.ConeGeometry(0.25, 0.6, 8);
+      coneGeo.translate(0, 0.3, 0);
+      const coneMat = new THREE.MeshStandardMaterial({
+        color: 0xff5500,
+        roughness: 0.4,
+        metalness: 0.1
+      });
+      const coneIM = new THREE.InstancedMesh(coneGeo, coneMat, totalCones);
+      coneIM.castShadow = coneIM.receiveShadow = true;
+      let coneIdx = 0;
+
+      for (const c of track.corners) {
+        const insideSign = c.insideSign;
+        for (const offset of [-3, -1, 1, 3]) {
+          const idx = getWrappedIdx(c.apex + offset, N, track.closed);
+          if (idx === -1 || !isSpawningSafe(idx, track)) continue;
+          const s = ss[idx];
+          if (!s) continue;
+
+          const p = V.addS(s.p, s.r, insideSign * (s.w / 2 + 1.4));
+
+          const basis = new THREE.Matrix4();
+          if (basis.makeBasis) {
+            basis.makeBasis(
+              new THREE.Vector3(s.r[0], s.r[1], s.r[2]),
+              new THREE.Vector3(s.u[0], s.u[1], s.u[2]),
+              new THREE.Vector3(s.f[0], s.f[1], s.f[2])
+            );
+          }
+          const qCone = new THREE.Quaternion().setFromRotationMatrix(basis);
+          const mCone = new THREE.Matrix4();
+          if (mCone.compose) {
+            mCone.compose(
+              new THREE.Vector3(p[0], p[1], p[2]),
+              qCone,
+              new THREE.Vector3(1, 1, 1)
+            );
+          }
+          coneIM.setMatrixAt(coneIdx++, mCone);
+        }
+      }
+      coneIM.instanceMatrix.needsUpdate = true;
+      coneIM.frustumCulled = false;
+      group.add(coneIM);
+    }
+
+    // Hazard chevrons
+    const chevrons = buildHazardChevrons(track, theme);
+    if (chevrons) group.add(chevrons);
+
+    // Distance to finish boards
+    const distanceBoards = buildDistanceBoards(track, theme);
+    group.add(distanceBoards);
 
     // Keep non-instanced components (brake bars & apex beacons)
     for (const c of track.corners) {
       const outside = -c.insideSign;
-      // braking-marker bars across the track on approach
       for (const dM of [80, 55, 30]) {
         const bi = c.entry - Math.round(dM / track.ds);
         const s = ss[bi];
@@ -848,7 +1277,6 @@
         bar.rotateX(-Math.PI / 2);
         group.add(bar);
       }
-      // apex beacon
       const sA = ss[c.apex];
       if (sA && !sA.gap) {
         const p = V.addS(sA.p, sA.r, outside * (sA.w / 2 + 5));
@@ -1093,6 +1521,74 @@
           track.startLights.push(lightMesh);
         }
 
+        // Build the 24-meter dark start slab + painted grid box lines (startIdx ± 6)
+        const iMin = idx - 6;
+        const iMax = idx + 6;
+        const slabPos = [];
+        const slabUvs = [];
+        const slabIdx = [];
+        let slabVi = 0;
+        
+        for (let i = iMin; i <= iMax; i++) {
+          const wIdx = getWrappedIdx(i, N, track.closed);
+          if (wIdx === -1) continue;
+          const sSlab = ss[wIdx];
+          
+          const halfW = sSlab.w * 0.49;
+          const pL = V.addS(V.addS(sSlab.p, sSlab.r, -halfW), sSlab.u, 0.02);
+          const pR = V.addS(V.addS(sSlab.p, sSlab.r, halfW), sSlab.u, 0.02);
+          
+          slabPos.push(pL[0], pL[1], pL[2]);
+          slabPos.push(pR[0], pR[1], pR[2]);
+          
+          const vCoord = (i - iMin) / 2.0; // repeats every 4 meters
+          slabUvs.push(0, vCoord);
+          slabUvs.push(1, vCoord);
+          
+          if (i > iMin) {
+            const q = slabVi - 2;
+            slabIdx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2);
+          }
+          slabVi += 2;
+        }
+        
+        if (slabPos.length > 0) {
+          const slabGeo = new THREE.BufferGeometry();
+          slabGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slabPos), 3));
+          slabGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(slabUvs), 2));
+          slabGeo.setIndex(slabIdx);
+          
+          const slabCanvas = document.createElement('canvas');
+          slabCanvas.width = 128;
+          slabCanvas.height = 256;
+          const slabCtx = slabCanvas.getContext('2d');
+          if (slabCtx) {
+            slabCtx.fillStyle = '#0a0812';
+            slabCtx.fillRect(0, 0, 128, 256);
+            slabCtx.strokeStyle = 'rgba(' + Math.round(theme.accent[0] * 255) + ',' + Math.round(theme.accent[1] * 255) + ',' + Math.round(theme.accent[2] * 255) + ', 0.6)';
+            slabCtx.lineWidth = 4;
+            slabCtx.strokeRect(10, 20, 45, 80);
+            slabCtx.strokeRect(73, 140, 45, 80);
+          }
+          const slabTex = new THREE.CanvasTexture(slabCanvas);
+          slabTex.wrapS = THREE.ClampToEdgeWrapping;
+          slabTex.wrapT = THREE.RepeatWrapping;
+          
+          const slabMat = new THREE.MeshBasicMaterial({
+            map: slabTex,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            polygonOffset: true,
+            polygonOffsetFactor: -1.5,
+            polygonOffsetUnits: -1.5
+          });
+          const slabMesh = new THREE.Mesh(slabGeo, slabMat);
+          slabMesh.frustumCulled = false;
+          group.add(slabMesh);
+        }
+
         const gridPad = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.96, 12),
           new THREE.MeshBasicMaterial({
             map: getStartGridTexture(theme),
@@ -1114,7 +1610,7 @@
         track.checkpointLights[ckptIdx] = [];
         const lightGeo = new THREE.SphereGeometry(0.1, 8, 8);
         for (let i = 0; i < 3; i++) {
-          const lightMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.5 });
+          const lightMat = new THREE.MeshBasicMaterial({ color: col(signColor), transparent: true, opacity: 0.8 });
           const lightMesh = new THREE.Mesh(lightGeo, lightMat);
           const offsetRatio = (i - 1) * 0.22;
           const bulbPos = new THREE.Vector3(
@@ -1177,7 +1673,17 @@
     // checkpoints: numbered sector gates (T4)
     const ckpts = track.checkpoints || [];
     for (let i = 0; i < ckpts.length; i++) {
-      placeGantry(ckpts[i], 'SECTOR ' + (i + 1), theme.accent2, false, false, i);
+      let gateColor = theme.accent2;
+      if (theme.biome === 'frozen') {
+        gateColor = [0.85, 0.95, 1.0];
+      } else if (theme.biome === 'canyon') {
+        gateColor = [1.0, 0.6, 0.0];
+      } else if (theme.biome === 'dune') {
+        gateColor = [1.0, 0.9, 0.75];
+      } else if (theme.biome === 'neon') {
+        gateColor = [1.0, 0.0, 0.75];
+      }
+      placeGantry(ckpts[i], 'SECTOR ' + (i + 1), gateColor, false, false, i);
     }
 
     // start gantry (T3)

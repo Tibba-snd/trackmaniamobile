@@ -2207,7 +2207,7 @@
 
   function buildSettingsMenu() {
     const s = G.save.settings;
-    $('setTilt').checked = s.controlMode === 'tilt';
+    $('setControlMode').value = s.controlMode || 'keys';
     $('setSens').value = s.tiltSens;
     $('setInvert').checked = !!s.invertTilt;
     $('setEngine').value = s.engine;
@@ -2339,9 +2339,10 @@
       showScreen('garage');
     };
     $('btnSettings').onclick = () => { DD.sfxClick(); buildSettingsMenu(); showScreen('settings'); };
-    $('btnPlayCampTrack').onclick = () => {
+    $('btnPlayCampTrack').onclick = async () => {
       if (selectedCampTrack) {
         DD.sfxClick();
+        await ensureTilt();
         startTrack(selectedCampTrack.seed, selectedCampTrack.tier);
       }
     };
@@ -2400,7 +2401,7 @@
     };
 
     // settings wiring
-    $('setTilt').onchange = (e) => { G.save.settings.controlMode = e.target.checked ? 'tilt' : 'touch'; saveSet(); };
+    $('setControlMode').onchange = (e) => { G.save.settings.controlMode = e.target.value; saveSet(); ensureTilt(); };
     $('setSens').oninput = (e) => { G.save.settings.tiltSens = parseFloat(e.target.value); saveSet(); };
     $('setInvert').onchange = (e) => { G.save.settings.invertTilt = e.target.checked; saveSet(); };
     $('setEngine').oninput = (e) => { G.save.settings.engine = parseFloat(e.target.value); DD.audio.volumes.engine = G.save.settings.engine; saveSet(); };
@@ -2414,7 +2415,7 @@
     function saveSet() { DD.persistSave(G.save); }
 
     // touch controls
-    DD.bindTouch({ gas: $('padGas'), brake: $('padBrake'), steerL: $('padL'), steerR: $('padR') });
+    DD.bindTouch({ gas: $('padGas'), brake: $('padBrake'), steerL: $('padL'), steerR: $('padR'), zoneL: $('zoneL'), zoneR: $('zoneR') });
     updateSteerPadsVisibility();
 
     // Pointer drag for orbit camera manual rotation in garage, PLUS (P2 slice A) ring-handle
@@ -2619,14 +2620,28 @@
   async function ensureTilt() {
     if (G.save.settings.controlMode === 'tilt' && isTouch()) {
       const ok = await DD.requestTiltPermission();
-      if (!ok) { G.save.settings.controlMode = 'touch'; DD.persistSave(G.save); }
+      if (!ok) {
+        G.save.settings.controlMode = 'touch';
+        if ($('setControlMode')) $('setControlMode').value = 'touch';
+        DD.persistSave(G.save);
+      }
     }
     updateSteerPadsVisibility();
   }
   function updateSteerPadsVisibility() {
-    const touchSteer = G.save.settings.controlMode !== 'tilt';
-    $('padL').style.display = touchSteer ? 'block' : 'none';
-    $('padR').style.display = touchSteer ? 'block' : 'none';
+    const s = G.save.settings;
+    const isTilt = s.controlMode === 'tilt';
+    const isTap = s.controlMode === 'tap';
+    const isTouchBtn = s.controlMode === 'touch';
+
+    $('padL').style.display = isTouchBtn ? 'block' : 'none';
+    $('padR').style.display = isTouchBtn ? 'block' : 'none';
+    $('padGas').style.display = (isTouchBtn || isTilt) ? 'block' : 'none';
+    $('padBrake').style.display = (isTouchBtn || isTilt || isTap) ? 'block' : 'none';
+
+    // Tap zones
+    $('zoneL').style.display = isTap ? 'block' : 'none';
+    $('zoneR').style.display = isTap ? 'block' : 'none';
   }
 
   window.addEventListener('DOMContentLoaded', DD.boot);
