@@ -7,6 +7,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowInsetsController;
+import androidx.core.view.WindowCompat;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -39,6 +40,12 @@ public class MainActivity extends BridgeActivity {
     private void applyImmersive() {
         Window window = getWindow();
         if (window == null) return;
+
+        // CRITICAL: draw the WebView *behind* the system bars. Without this, on API 30+ the
+        // WebView is inset away from the top/left edges, exposing the window background
+        // (a coloured strip) — and the game's CSS never reaches the screen edges. This single
+        // line is what makes "the blur extends all the way" and "no white bar" both true.
+        WindowCompat.setDecorFitsSystemWindows(window, false);
 
         // Keep the screen on at the native layer as a belt-and-suspenders alongside the Web wake-lock.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

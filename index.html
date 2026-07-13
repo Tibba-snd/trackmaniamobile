@@ -1090,16 +1090,14 @@
   @media (max-height: 520px) and (min-width: 560px) {
     #menu {
       display: grid;
-      grid-template-columns: 1fr minmax(200px, 340px) minmax(200px, 340px) 1fr;
+      grid-template-columns: 1fr 1fr;
       grid-gap: 6px 20px;
       padding: 16px 32px;
       align-items: center;
       justify-content: center;
-      max-width: none;
-      margin: 0;
+      max-width: 680px;
+      margin: 0 auto;
       box-sizing: border-box;
-      width: 100%;
-      height: 100%;
     }
     #menu .logo {
       grid-column: 1 / -1;
@@ -1117,13 +1115,13 @@
       text-align: center;
       margin-top: 4px;
     }
-    #menu #btnDaily { grid-column: 2; margin: 0; }
-    #menu #btnRandom { grid-column: 2; margin: 0; }
-    #menu .seedRow { grid-column: 2; margin: 0; }
+    #menu #btnDaily { grid-column: 1; margin: 0; }
+    #menu #btnRandom { grid-column: 1; margin: 0; }
+    #menu .seedRow { grid-column: 1; margin: 0; }
     
-    #menu #btnCampaign { grid-column: 3; margin: 0; }
-    #menu #btnGarage { grid-column: 3; margin: 0; }
-    #menu #btnSettings { grid-column: 3; margin: 0; }
+    #menu #btnCampaign { grid-column: 2; margin: 0; }
+    #menu #btnGarage { grid-column: 2; margin: 0; }
+    #menu #btnSettings { grid-column: 2; margin: 0; }
   }
 </style>
 </head>
