@@ -1,4 +1,4 @@
-const CACHE_NAME = 'driftdream-v4';
+const CACHE_NAME = 'driftdream-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -49,16 +49,29 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// NETWORK-FIRST, cache fallback. The previous cache-first strategy froze installed PWAs on
+// whatever build they first cached — updates only arrived on a manual CACHE_NAME bump, which
+// is exactly the kind of per-release discipline that gets forgotten (and was). Online users
+// now always get the freshest build; the cache exists purely for offline launches.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith('http')) {
     return;
   }
-  // ignoreSearch: index.html loads scripts as game.js?v=74 for browser cache-busting,
-  // but the SW caches them bare. Without this the ?v= requests never match and offline
-  // launches fail to load any JS.
+  const reqUrl = new URL(e.request.url);
+  // Store same-origin responses under a search-less key (game.js, not game.js?v=76) so each
+  // path has exactly ONE cache entry — always the freshest — and the ignoreSearch fallback
+  // below can never race an old ?v= duplicate.
+  const bareKey = reqUrl.origin === location.origin ? reqUrl.origin + reqUrl.pathname : null;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then((cachedResponse) => {
-      return cachedResponse || fetch(e.request);
-    })
+    fetch(e.request).then((res) => {
+      if (res && res.ok && bareKey) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(bareKey, clone));
+      }
+      return res;
+    }).catch(() =>
+      // Offline: ignoreSearch so ?v= requests match the bare-key entries.
+      caches.match(e.request, { ignoreSearch: true })
+    )
   );
 });

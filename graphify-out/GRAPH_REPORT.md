@@ -1,16 +1,16 @@
 # Graph Report - trackmaniamobile  (2026-07-13)
 
 ## Corpus Check
-- 128 files · ~2,696,382 words
+- 128 files · ~2,696,412 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4088 nodes · 7096 edges · 276 communities (148 shown, 128 thin omitted)
+- 4088 nodes · 7096 edges · 276 communities (149 shown, 127 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 140 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `eadf52bf`
+- Built from commit: `2d37137d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -292,7 +292,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (276 total, 128 thin omitted)
+## Communities (276 total, 127 thin omitted)
 
 ### Community 0 - "three.min.js"
 Cohesion: 0.02
@@ -327,8 +327,8 @@ Cohesion: 0.04
 Nodes (44): 10. File touchpoints, 1.5 How players edit a part (the editing model), 1. The three layers (all JSON-serializable, all deterministic), 2. The renderer — `DD.buildCarFromSpec(spec, ctx)`, 3. Materials — slots, so garage paint still works, 4. `normalizeSpec(spec)` — the guardrail, 5. Contact shadow — spec-driven (kills the last hardcode), 6. Persistence & sharing (Phase 3) (+36 more)
 
 ### Community 18 - "i"
-Cohesion: 0.10
-Nodes (12): hl, i(), load(), oc, ol, parse(), parseAnimations(), parseImages() (+4 more)
+Cohesion: 0.08
+Nodes (14): hl, i(), ic, load(), oc, ol, parse(), parseAnimations() (+6 more)
 
 ### Community 20 - "tn"
 Cohesion: 0.08
@@ -336,11 +336,7 @@ Nodes (5): dt(), $e(), Qe(), tn, ut()
 
 ### Community 21 - ".setAttribute"
 Cohesion: 0.05
-Nodes (5): ai, copy(), ec, Ne, re
-
-### Community 22 - "bl"
-Cohesion: 0.12
-Nodes (4): clone(), kl, us(), Wl
+Nodes (3): ai, Ne, re
 
 ### Community 25 - "Lc"
 Cohesion: 0.08
@@ -380,7 +376,7 @@ Nodes (18): el, hn, boundLabel(), build(), envInfo(), finalizeRec(), fmt(), fmtK
 
 ### Community 34 - ".applyMatrix4"
 Cohesion: 0.10
-Nodes (3): Ea(), ls(), setFromCamera()
+Nodes (4): Ea(), ls(), setFromCamera(), wh()
 
 ### Community 37 - "updateMatrixWorld"
 Cohesion: 0.07
@@ -392,7 +388,7 @@ Nodes (18): ao(), co(), eo(), ho(), io(), ja(), ka(), lo() (+10 more)
 
 ### Community 40 - ".fromArray"
 Cohesion: 0.05
-Nodes (6): Ce, parseObject(), qn, xs, ys, makePieces()
+Nodes (7): Ce, parseObject(), qn, Wl, xs, ys, makePieces()
 
 ### Community 42 - "no"
 Cohesion: 0.11
@@ -415,8 +411,8 @@ Cohesion: 0.09
 Nodes (9): buildAprons(), buildAurora(), buildGodrays(), buildRoadBody(), buildStrip(), buildTerrain(), getAuroraTexture(), noise2() (+1 more)
 
 ### Community 50 - "scene-decor.js"
-Cohesion: 0.08
-Nodes (15): addLightSource(), buildAprons(), buildAurora(), buildBoostPads(), buildEmissiveElements(), buildGodrays(), buildLightPoles(), buildNeonArches() (+7 more)
+Cohesion: 0.09
+Nodes (9): buildAprons(), buildAurora(), buildGodrays(), buildRoadBody(), buildStrip(), buildTerrain(), getAuroraTexture(), noise2() (+1 more)
 
 ### Community 52 - "DRIFTDREAM — Status & Known Issues"
 Cohesion: 0.07
@@ -452,7 +448,7 @@ Nodes (8): bind(), bindSkeletons(), ds(), getValue(), hh, parseSkeletons(), setV
 
 ### Community 67 - ".updateProjectionMatrix"
 Cohesion: 0.07
-Nodes (11): dispose(), ei, ft(), gi(), mi(), ni, qr(), rt (+3 more)
+Nodes (14): dispose(), ds(), ft(), gi(), hh, mi(), ni, qr() (+6 more)
 
 ### Community 68 - ".setFromMatrixPosition"
 Cohesion: 0.12
@@ -463,8 +459,8 @@ Cohesion: 0.13
 Nodes (19): _allocateTargets(), _applyPMREM(), _blur(), _cleanup(), fromCubemap(), fromEquirectangular(), fromScene(), _fromTexture() (+11 more)
 
 ### Community 72 - "rh"
-Cohesion: 0.09
-Nodes (10): bind(), bindSkeletons(), ds(), ge, getValue(), hh, parseSkeletons(), setValue() (+2 more)
+Cohesion: 0.33
+Nodes (4): bind(), bindSkeletons(), getValue(), parseSkeletons()
 
 ### Community 73 - "re"
 Cohesion: 0.12
@@ -487,8 +483,8 @@ Cohesion: 0.26
 Nodes (8): appendPiece(), buildTerrainData(), collides(), commit(), decorate(), integratePiece(), noise2(), valueNoise()
 
 ### Community 80 - ".multiplyScalar"
-Cohesion: 0.11
-Nodes (5): je, jn(), Vs, Xn(), yn()
+Cohesion: 0.09
+Nodes (3): ec, je, jn()
 
 ### Community 81 - "Hi"
 Cohesion: 0.18
@@ -547,8 +543,8 @@ Cohesion: 0.13
 Nodes (14): Accent color binding, Antigravity brief — received + locked, Art direction — LOCKED (antigravity brief 2026-07-05), Back-and-forth loop with antigravity (post-build polish), Backdrop, Camera, Definition of done (post-build), Environment map (reflections) (+6 more)
 
 ### Community 102 - "constructor"
-Cohesion: 0.22
-Nodes (7): $c(), intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
+Cohesion: 0.12
+Nodes (8): $c(), ge, intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
 
 ### Community 103 - "us"
 Cohesion: 0.33
@@ -686,9 +682,13 @@ Nodes (4): Available Workspace Skills, caveman, ponytail, tool_graphify
 Cohesion: 0.29
 Nodes (7): 📢 FYI / NOTE, 📢 FYI / NOTE A15 landed + masterplan Phase 2 complete — 2026-07-07, 📢 FYI / NOTE A16 reviewed + landed · APK ActionBar root-caused · A17–A19 briefed — 2026-07-13, 📢 FYI / NOTE A16 (track dressing) implemented — 2026-07-13, 📢 FYI / NOTE Integration of ponytail and caveman skills — 2026-07-05, 📢 FYI / NOTE Phase 2 feedback round landed (session 28) — 2026-07-07, 📢 FYI / NOTE Phase 3 grammar landed + A16 briefed — 2026-07-07
 
-### Community 153 - "buildGarageMenu"
+### Community 151 - "bt"
 Cohesion: 0.07
-Nodes (10): constructor(), en, pi(), _s(), Si(), ti, update(), updateMatrixWorld() (+2 more)
+Nodes (5): constructor(), en, ht(), Si(), ti
+
+### Community 153 - "buildGarageMenu"
+Cohesion: 0.06
+Nodes (13): bo, clone(), copy(), kl, pi(), _s(), update(), updateMatrixWorld() (+5 more)
 
 ### Community 155 - "physics.js"
 Cohesion: 0.38
@@ -772,27 +772,31 @@ Nodes (4): DRIFTDREAM — Antigravity Briefs (BRIEFS.md), FIELD NOTES (hard-won 
 
 ### Community 200 - "Wl"
 Cohesion: 0.25
-Nodes (8): Diagnosis (what the code says today), DRIFTDREAM — TRACK / TERRAIN / CAR-FEEL MASTERPLAN (2026-07-07), Guardrails (apply to every phase), PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion), PHASE 2 — A world with reasons (off-track purpose + re-entry) ✅ **DONE** (session 27 — see STATUS.md; contract in `tests/verify_world.js`), PHASE 3 — Track depth, variety, looks, PHASE 4 — Fun layer + true forks, Suggested order of attack
+Nodes (8): Diagnosis (what the code says today), DRIFTDREAM — TRACK / TERRAIN / CAR-FEEL MASTERPLAN (2026-07-07), Guardrails (apply to every phase), PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion) ✅ **DONE** (1.1/1.2/1.5 session 26; 1.3 sessions 26–27/A15; 1.4 session 26 — hologram ghost + smooth playhead), PHASE 2 — A world with reasons (off-track purpose + re-entry) ✅ **DONE** (session 27 — see STATUS.md; contract in `tests/verify_world.js`), PHASE 3 — Track depth, variety, looks, PHASE 4 — Fun layer + true forks, Suggested order of attack
 
 ### Community 204 - "Do"
 Cohesion: 0.60
 Nodes (6): buildCornerSigns(), buildDistanceBoards(), buildHazardChevrons(), getTextTexture(), getWrappedIdx(), isSpawningSafe()
 
+### Community 225 - "Ba"
+Cohesion: 0.33
+Nodes (6): addLightSource(), buildBoostPads(), buildEmissiveElements(), buildLightPoles(), buildNeonArches(), buildTunnels()
+
 ## Knowledge Gaps
-- **453 isolated node(s):** `bs`, `tl`, `name`, `short_name`, `start_url` (+448 more)
+- **453 isolated node(s):** `Diagnosis (what the code says today)`, `PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion) ✅ **DONE** (1.1/1.2/1.5 session 26; 1.3 sessions 26–27/A15; 1.4 session 26 — hologram ghost + smooth playhead)`, `PHASE 2 — A world with reasons (off-track purpose + re-entry) ✅ **DONE** (session 27 — see STATUS.md; contract in `tests/verify_world.js`)`, `PHASE 3 — Track depth, variety, looks`, `PHASE 4 — Fun layer + true forks` (+448 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **128 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **127 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `k` connect `rh` to `ss`, `nl`, `.updateProjectionMatrix`, `verify_carspec.js`?**
-  _High betweenness centrality (0.186) - this node is a cross-community bridge._
+- **Why does `k` connect `.updateProjectionMatrix` to `ss`, `nl`, `verify_carspec.js`?**
+  _High betweenness centrality (0.180) - this node is a cross-community bridge._
 - **Why does `s` connect `verify_carspec.js` to `Ce`, `.fromArray`, `ge`, `i`, `bt`, `parse`?**
-  _High betweenness centrality (0.134) - this node is a cross-community bridge._
-- **Why does `ws()` connect `.updateProjectionMatrix` to `three.min.js`, `.applyMatrix4`, `sn`, `yo`, `constructor`, `rh`, `At`, `.fromArray`, `zl`, `Ce`, `i`, `.setAttribute`, `xc`, `bt`, `buildGarageMenu`, `tn`?**
-  _High betweenness centrality (0.118) - this node is a cross-community bridge._
-- **What connects `bs`, `tl`, `name` to the rest of the system?**
+  _High betweenness centrality (0.133) - this node is a cross-community bridge._
+- **Why does `ws()` connect `ss` to `ml`, `three.min.js`, `nl`, `.updateProjectionMatrix`, `copy`, `Ce`, `sn`, `yo`, `wo`, `jc`, `ge`, `.applyMatrix4`, `i`, `xc`, `parse`, `.crossFadeFrom`, `At`?**
+  _High betweenness centrality (0.114) - this node is a cross-community bridge._
+- **What connects `Diagnosis (what the code says today)`, `PHASE 1 — Feel fixes (walls, collision, z-fight, ghost motion) ✅ **DONE** (1.1/1.2/1.5 session 26; 1.3 sessions 26–27/A15; 1.4 session 26 — hologram ghost + smooth playhead)`, `PHASE 2 — A world with reasons (off-track purpose + re-entry) ✅ **DONE** (session 27 — see STATUS.md; contract in `tests/verify_world.js`)` to the rest of the system?**
   _453 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `three.min.js` be split into smaller, more focused modules?**
   _Cohesion score 0.021406727828746176 - nodes in this community are weakly interconnected._
