@@ -119,11 +119,9 @@ _Vision: falling off track today = dead zone (can't rejoin, barely driveable). O
 a procedural playground — skate-park energy: jumps, bowls, wallrides, pure sandbox fun with zero
 laptime value. Get bored, hop off, play, hop back._
 
-**5.0 Dirt feel + look rework** _(physics Claude, visuals delegable)_
-- Physics: current SURF.DIRT (grip 0.5 / accel 0.62 + drag) reads as a sticky trap. Rally
-  direction: lateral grip ~0.75, accel ~0.85, drag ≈ road, slightly looser yaw — fast, slidey,
-  correction-rich. Tune live via physdev; drivability + shortcut-viability re-checked (dirt
-  shortcuts must stay a real line choice, not become dominant).
+**5.0 Dirt feel + look rework** _(physics ✅ session 31; visuals → A21)_
+- Physics ✅: dirt grip 0.5→0.75, accel 0.62→0.85, drag 0.008→0.004 — rally-loose, carries
+  speed, straights still road-won (drivability [10] holds the cap). Tune further on feel.
 - Looks: noise/rut decal overlay on dirt spans, scattered stones at edges, wheel dust plumes,
   persistent tire marks, louder gravel audio layer.
 **5.1 A way back, everywhere** _(trackgen/terrain — Claude)_ — soft re-enterable shoulder on ALL
@@ -162,12 +160,12 @@ Candidate directions (Tibba picks before any brief):
 
 ## SIDEQUESTS (approved 2026-07-13)
 
-- **SQ1 — Low-speed stability (Claude, physics)** — below ~50 km/h the car is twitchy/slidey.
-  Hypothesis from code read: `driveRearGripMul 0.45` cuts rear grip on throttle at low speed
-  (donut feature) and the `tap` scheme pins throttle=1, so every slow corner power-oversteers;
-  `steerMaxLow 0.62` full lock + eager ramps amplify. Fix direction: gate the throttle grip cut
-  to near-standstill (<~8 m/s) or to high-steer intent, and/or soften low-speed steer authority.
-  Tune via physdev; drivability suite + the three 1.5 acceptance corners must hold.
+- **SQ1 — Low-speed stability** ✅ **DONE (session 31)** — three stacked throttle-gated
+  destabilizers below 24 m/s (power-oversteer fade at 45, hardcoded wheelspin/wantSlide gate at
+  24, and the slideState 0.15/0.07 latch flipping the dynamics regime where all assists are
+  zero) made tap-mode (throttle pinned 1) twitchy below 50 km/h. Fixed: `powerOversteerV` 45→18,
+  wheelspin steer-gated (`spinup`, enter <10 m/s, hysteresis to 24 — donuts intact), un-held
+  slideState below 22 m/s stays visual-only (grip dynamics). Regression lock: drivability [19].
 - **SQ2 — Music packs (Suno)** — prompt pack lives in `SUNO_PROMPTS.md` (Tibba generates).
   Player integration (Claude): `audio/music/` playlist, per-biome pick, menu/garage/finish slots,
   crossfade, existing `music` volume slider, lazy-load (never precached).

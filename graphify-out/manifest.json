@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783944247.2970595,
-    "ast_hash": "67c0c21ee8fe7c69bd0c88bd680db2d7",
+    "mtime": 1783947161.445027,
+    "ast_hash": "5814e4459d1ee1a535811c88f7e07639",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "INBOX.md": {
-    "mtime": 1783944267.8514202,
-    "ast_hash": "87367e23851a870cf3527f80b6a06e4e",
+    "mtime": 1783947179.5048265,
+    "ast_hash": "c2a5cc901bc141b93ef358b0f903d451",
     "semantic_hash": ""
   },
   "README.md": {
@@ -1250,8 +1250,8 @@
     "semantic_hash": ""
   },
   "MASTERPLAN.md": {
-    "mtime": 1783943755.690877,
-    "ast_hash": "cd8f8c88fff925f897b8f1ac38ce4d9a",
+    "mtime": 1783947126.271542,
+    "ast_hash": "8e25726b0cee8d4c676a9b4806c9304d",
     "semantic_hash": ""
   },
   "tests/verify_world.js": {
@@ -1302,6 +1302,11 @@
   "AGENTS.md": {
     "mtime": 1783939421.338478,
     "ast_hash": "41b83367a766e94c6884c407cd6f8ed2",
+    "semantic_hash": ""
+  },
+  "SUNO_PROMPTS.md": {
+    "mtime": 1783947082.747434,
+    "ast_hash": "e9ff2cd623d95d5751e60d5230121847",
     "semantic_hash": ""
   }
 }

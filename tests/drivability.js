@@ -476,5 +476,40 @@ console.log('[18] bot corner speed tracks grip budget (C4c)');
     'bot ' + botV.toFixed(1) + ' m/s vs old buggy ' + buggyV.toFixed(1) + ' m/s');
 }
 
+/* ---- [19] low-speed full-throttle stability (SQ1 regression lock) ----
+   The tap control scheme pins throttle=1. The old hardcoded wheelspin/wantSlide gate (speed<24,
+   ≈86 km/h) plus powerOversteerV 45 forced the slide regime for ALL slow full-throttle driving —
+   twitchy/slidey below 50 km/h. Lock the fix: full throttle at ~47 km/h must corner in the grip
+   regime; donuts must still break loose near standstill. */
+console.log('[19] low-speed full-throttle stability (SQ1)');
+{
+  // Tight low-speed cornering legitimately runs visible rear slip (kart geometry) — the defect
+  // was the DYNAMICS regime, not the slip flag. Assert the car stays grip-model dominant and
+  // never approaches a spin. Pre-fix, regimeMix pinned to 1.0 here (wantSlide latched below 24).
+  // Window: the sub-20 m/s band (the complaint zone). Full throttle accelerates out of it —
+  // above ~22 m/s the mid-speed slide band (counter-assisted, learnable) is allowed by design.
+  const car = spawn(13); // ~47 km/h
+  let maxMix = 0, maxSlip = 0;
+  for (let t = 0; t < 60 * 3; t++) {
+    DD.stepCar(car, { steer: 0.9, throttle: 1, brake: 0 }, FT);
+    const v = V.len(car.vel);
+    if (t > 20 && v <= 20) {
+      maxMix = Math.max(maxMix, car.regimeMix || 0);
+      maxSlip = Math.max(maxSlip, Math.abs(car.slipR || 0));
+    }
+    if (v > 26) break;
+  }
+  check('full throttle below 20 m/s stays in the grip regime', maxMix < 0.35, 'maxRegimeMix=' + maxMix.toFixed(2));
+  check('full throttle below 20 m/s never nears a spin', maxSlip < 0.35, 'maxSlipR=' + maxSlip.toFixed(3));
+
+  const car2 = spawn(3);
+  let spun = false;
+  for (let t = 0; t < 60 * 2; t++) {
+    DD.stepCar(car2, { steer: 1, throttle: 1, brake: 0 }, FT);
+    if (Math.abs(car2.slipR || 0) > P.slideEnter) spun = true;
+  }
+  check('donuts still break loose near standstill', spun, '');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

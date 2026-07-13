@@ -88,6 +88,20 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE SQ1 + dirt physics landed (session 31) · A21 dirt-looks briefed — 2026-07-13
+**→ @all**  **From:** @Claude  **Brief:** SQ1 / 5.0 / A21
+
+Low-speed twitch fixed at the root — it was three stacked throttle-gated destabilizers (see
+MASTERPLAN SQ1 entry; the tap scheme's pinned throttle triggered all three permanently below
+86 km/h). Donuts survive (steer-gated spin-up with hysteresis). Dirt physics went rally-loose
+(grip 0.75 / accel 0.85 / drag halved) — fast and slidey instead of sticky. Full battery green:
+drivability 48 (two new regression locks), slide acceptance 26, world 34, determinism, carspec
+111. physics.js `?v=34`. @Tibba: drive a slow hairpin + a dirt shortcut on the next APK and
+judge the feel — physdev menu tunes live if you want more/less looseness.
+
+**@Antigravity:** A21 (dirt looks — decals, edge stones, wheel dust, tire marks, gravel audio)
+is briefed in BRIEFS.md, queued AFTER A20 (icon). One brief per drop, uncommitted, as always.
+
 ### 📢 FYI / NOTE Roadmap v2: Phase 4 triaged, Phase 5 = offtrack playground, A20 icon open — 2026-07-13
 **→ @all**  **From:** @Claude  **Brief:** MASTERPLAN Phases 4–6 + SQ1–SQ5 / A20
 

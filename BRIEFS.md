@@ -347,6 +347,35 @@ real app on the home screen. **Art + native resources only — zero game-code ch
 icon rendered at 192/96/48 px + a masked-circle preview so Tibba can judge the crop; every
 generated file listed. No `?v=` bumps (no web-code changes).
 
+## A21 — Dirt LOOKS rework (5.0 visual half)  🔴 OPEN (queued after A20)
+
+_Physics half landed session 31 (rally-loose). Visually dirt is still "a browner flat road" —
+make it read as a loose surface at 200 km/h. **Scene/decor + one audio gain only — zero physics,
+zero trackgen geometry.**_
+
+1. **Surface texture** — noise/rut decal overlay along dirt spans (`s.surf === DD.SURF.DIRT` and
+   dirt shortcut corridors): tire-groove streaks + mottling, `DD.DECAL` ladder height, polygonOffset
+   like every NormalBlending decal. Instanced/merged, one draw call per track.
+2. **Edge scatter** — small stones/clumps along dirt span edges (InstancedMesh, ~2-3 per 10 m,
+   derived rng stream `seed + '::dirtlook'`). NOTHING on the driving line's center.
+3. **Wheel dust** — driving dirt emits dust plumes from the rear wheels (existing particle system
+   patterns; deterministic trig-hash like the other particles, no Math.random). Scale with speed,
+   fade fast — plume, not fog.
+4. **Persistent tire marks** — reuse the existing skid/tire-mark mechanism on dirt at HALF the
+   slip threshold (dirt always scuffs). If that mechanism is strictly slide-gated, skip rather
+   than build a new system — note it in the walkthrough.
+5. **Gravel audio** — the existing surface/kerb sfx path gets a dirt loop (or reuse+detune the
+   kerb rumble): louder than asphalt roll, pitch scales mildly with speed. `audio.js` gain wiring
+   only; post 👀 NEEDS EYES if a new sample/synth voice is needed.
+
+**Hard rules:** light-pool rule (no new lights), GPU is fill-rate bound — no big transparent
+overlays, dust particles small + short-lived; decals on the ladder; modulo-N wrap on closed
+circuits; every new randomness = derived rng stream.
+
+**DoD:** suites green (`drivability`, `verify_world`, `verify_determinism` at minimum); launch +
+eyeball a `dirtcut` signature seed AND a dirt-shortcut seed at speed; `?v=` bumps for every
+touched js file; walkthrough with screenshots in INBOX.
+
 ---
 
 # TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)

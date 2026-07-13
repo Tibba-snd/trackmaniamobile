@@ -55,8 +55,16 @@
     // weight transfer-ish grip modifiers
     brakeFrontGripMul: 0.80, // brake-light front grip (trail-brake: nose tucks, less push)
     brakeRearGripMul: 0.45,  // brake-tap = rear washes out = slide entry (looser than 0.5 = more rotation)
-    driveRearGripMul: 0.45, // throttle cuts rear grip — but only at low speed (donuts), fades by powerOversteerV
-    powerOversteerV: 45,    // m/s above which throttle no longer destabilises the rear
+    driveRearGripMul: 0.45, // throttle cuts rear grip — but only NEAR STANDSTILL (donuts), fades by powerOversteerV
+    powerOversteerV: 18,    // m/s above which throttle no longer destabilises the rear. Was 45: with the
+                            // tap scheme pinning throttle=1, every corner below ~160 km/h lost rear grip —
+                            // the "twitchy/slidey below 50 km/h" complaint (SQ1). 18 keeps launch/donut
+                            // looseness near standstill and nothing else.
+    wheelspinV: 10,         // m/s below which full throttle lights up the rears (burnouts/donuts). Was a
+                            // hardcoded 24 (≈86 km/h!) in TWO places — including the wantSlide gate, which
+                            // FORCED the slide regime for any full-throttle driving below 86 km/h. With
+                            // auto-throttle that meant the car lived in the raw bicycle model (assists
+                            // speed-gated to zero down there) — the actual source of the low-speed twitch.
     slideRearMul: 0.80,     // once sliding, rear stays a touch loose (drifts hold). Raised from 0.68:
                             // with slideCoupling cut, the rear tire's REAL lateral force at the held
                             // angle is what makes the corner — the car grips while sideways.
@@ -91,7 +99,12 @@
     exitBoostA: 2.0,        // m/s² during the reward window (replaces the old sdBoost shallow-slide exploit)
     // surfaces
     glassGripMul: 0.12, glassSteerMul: 0.6, // glass = ICE: nearly no lateral friction, glide it sideways
-    dirtGripMul: 0.5, dirtDragK: 0.008, dirtAccelMul: 0.62,
+    // dirt = RALLY, not mud (5.0 rework): fast and slidey with constant small corrections.
+    // Old 0.5 grip / 0.62 accel / 0.008 drag read as a sticky trap — off the racing surface the
+    // car felt parked. Grip 0.75 breaks loose earlier than road but carries speed; accel 0.85
+    // keeps drive alive; drag 0.004 (half the old anchor) still caps dirt top speed clearly
+    // below asphalt so straights stay road-won.
+    dirtGripMul: 0.75, dirtDragK: 0.004, dirtAccelMul: 0.85,
     dirtStickBand: 1.4, dirtLaunchVu: 7,
     // air
     airSteer: 1.1,
@@ -365,8 +378,14 @@
     if (prevSlip < 0.5) { // beyond ~30° the rear "catches" — slides stay shapely, no spinouts
       if (car.slideState) gR *= P.slideRearMul;
     }
-    // wheelspin: dumping full power at low speed lights up the rears (burnouts, donuts)
-    if (throttle > 0.85 && speed < 24) gR *= 0.5;
+    // wheelspin: full power + real lock near standstill lights up the rears (burnouts, donuts).
+    // Steer-gated so launches and normal low-speed corners never enter the spin-up state — only a
+    // deliberate power-on-lock request below wheelspinV does. HYSTERESIS to 24 m/s once engaged:
+    // a donut needs to keep spinning while it orbits, or the car grips up and drives out of it.
+    const spinReq = throttle > 0.85 && Math.abs(car.steerPos) > 0.6;
+    car.spinup = spinReq && speed < (car.spinup ? 24 : P.wheelspinV);
+    const spinup = car.spinup;
+    if (spinup) gR *= 0.5;
     gR = Math.max(gR, 3.5 * surfMul); // floor scales with surface — ice stays truly slick
     gF = Math.max(gF, 3.5 * surfMul);
 
@@ -398,7 +417,7 @@
       const betaCmd = car.slideHold ? -car.steerPos * P.slideAngle * sa * hold01 : 0;
       car.slideBeta += DD.clamp(betaCmd - car.slideBeta, -P.slideBetaRate * dt, P.slideBetaRate * dt);
     }
-    const wantSlide = car.slideHold || (throttle > 0.85 && speed < 24) || glass;
+    const wantSlide = car.slideHold || spinup || glass;
     if (!wantSlide && speed > 8) {
       // soft overdrive: light inputs stay fully proportional (you can FEEL the modulation);
       // only steering past the useful band gives diminishing return — no hard clamp, no dead zone.
@@ -436,7 +455,12 @@
     // velocity-heading coupling — a braked slide rotates the nose via tire-force torque and the
     // auto-countersteer catches the exit. The player initiates with a brake-tap, holds on the wheel.
     const aGrip = gF + gR; // total lateral capability (sum of both axles)
-    const slideRegime = wantSlide || car.slideState;
+    // Un-held slideState below ~22 m/s stays a VISUAL slide (smoke/sfx/slipMax all still fire)
+    // but keeps grip dynamics: every slide assist is speed-gated to zero down there, so switching
+    // to the raw bicycle model just wanders — that regime flip on the 0.15/0.07 slip hysteresis
+    // was the SQ1 "twitchy below 50 km/h" feel. Held slides (brake latch), spin-ups (donuts) and
+    // ice still switch regimes at any speed.
+    const slideRegime = wantSlide || (car.slideState && speed > 22);
     // Regime CROSSFADE: both models are evaluated every tick and mixed over regimeBlendT, so
     // entering/leaving a slide MORPHS the dynamics instead of swapping personalities in one tick
     // (the old hard switch was the "unnatural" moment on every entry and exit).
