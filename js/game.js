@@ -2273,6 +2273,7 @@
     $('setSfx').value = s.sfx;
     $('setMusic').value = s.music;
     $('setQuality').value = s.quality;
+    $('setSharp').value = s.sharpness || 'sharp';
     $('setGlow').value = s.glow || 'standard';
     $('setCamera').value = s.camera || 'close';
     $('setGhost').value = s.ghost || 'pb';
@@ -2308,7 +2309,7 @@
     }
     DD.cameraProfile = G.save.settings.camera || 'close'; // saved framing profile (see DD.CAM_PROFILES)
     const canvas = $('gl');
-    G.renderer = DD.createRenderer(canvas, G.save.settings.quality);
+    G.renderer = DD.createRenderer(canvas, G.save.settings.quality, G.save.settings.sharpness);
     // Adaptive-DPR ceiling = the quality-capped ratio createRenderer chose. updateAdaptiveDPR scales
     // between 1.0 and this to hold 60fps. Off at low quality (no composer / already minimal).
     G._dprCap = G.renderer.getPixelRatio();
@@ -2473,7 +2474,21 @@
     $('setEngine').oninput = (e) => { G.save.settings.engine = parseFloat(e.target.value); DD.audio.volumes.engine = G.save.settings.engine; saveSet(); };
     $('setSfx').oninput = (e) => { G.save.settings.sfx = parseFloat(e.target.value); DD.audio.volumes.sfx = G.save.settings.sfx; saveSet(); };
     $('setMusic').oninput = (e) => { G.save.settings.music = parseFloat(e.target.value); DD.audio.volumes.music = G.save.settings.music; if (DD.audio.nodes.padMaster) DD.audio.nodes.padMaster.gain.value = 0.1 * G.save.settings.music; if (DD.updateMusicVolume) DD.updateMusicVolume(); saveSet(); };
-    $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); };
+    $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); applySharpness(); };
+    $('setSharp').onchange = (e) => { G.save.settings.sharpness = e.target.value; saveSet(); applySharpness(); };
+    // Live re-apply of the DPR ceiling (quality/sharpness change): renderer + composer + FXAA
+    // resolution uniform must all agree or FXAA smears (it samples at the wrong texel size).
+    function applySharpness() {
+      const pr = Math.min(window.devicePixelRatio || 1, DD.dprCapFor(G.save.settings.quality, G.save.settings.sharpness));
+      G.renderer.setPixelRatio(pr);
+      G.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (G.composer) {
+        G.composer.setPixelRatio(pr);
+        G.composer.setSize(window.innerWidth, window.innerHeight);
+        if (G.composer._fxaa) G.composer._fxaa.material.uniforms['resolution'].value.set(1 / (window.innerWidth * pr), 1 / (window.innerHeight * pr));
+      }
+      G._dprCap = pr;
+    }
     $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
     $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
     $('setGhost').onchange = (e) => { G.save.settings.ghost = e.target.value; saveSet(); updateActiveGhost(); };

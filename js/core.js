@@ -137,7 +137,7 @@
     } catch (e) { /* corrupted */ }
     if (!save) {
       // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
-      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tap', glow: 'standard', camera: 'close', ghost: 'pb', crt: false }, garage: { grad: 0, finish: 1, form: 2, activeCustom: null }, customDesigns: [], tracks: {}, meta: { created: Date.now(), ver: SAVE_VER, customSeq: 0 } };
+      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', sharpness: 'sharp', controlMode: 'tap', glow: 'standard', camera: 'close', ghost: 'pb', crt: false }, garage: { grad: 0, finish: 1, form: 2, activeCustom: null }, customDesigns: [], tracks: {}, meta: { created: Date.now(), ver: SAVE_VER, customSeq: 0 } };
     }
     // Migration: if the save predates this SAVE_VER, clear campaign track records (PBs/medals/
     // ghosts/author) so they re-derive against the new tracks. Daily/random PBs are keyed by their
@@ -159,6 +159,11 @@
     if (!save.garage) save.garage = { grad: 0, finish: 1, form: 2 };
     if (save.garage.activeCustom === undefined) save.garage.activeCustom = null;
     if (typeof save.meta.customSeq !== 'number') save.meta.customSeq = 0;
+    // Settings keys added after launch: back-fill for older saves (no SAVE_VER bump — additive,
+    // doesn't affect tracks). sharpness landed with the DPR-control feature; older saves lack it,
+    // which left the settings dropdown showing the wrong selection.
+    if (!save.settings) save.settings = {};
+    if (!save.settings.sharpness) save.settings.sharpness = 'sharp';
     if (DD.normalizeSpec) save.customDesigns = save.customDesigns.map((d) => DD.normalizeSpec(d));
     return save;
   };

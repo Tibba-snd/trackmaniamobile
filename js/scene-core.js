@@ -142,15 +142,22 @@
     return report;
   };
 
-  DD.createRenderer = function (canvas, quality) {
+  // DPR ceiling per quality × sharpness. Fill rate is the dominant cost, so this is THE perf/
+  // clarity lever: 'soft' = the old caps (1.5/1.25 — read as low-res and jagged on 2.5-3x phone
+  // panels), 'sharp' = the new default (2.0/1.5), 'native' = the panel's full ratio (crispest,
+  // costliest — modern flagships handle it, mid phones drop frames: it's a user pick, not auto).
+  DD.dprCapFor = function (quality, sharpness) {
+    const dpr = window.devicePixelRatio || 1;
+    const s = sharpness || 'sharp';
+    if (s === 'native') return dpr;
+    if (s === 'sharp') return quality === 'high' ? 2.0 : 1.5;
+    return quality === 'high' ? 1.5 : 1.25;
+  };
+
+  DD.createRenderer = function (canvas, quality, sharpness) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality !== 'low', powerPreference: 'high-performance' });
-    // PERF: cap the device-pixel-ratio. Fill rate is the dominant cost, but the adaptive DPR
-    // system (game.js) already steps down on frame drops — so the static cap only needs to set a
-    // sane ceiling, not pre-emptively blur the image. 1.5 keeps edges crisp (FXAA cleans the rest)
-    // and lets the adaptive system manage real under-load tradeoffs. The old 1.15 floor for 3x
-    // panels was too aggressive — it pre-blurred screens that had headroom to spare.
     const _dpr = window.devicePixelRatio || 1;
-    const _cap = quality === 'high' ? 1.5 : 1.25;
+    const _cap = DD.dprCapFor(quality, sharpness);
     renderer.setPixelRatio(Math.min(_dpr, _cap));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
