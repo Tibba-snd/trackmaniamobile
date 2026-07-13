@@ -21,17 +21,12 @@
 
 
     <!-- Launch theme: the Activity opens with this until Capacitor's WebView paints its first frame.
-         Capacitor does NOT call installSplashScreen(), so the postSplashScreenTheme swap never fires
-         and the Activity keeps running under this theme for its entire lifetime. That means every
-         fullscreen flag must live HERE, not just in AppTheme.NoActionBar:
-           - windowFullscreen=true tells the OS the window wants no status bar (the reserved strip
-             you saw was the status-bar inset; the purple you saw was the menu gradient bleeding
-             into it once the WebView started drawing behind it).
-           - The runtime WindowInsetsController.hide() in MainActivity handles nav-bar hiding and
-             the immersive-sticky re-assert on focus regain.
+         `postSplashScreenTheme` switches to the no-action-bar runtime theme as soon as the
+         splash screen finishes. Without it, Theme.SplashScreen can retain its purple title bar.
          Default @drawable/splash is a white PNG with the Capacitor "X" logo — that was the original
          white bar. Now solid black: the game canvas paints black, so handoff is seamless + logo-free. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:background">@color/black</item>
         <item name="android:windowBackground">@color/black</item>
         <item name="android:windowFullscreen">true</item>
