@@ -59,3 +59,22 @@ re-sync before rebuilding:
 - App name: **DRIFTDREAM**  |  App ID: com.driftdream.game
 - Capacitor 6 | compileSdk 34 | minSdk 22 | Gradle 8.2.1
 - Orientation/permissions: edit android/app/src/main/AndroidManifest.xml
+
+## Fullscreen / immersive setup
+
+The native shell is wired for a true fullscreen app experience:
+
+- **Immersive sticky mode** (`MainActivity.java`) hides the status + nav bars at launch. A swipe
+  reveals them transiently (Android re-hides them automatically); they never *stay*, so the canvas
+  never permanently loses a strip. Re-applied on focus regain.
+- **Sensor landscape** + `resizeableActivity=false` (AndroidManifest) — locks to landscape and
+  blocks multi-window, which would otherwise break the racing layout.
+- **Display cutout → shortEdges** (`values-v28/styles.xml`) — renders into the notch/punch-hole zone
+  so the track isn't clipped in landscape on modern phones. The HUD already pads with
+  `env(safe-area-inset-*)`, so UI stays clear of the cutout.
+- **Black window background** (`values/colors.xml` + theme) — no white flash during splash handoff.
+- **Wake-lock** — two layers: native `FLAG_KEEP_SCREEN_ON` (always on while the app is focused),
+  plus a Web `navigator.wakeLock` in `js/game.js` that releases on menu/garage and re-acquires on
+  the track (saves battery on idle screens). Re-acquires automatically after backgrounding.
+- **Latent build fix:** added `values/colors.xml` — the theme referenced `@color/colorPrimary`
+  (and Dark/Accent) but no `colors.xml` existed, which would break `assembleDebug`.

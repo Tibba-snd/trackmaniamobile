@@ -8,6 +8,33 @@
 
   DD.trackCache = {};
 
+  // Screen wake-lock: held only while actively racing (game + finish screens) so the screen
+  // doesn't dim mid-race. Released on menu/garage/campaign to save battery. The native shell
+  // (MainActivity) also sets FLAG_KEEP_SCREEN_ON as a belt-and-suspenders layer; this Web lock
+  // is finer-grained because it can release on idle screens.
+  let wakeLockSentinel = null;
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      if (!wakeLockSentinel) {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; });
+      }
+    } catch (e) { /* visibility change / unsupported — non-fatal */ }
+  }
+  async function releaseWakeLock() {
+    try { if (wakeLockSentinel) await wakeLockSentinel.release(); } catch (e) { /* ignore */ }
+    wakeLockSentinel = null;
+  }
+  // Re-acquire after the tab becomes visible again (the lock is dropped when hidden/backgrounded).
+  if ('visibilitychange' in document) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && (G.state === 'play' || G.state === 'countdown')) {
+        requestWakeLock();
+      }
+    });
+  }
+
   let cachedHudWarn = null;
   let cachedHudSpeed = null;
   let cachedHudGear = null;
@@ -1384,6 +1411,8 @@
     if (name === 'settings') $('settings').style.display = 'flex';
     if (name === 'garage') $('garage').style.display = 'flex';
     const touchUI = (name === 'game' || name === 'finish');
+    // Wake-lock on active racing screens; release on idle screens.
+    if (touchUI) requestWakeLock(); else releaseWakeLock();
     const touchControlsOn = touchUI && isTouch();
     $('touchControls').style.display = touchControlsOn ? 'block' : 'none';
     // When the touch pads are up, the GAS pad sits in the bottom-right corner where

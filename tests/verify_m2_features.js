@@ -39,6 +39,9 @@ globalThis.THREE = {
       this.x /= len; this.y /= len; this.z /= len;
       return this;
     };
+    this.setFromMatrixPosition = function(m) {
+      return this;
+    };
     return this;
   },
   Vector2: function(x, y) {
@@ -196,6 +199,9 @@ globalThis.THREE = {
   Matrix4: function() {
     this.makeBasis = function() { return this; };
     this.compose = function() { return this; };
+    this.multiplyMatrices = function() { return this; };
+    this.copy = function() { return this; };
+    this.identity = function() { return this; };
     return this;
   },
   Quaternion: function() {
@@ -259,7 +265,6 @@ globalThis.THREE = {
   }
 };
 
-// Mock document for canvas creation
 globalThis.document = {
   createElement: function(type) {
     if (type === 'canvas') {
@@ -269,7 +274,14 @@ globalThis.document = {
         getContext: function() {
           return {
             fillStyle: '',
+            strokeStyle: '',
+            lineWidth: 0,
+            font: '',
+            textAlign: '',
+            textBaseline: '',
             fillRect: function() {},
+            strokeRect: function() {},
+            fillText: function() {},
             drawImage: function() {},
             createImageData: function(w, h) {
               return { data: new Uint8ClampedArray(w * h * 4) };

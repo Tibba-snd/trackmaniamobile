@@ -3,7 +3,7 @@
   "short_name": "DRIFTDREAM",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#07040e",
   "theme_color": "#ff7bd5",
   "icons": [

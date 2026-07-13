@@ -13,6 +13,10 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <!-- Black behind everything so the translucent system-bar / splash handoff never shows white. -->
+        <item name="android:colorBackground">@color/black</item>
     </style>
 
 

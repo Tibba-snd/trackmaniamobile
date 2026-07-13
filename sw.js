@@ -1,4 +1,4 @@
-const CACHE_NAME = 'driftdream-v2';
+const CACHE_NAME = 'driftdream-v4';
 const ASSETS = [
   './',
   './index.html',

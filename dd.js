@@ -178,6 +178,16 @@ function handleSync() {
     fs.copyFileSync(indexSrc, indexDest);
     console.log(`Copied index.html -> apk-build/www/index.html`);
 
+    // Copy PWA files (manifest.json, sw.js, icon.png)
+    const pwaFiles = ['manifest.json', 'sw.js', 'icon.png'];
+    for (const file of pwaFiles) {
+      const srcPath = path.join(ROOT_DIR, file);
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, path.join(wwwDir, file));
+        console.log(`Copied ${file} -> apk-build/www/${file}`);
+      }
+    }
+
     // 4. Copy js folder recursively
     const jsSrc = path.join(ROOT_DIR, 'js');
     const jsDest = path.join(wwwDir, 'js');
