@@ -105,13 +105,82 @@ audible/visible the whole time.
 **3.4 Track dressing** _(scene-decor — delegable)_ ✅ **DONE** (A16, Antigravity — retro-reviewed + landed session 30; note: drop was swept into commit `885a187`)
 - Braking boards (100/50) before detected `corners[]`; apex cones; hazard chevron paint on `tighten`; start grid slab + gantry countdown lights; distance-to-finish boards each 25%; checkpoint ring variety per biome. All instanced/merged, decal ladder heights.
 
-## PHASE 4 — Fun layer + true forks
+## PHASE 4 — Fun layer + true forks (triaged by Tibba, 2026-07-13)
 
-**4.1 Boost rings** — on jump/gap flight paths (fit to the bot's recorded parabola); pass-through = small boost + chime. Static, deterministic, bonus-only.
-**4.2 Drift-score zones** — marked sweepers score held slide angle; full meter = spark shower + small exit boost. Rewards the core mechanic where it's optimal anyway.
-**4.3 Destructible bollards/cones** on aprons + shortcut gates — fling on contact, zero speed cost (juice, not punishment).
-**4.4 Speed traps** — radar gate + HUD popup + per-track top-speed stat on the finish card.
-**4.5 True branches** _(big — design note required)_ — dual-ribbon fork/merge as a piece pair; needs branch-aware `trackQuery`, checkpoint gating on both limbs, bot on main limb. Only after 2.2/2.3 prove route choice is fun.
+**4.1 Boost rings** ❌ **RETIRED** — boost pads already exist; redundant. Salvaged idea → SQ4 (boost tile look rework).
+**4.2 Drift-score zones** ❌ **RETIRED** — scoring layer unwanted; powerslide balance stays untouched.
+**4.3 Destructible bollards/cones** ❌ **RETIRED** — distracts the player, adds nothing (same verdict as 2.3 bollards).
+**4.4 Speed traps** 🔵 **APPROVED** — radar gate + HUD popup + per-track top-speed stat on the finish card. Small, delegable.
+**4.5 True branches** 🔵 **APPROVED (later — design note first)** — dual-ribbon fork/merge as a piece pair; needs branch-aware `trackQuery`, checkpoint gating on both limbs, bot on main limb. Big, Claude-owned core.
+
+## PHASE 5 — OFFTRACK PLAYGROUND + dirt rework (Tibba-directed 2026-07-13, approved) — flagship next
+
+_Vision: falling off track today = dead zone (can't rejoin, barely driveable). Off-track becomes
+a procedural playground — skate-park energy: jumps, bowls, wallrides, pure sandbox fun with zero
+laptime value. Get bored, hop off, play, hop back._
+
+**5.0 Dirt feel + look rework** _(physics Claude, visuals delegable)_
+- Physics: current SURF.DIRT (grip 0.5 / accel 0.62 + drag) reads as a sticky trap. Rally
+  direction: lateral grip ~0.75, accel ~0.85, drag ≈ road, slightly looser yaw — fast, slidey,
+  correction-rich. Tune live via physdev; drivability + shortcut-viability re-checked (dirt
+  shortcuts must stay a real line choice, not become dominant).
+- Looks: noise/rut decal overlay on dirt spans, scattered stones at edges, wheel dust plumes,
+  persistent tire marks, louder gravel audio layer.
+**5.1 A way back, everywhere** _(trackgen/terrain — Claude)_ — soft re-enterable shoulder on ALL
+  non-hostile spans (ledge −0.85 blends to ~−0.15 where terrain isn't cliff/void); aprons remain
+  the painted "official" invitations. Rejoin-exploit stance: accept freedom v1, watch, guard
+  later only if abused (Tibba call).
+**5.2 Driveable basins** _(terrain — Claude)_ — heightfield relaxation pockets near the road
+  (`::playground` rng stream) so off-track driving is smooth enough to be fun. Closed-loop
+  audited against the built grid (10–13 m/cell rule).
+**5.3 Playground furniture v1: heightfield stamps** _(trackgen/terrain — Claude; dressing
+  delegable)_ — kickers, tabletops, rollers, banked bowls stamped INTO the heightfield inside
+  basins. Free collision via existing ground query. Jump lines loosely parallel the track.
+**5.4 Wallrides v2** _(physics-adjacent — Claude)_ — standalone vertical quarter-pipe panels
+  reusing the track-wall collision path. No overhangs/loops off-track (engine limit, v1).
+**5.5 Discovery cues** _(scene-decor — delegable)_ — faint paint arrows/glow marks at basin
+  entrances. No HUD, no scoring — sandbox by design.
+- Order: 5.0 first (standalone win), then 5.1+5.2 one session, 5.3, then 5.4+5.5.
+
+## PHASE 6 — Car looks overhaul (thinking stage — directions to pick from)
+
+_Cars are procedural (cars-as-data, `DD.buildCar`, garage forms). Overhaul = stronger identity
+per form + material/light richness, within the fill-rate budget (no new transparent layers,
+no real-time lights — emissive + envmap only)._
+
+Candidate directions (Tibba picks before any brief):
+- **6.1 Silhouette pass** — sharper per-form proportions (cab-forward racer / muscle wedge /
+  endurance prototype…), stronger stance (wider track, wheel-arch presence).
+- **6.2 Material tier** — cheap static envmap (one cubemap) for real paint reflections;
+  clearcoat flake / brushed metal / chrome trim finishes in the garage.
+- **6.3 Light signatures** — headlight/taillight strips per form, brake-light reactivity,
+  optional underglow as a garage pick (emissive only, pooled glow rules).
+- **6.4 Liveries** — procedural stripes/blocks/numbers baked into the body texture; garage tab.
+- **6.5 Wheel depth** — brake-disc glow on hard braking, more spoke styles, tire sidewall text.
+- **6.6 FX identity** — shift backfire pop + small exhaust flame sprite, speed-streak particles
+  tied to the car's accent color.
+
+## SIDEQUESTS (approved 2026-07-13)
+
+- **SQ1 — Low-speed stability (Claude, physics)** — below ~50 km/h the car is twitchy/slidey.
+  Hypothesis from code read: `driveRearGripMul 0.45` cuts rear grip on throttle at low speed
+  (donut feature) and the `tap` scheme pins throttle=1, so every slow corner power-oversteers;
+  `steerMaxLow 0.62` full lock + eager ramps amplify. Fix direction: gate the throttle grip cut
+  to near-standstill (<~8 m/s) or to high-steer intent, and/or soften low-speed steer authority.
+  Tune via physdev; drivability suite + the three 1.5 acceptance corners must hold.
+- **SQ2 — Music packs (Suno)** — prompt pack lives in `SUNO_PROMPTS.md` (Tibba generates).
+  Player integration (Claude): `audio/music/` playlist, per-biome pick, menu/garage/finish slots,
+  crossfade, existing `music` volume slider, lazy-load (never precached).
+- **SQ3 — Ghost trio** — (a) medal-target ghost: author replay time-scaled to the next unearned
+  medal pace (playback-rate trick, deterministic); (b) sum-of-best sectors + theoretical best on
+  the finish card; (c) ghost share: export/import PB ghost as compressed code/file
+  (quantized deltas + deflate via CompressionStream), seed-validated. Claude core, UI delegable.
+- **SQ4 — Boost tile look rework** _(delegable)_ — scrolling chevron shader pulse, approach glow,
+  hit flash + short color-shifted speed lines.
+- **SQ5 — APK icon** _(delegable — briefed as A20)_ — real launcher icon set from the game's
+  visual identity; adaptive icon layers, all densities.
+- **Platform note (2026-07-13):** distribution = **Capacitor APK first**. PWA install path is
+  deprecated (manifest/sw stay for browser dev convenience; no further PWA-specific work).
 
 ## Guardrails (apply to every phase)
 

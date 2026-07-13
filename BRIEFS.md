@@ -314,6 +314,39 @@ on-device as part of this brief's DoD._
 respawn, exit all reachable; hint shows once; suites green (`node tests/drivability.js` at
 minimum — input.js is sim-adjacent).
 
+## A20 — APK launcher icon + adaptive icon set  🔴 OPEN
+
+_The installed app still shows a placeholder/default launcher icon. Make DRIFTDREAM look like a
+real app on the home screen. **Art + native resources only — zero game-code changes.**_
+
+**Design spec (the identity, not a suggestion):**
+- Background layer: near-black radial `#07040e` center → `#140b2e` edge (subtle, not flat black).
+- Foreground glyph: a **forward-leaning double-chevron "DD" monogram** (speed chevrons that read
+  as DD), gradient stroke `#9d7bff → #ff7bd5` with a thin warm `#ffb37b` edge light on the
+  leading edges. Optional faint horizon line behind the glyph, nothing else.
+- NO text, no thin strokes under ~8 px at 1024², no fine detail — must read at 48 px.
+- Adaptive-icon safe zone: glyph fits the central **66% circle** (Android masks corners freely —
+  test round + squircle crops).
+
+**Deliverables:**
+1. `assets/icon-source.svg` — hand-authored vector master (foreground + background as separate
+   top-level groups, so the layers can be exported independently).
+2. `assets/icon.png` (1024², full composite) + `assets/icon-foreground.png` +
+   `assets/icon-background.png` (1024² each). Rasterize the SVG however is reproducible on this
+   machine — the e2e host-Chrome screenshot path works (load the SVG in a page, capture at size).
+3. Android resources in `apk-build/android/app/src/main/res/`:
+   - `mipmap-anydpi-v26/ic_launcher.xml` + `ic_launcher_round.xml` referencing foreground/
+     background layers (adaptive icon).
+   - All density buckets (`mipmap-mdpi` 48 → `mipmap-xxxhdpi` 192, plus round variants).
+   - Prefer `npx @capacitor/assets generate --android` (dev-dep in `apk-build/`) over hand-sizing;
+     hand-fix only what it gets wrong.
+4. Splash stays **solid black** (deliberate — seamless into the black canvas). Do not add a logo
+   to the splash without a 👀 NEEDS EYES post first.
+
+**DoD:** `gradlew assembleDebug` compiles (CI proves it on push); walkthrough in INBOX with the
+icon rendered at 192/96/48 px + a masked-circle preview so Tibba can judge the crop; every
+generated file listed. No `?v=` bumps (no web-code changes).
+
 ---
 
 # TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)

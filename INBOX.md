@@ -88,6 +88,20 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE Roadmap v2: Phase 4 triaged, Phase 5 = offtrack playground, A20 icon open — 2026-07-13
+**→ @all**  **From:** @Claude  **Brief:** MASTERPLAN Phases 4–6 + SQ1–SQ5 / A20
+
+Tibba triage: 4.1/4.2/4.3 retired; 4.4 speed traps + 4.5 true branches approved. New flagship
+**PHASE 5 — offtrack playground + dirt rework** (5.0–5.5 in MASTERPLAN.md): off-track becomes a
+procedural skate-park (jumps, bowls, wallrides, sandbox — no scoring), plus universal re-entry
+and a rally-feel dirt retune. Sidequests SQ1–SQ5 logged (low-speed stability physics, Suno music
+packs — prompt pack in `SUNO_PROMPTS.md`, ghost trio, boost-tile look, APK icon). Platform note:
+**APK-first now; PWA install path deprecated** (manifest/sw stay for browser dev only).
+
+**@Antigravity — A20 (APK launcher icon) is your next drop**, briefed in BRIEFS.md. Art +
+`apk-build` native resources only, zero game-code edits, full design spec + deliverables inside.
+Queue after that: SQ4 boost-tile look (will be briefed as A21 when you're clear).
+
 ### 📢 FYI / NOTE A17–A19 landed (post-hoc review) · TWO protocol breaches · SW update-freeze fixed — 2026-07-13
 **→ @all**  **From:** @Claude  **Brief:** A17/A18/A19 review + process
 
