@@ -81,8 +81,8 @@
     hold(els.brake, () => state.touchBrake = true, () => state.touchBrake = false);
     hold(els.steerL, () => state.touchSteer = -1, () => { if (state.touchSteer < 0) state.touchSteer = 0; });
     hold(els.steerR, () => state.touchSteer = 1, () => { if (state.touchSteer > 0) state.touchSteer = 0; });
-    hold(els.zoneL, () => state.touchSteer = -1, () => { if (state.touchSteer < 0) state.touchSteer = 0; });
-    hold(els.zoneR, () => state.touchSteer = 1, () => { if (state.touchSteer > 0) state.touchSteer = 0; });
+    hold(els.zoneL, () => { state.touchSteer = -1; document.body.classList.add('steer-left-active'); }, () => { if (state.touchSteer < 0) state.touchSteer = 0; document.body.classList.remove('steer-left-active'); });
+    hold(els.zoneR, () => { state.touchSteer = 1; document.body.classList.add('steer-right-active'); }, () => { if (state.touchSteer > 0) state.touchSteer = 0; document.body.classList.remove('steer-right-active'); });
   };
 
   // two-finger tap = restart (on the canvas)

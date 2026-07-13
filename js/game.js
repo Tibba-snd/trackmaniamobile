@@ -1402,7 +1402,17 @@
     }
     if (name === 'loading') $('loading').style.display = 'flex';
     if (name === 'finish') { $('finish').style.display = 'flex'; $('gameHud').style.display = 'block'; }
-    if (name === 'game') $('gameHud').style.display = 'block';
+    if (name === 'game') {
+      $('gameHud').style.display = 'block';
+      if (G.save.settings.controlMode === 'tap' && !sessionStorage.getItem('tapHintShown')) {
+        sessionStorage.setItem('tapHintShown', 'true');
+        const hint = $('tapHint');
+        if (hint) {
+          hint.style.display = 'block';
+          setTimeout(() => { hint.style.display = 'none'; }, 2500);
+        }
+      }
+    }
     if (name === 'replay') {
       const el = $('replayHud');
       if (el) el.style.display = 'flex';
@@ -2522,7 +2532,9 @@
     // + swap to 18-point cross handles). Once active, picking a cross point DRAGS it.
     const inCrossSession = () => G.editMode === 'cross' && G.crossSession;
     window.addEventListener('pointerdown', (e) => {
-      if (G.state !== 'garage' || e.clientX <= 370) return;
+      if (G.state !== 'garage') return;
+      const isPortrait = window.innerWidth <= 768;
+      if (isPortrait ? (e.clientY > window.innerHeight * 0.48) : (e.clientX <= 370)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // pinch-zoom disabled during an active cross-session (camera is locked to end-on)
       if (pointers.size === 2 && !inCrossSession()) {
@@ -2671,6 +2683,8 @@
     // Tap zones
     $('zoneL').style.display = isTap ? 'block' : 'none';
     $('zoneR').style.display = isTap ? 'block' : 'none';
+
+    document.body.classList.toggle('tap-mode', isTap);
   }
 
   window.addEventListener('DOMContentLoaded', DD.boot);

@@ -10,7 +10,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/capacitor.build.gradle": {
-    "mtime": 1783939007.9728727,
+    "mtime": 1783943067.8563464,
     "ast_hash": "5081a3b5bf8a1befe041807f0e2eb79c",
     "semantic_hash": ""
   },
@@ -20,22 +20,22 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.config.json": {
-    "mtime": 1783939007.9417324,
+    "mtime": 1783943067.8149116,
     "ast_hash": "2eddd882e66b0d0a562385e8b95dc9a3",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/capacitor.plugins.json": {
-    "mtime": 1783939007.9508483,
+    "mtime": 1783943067.8271623,
     "ast_hash": "58e0494c51d30eb3494f7c9198986bb9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova.js": {
-    "mtime": 1783939007.968089,
+    "mtime": 1783943067.8503208,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/cordova_plugins.js": {
-    "mtime": 1783939007.968089,
+    "mtime": 1783943067.8503208,
     "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
     "semantic_hash": ""
   },
@@ -50,18 +50,18 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/core.js": {
-    "mtime": 1783448437.509684,
-    "ast_hash": "4e21fca1c78e34cebf240fd866c7ef5f",
+    "mtime": 1783942840.7630222,
+    "ast_hash": "f4ddb7bbc4db01f91a380e7ca1cb79c9",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/game.js": {
-    "mtime": 1783932431.6951518,
-    "ast_hash": "946503bdaa9801457dbd8fd2576b143a",
+    "mtime": 1783942983.2173367,
+    "ast_hash": "9a064464624060d60c3a319bfab85330",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/input.js": {
-    "mtime": 1783925405.1364765,
-    "ast_hash": "b4621f43690970e5ef2e72be3b9af756",
+    "mtime": 1783942994.6897585,
+    "ast_hash": "6bd891b4e3853496007accdf1bad9865",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/lib/CopyShader.js": {
@@ -115,13 +115,13 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-car.js": {
-    "mtime": 1783417051.0069966,
-    "ast_hash": "e2fe3f67d26dfe0de3d51dc30de7800b",
+    "mtime": 1783942861.8848817,
+    "ast_hash": "b2e649360cb2a12079a2ffa674e603e1",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-core.js": {
-    "mtime": 1783937276.34936,
-    "ast_hash": "261cb3e577c747c2401010845c67e28f",
+    "mtime": 1783942878.2877784,
+    "ast_hash": "98dba4aa2ae22dc4efd58bb7c85b4eba",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/scene-decor.js": {
@@ -160,7 +160,7 @@
     "semantic_hash": ""
   },
   "apk-build/android/capacitor.settings.gradle": {
-    "mtime": 1783939007.9716198,
+    "mtime": 1783943067.8533778,
     "ast_hash": "455ebb7f9fe84a6974da6bdae43097c2",
     "semantic_hash": ""
   },
@@ -210,18 +210,18 @@
     "semantic_hash": ""
   },
   "js/core.js": {
-    "mtime": 1783448437.509684,
-    "ast_hash": "4e21fca1c78e34cebf240fd866c7ef5f",
+    "mtime": 1783942840.7630222,
+    "ast_hash": "f4ddb7bbc4db01f91a380e7ca1cb79c9",
     "semantic_hash": ""
   },
   "js/game.js": {
-    "mtime": 1783932431.6951518,
-    "ast_hash": "946503bdaa9801457dbd8fd2576b143a",
+    "mtime": 1783942983.2173367,
+    "ast_hash": "9a064464624060d60c3a319bfab85330",
     "semantic_hash": ""
   },
   "js/input.js": {
-    "mtime": 1783925405.1364765,
-    "ast_hash": "b4621f43690970e5ef2e72be3b9af756",
+    "mtime": 1783942994.6897585,
+    "ast_hash": "6bd891b4e3853496007accdf1bad9865",
     "semantic_hash": ""
   },
   "js/lib/CopyShader.js": {
@@ -275,13 +275,13 @@
     "semantic_hash": ""
   },
   "js/scene-car.js": {
-    "mtime": 1783417051.0069966,
-    "ast_hash": "e2fe3f67d26dfe0de3d51dc30de7800b",
+    "mtime": 1783942861.8848817,
+    "ast_hash": "b2e649360cb2a12079a2ffa674e603e1",
     "semantic_hash": ""
   },
   "js/scene-core.js": {
-    "mtime": 1783937276.34936,
-    "ast_hash": "261cb3e577c747c2401010845c67e28f",
+    "mtime": 1783942878.2877784,
+    "ast_hash": "98dba4aa2ae22dc4efd58bb7c85b4eba",
     "semantic_hash": ""
   },
   "js/scene-decor.js": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783941996.6334321,
-    "ast_hash": "bf9839ababc7c5adc6a650ff5598c250",
+    "mtime": 1783943066.5689068,
+    "ast_hash": "e3d0307a3132d0fa5a7dbf82ec01b2fb",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/index.html": {
-    "mtime": 1783937302.236539,
-    "ast_hash": "4eb7094f7e6047721e4cb20043129c43",
+    "mtime": 1783943012.0336134,
+    "ast_hash": "3b5188f314944458f9367ec6c7baf1b2",
     "semantic_hash": ""
   },
   "docs/DESIGN_PROMPT.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1783937302.236539,
-    "ast_hash": "4eb7094f7e6047721e4cb20043129c43",
+    "mtime": 1783943012.0336134,
+    "ast_hash": "3b5188f314944458f9367ec6c7baf1b2",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/res/drawable-land-hdpi/splash.png": {
