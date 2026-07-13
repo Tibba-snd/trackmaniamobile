@@ -567,7 +567,9 @@
      and the z-index:6 buttons were painting directly over the live timer digits. Offsetting them
      down by the card height keeps the timer fully readable while leaving the buttons in the
      conventional top-left utility cluster. */
-  #gameButtons { display:none; position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 104px); left:max(16px,env(safe-area-inset-left)); gap:8px; z-index:6; flex-direction:row; }
+  /* z-index 7: must paint ABOVE #touchControls (z6) — the full-height tap-steer zones come later
+     in the DOM, and at equal z they swallowed every tap on restart/respawn/exit in tap mode. */
+  #gameButtons { display:none; position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 104px); left:max(16px,env(safe-area-inset-left)); gap:8px; z-index:7; flex-direction:row; }
   /* no backdrop-filter in-race — blurring the live WebGL framebuffer recomposites it every frame (mobile perf). Higher bg alpha keeps it legible. */
   .gbtn { pointer-events:auto; width:44px; height:44px; border-radius:0; border:1px solid rgba(var(--accent-rgb),0.22); background:rgba(10,7,22,0.85);
     color:#e8e4f5; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;
@@ -1121,12 +1123,258 @@
     #menu #btnGarage { grid-column: 2; margin: 0; }
     #menu #btnSettings { grid-column: 2; margin: 0; }
   }
+
+  /* A17: Garage Mobile Layout bottom sheet */
+  @media (max-width: 768px) and (orientation: portrait) {
+    .garage-sidebar {
+      width: 100% !important;
+      height: 52% !important;
+      left: 0 !important;
+      top: auto !important;
+      bottom: 0 !important;
+      border-right: none !important;
+      border-top: 1px solid rgba(var(--accent-rgb), 0.12) !important;
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.6) !important;
+      padding: 16px 20px 20px 20px !important;
+    }
+    .garage-instruction {
+      display: none !important;
+    }
+    .garage-tabs {
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      scrollbar-width: none !important;
+      margin-bottom: 12px !important;
+    }
+    .garage-tabs::-webkit-scrollbar {
+      display: none !important;
+    }
+    .tab-btn {
+      flex: 0 0 auto !important;
+      padding: 10px 16px !important;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .tab-btn {
+      font-size: 11px !important;
+      min-height: 44px !important;
+    }
+    .gItem {
+      padding-top: 14px !important;
+      padding-bottom: 14px !important;
+      font-size: 12px !important;
+    }
+  }
+
+  /* A18: Campaign, Settings, Finish Screen Mobile Compaction */
+  @media (max-width: 480px) {
+    .campaign-left {
+      padding: 12px !important;
+    }
+    .trackBtn {
+      min-height: 44px !important;
+    }
+  }
+
+  @media (max-width: 768px) and (orientation: portrait) {
+    .details-content {
+      position: relative !important;
+      padding-bottom: 70px !important;
+    }
+    #btnPlayCampTrack {
+      position: absolute !important;
+      bottom: 15px !important;
+      left: 15px !important;
+      width: calc(100% - 30px) !important;
+      margin: 0 !important;
+    }
+  }
+
+  @media (max-height: 470px) {
+    .tier-card {
+      padding: 8px 10px !important;
+      margin-bottom: 8px !important;
+    }
+    .campaign-header-row {
+      margin-bottom: 6px !important;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .panel {
+      max-height: 78vh !important;
+    }
+    .setRow {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 6px !important;
+    }
+    .setRow input[type=range] {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .setRow select {
+      width: 100% !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #finish .card {
+      padding: 20px 16px !important;
+    }
+    #finTime {
+      font-size: 40px !important;
+    }
+    .finRow {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+      width: 100% !important;
+    }
+    .finRow button {
+      width: 100% !important;
+      padding: 10px 8px !important;
+      min-height: 44px !important;
+    }
+    #replayHud {
+      padding: 8px 12px !important;
+      gap: 8px !important;
+      bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    }
+    #replayHud button {
+      padding: 8px 12px !important;
+      min-height: 44px !important;
+    }
+    #repSlider::-webkit-slider-thumb {
+      width: 20px !important;
+      height: 20px !important;
+    }
+  }
+
+  @media (max-height: 480px) {
+    #finish .card {
+      padding: 12px 20px !important;
+    }
+    #finTime {
+      font-size: 32px !important;
+    }
+    #finSeed {
+      margin-bottom: 8px !important;
+    }
+    .finRow {
+      gap: 6px !important;
+    }
+    .finRow button {
+      padding: 8px 12px !important;
+      font-size: 12px !important;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .mbtn {
+      padding: 17px 22px !important;
+    }
+    .setRow {
+      min-height: 44px !important;
+    }
+    .setRow input[type=checkbox] {
+      width: 24px !important;
+      height: 24px !important;
+    }
+    .setRow select {
+      min-height: 44px !important;
+      padding: 10px 14px !important;
+    }
+    .setRow input[type=range] {
+      min-height: 44px !important;
+    }
+  }
+
+  @media (max-height: 470px) and (min-width: 560px) {
+    #menu {
+      grid-gap: 4px 16px !important;
+      padding: 8px 32px !important;
+      overflow-y: auto !important;
+    }
+    #menu h1.logo {
+      font-size: 22px !important;
+    }
+    #menu .mbtn {
+      padding: 8px 16px !important;
+      font-size: 13px !important;
+    }
+    #menu .seedRow input, #menu .seedRow select, #menu .seedRow button {
+      height: 32px !important;
+      padding: 6px !important;
+      font-size: 11px !important;
+    }
+  }
+
+  /* A19: Tap mode brake placement, steer indicators, and first-run hint */
+  body.tap-mode #padBrake {
+    right: max(24px, env(safe-area-inset-right)) !important;
+    bottom: max(24px, env(safe-area-inset-bottom)) !important;
+    width: 112px !important;
+    height: 112px !important;
+    left: auto !important;
+  }
+
+  #steerIndicatorL, #steerIndicatorR {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 32px;
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+    opacity: 0.35;
+  }
+  #steerIndicatorL {
+    left: 0;
+    background: linear-gradient(90deg, var(--accent2), transparent);
+  }
+  #steerIndicatorR {
+    right: 0;
+    background: linear-gradient(-90deg, var(--accent2), transparent);
+  }
+  body.steer-left-active #steerIndicatorL {
+    display: block;
+  }
+  body.steer-right-active #steerIndicatorR {
+    display: block;
+  }
+
+  .tap-hint-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(10, 7, 22, 0.85);
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
+    padding: 16px 28px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--warm);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    z-index: 1000;
+    pointer-events: none;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.25);
+    clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
 <div id="vignette"></div>
 <div id="grain"></div>
+<div id="steerIndicatorL"></div>
+<div id="steerIndicatorR"></div>
+<div id="tapHint" class="tap-hint-overlay" style="display: none;">◀ tap left · right tap ▶ · hold to steer</div>
 
 <!-- MAIN MENU -->
 <div class="screen glass" id="menu">
@@ -1418,18 +1666,18 @@
 <script src="js/lib/RenderPass.js?v=15"></script>
 <script src="js/lib/UnrealBloomPass.js?v=15"></script>
 <script src="js/lib/FXAAShader.js?v=16"></script>
-<script src="js/core.js?v=21"></script>
+<script src="js/core.js?v=22"></script>
 <script src="js/theme.js?v=24"></script>
 <script src="js/trackgen.js?v=27"></script>
 <script src="js/physics.js?v=33"></script>
 <script src="js/audio.js?v=19"></script>
-<script src="js/input.js?v=16"></script>
+<script src="js/input.js?v=17"></script>
 <script src="js/carspec.js?v=5"></script>
-<script src="js/scene-core.js?v=63"></script>
+<script src="js/scene-core.js?v=64"></script>
 <script src="js/scene-decor.js?v=62"></script>
-<script src="js/scene-car.js?v=59"></script>
+<script src="js/scene-car.js?v=60"></script>
 <script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=75"></script>
+<script src="js/game.js?v=76"></script>
 <script src="js/physdev.js?v=4"></script>
 <script src="js/perfhud.js?v=2"></script>
 </body>

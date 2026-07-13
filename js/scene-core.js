@@ -760,8 +760,10 @@
     camera.position.set(camFinalPos[0], camFinalPos[1], camFinalPos[2]);
     camera.up.set(DD.lerp(0, up[0], 0.55), 1, DD.lerp(0, up[2], 0.55));
     camera.lookAt(camState.look[0], camState.look[1], camState.look[2]);
-    // FOV widens with speed (with a subtle non-linear speed-creep above 75% speed), a touch more while sliding, plus a punch on boost pads (speed rush).
-    const targetFov = CP.fov0 + sv * CP.fovV + (sv > 0.75 ? Math.pow(sv - 0.75, 1.5) * 20 : 0) + (car.sliding ? 3 : 0) + (car.boostGlow || 0) * 7;
+    // FOV widens with speed (with a non-linear speed-creep above 75% speed, scaled per camera
+    // profile — CP.creep), a touch more while sliding, plus a punch on boost pads (speed rush).
+    const creep = CP.creep !== undefined ? CP.creep : 20;
+    const targetFov = CP.fov0 + sv * CP.fovV + (sv > 0.75 ? Math.pow(sv - 0.75, 1.5) * creep : 0) + (car.sliding ? 3 : 0) + (car.boostGlow || 0) * 7;
     camState.fov = DD.dampTo(camState.fov, targetFov, 6, dt);
     camera.fov = camState.fov;
     camera.updateProjectionMatrix();

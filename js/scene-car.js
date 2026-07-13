@@ -1142,11 +1142,13 @@
   // car" (hero presence); `classic` = the original farther/higher frame. game.js sets
   // DD.cameraProfile from settings; the module default keeps headless tests on the old numbers.
   DD.CAM_PROFILES = {
-    // distV = extra follow distance at vmax, fovV = extra FOV(deg) at vmax. Both were pushed high
-    // enough that the car read as "too far away" at speed (the wide FOV shrinks it as much as the
-    // pull-back does). Trimmed both: still a clear speed sensation, but the car stays close at top end.
-    classic: { dist0: 7.2, distV: 1.1, h0: 2.45, hV: 0.45, look: 11, fov0: 63, fovV: 22 },
-    close:   { dist0: 5.7, distV: 0.8, h0: 1.90, hV: 0.40, look: 10, fov0: 64, fovV: 20 }
+    // distV = extra follow distance at vmax, fovV = extra FOV(deg) at vmax, creep = extra
+    // non-linear FOV degrees above 75% speed (scene-core). FOV widening shrinks the car as much
+    // as pull-back does — on a phone the old close profile peaked at ~104° and the car read as
+    // a speck. `close` retuned (2026-07-13, Tibba): hug the car and HOLD it at top speed —
+    // dist/FOV growth trimmed hard; speed feel now leans on the radial blur + slide/boost punches.
+    classic: { dist0: 7.2, distV: 1.1, h0: 2.45, hV: 0.45, look: 11, fov0: 63, fovV: 22, creep: 20 },
+    close:   { dist0: 5.0, distV: 0.3, h0: 1.70, hV: 0.25, look: 10, fov0: 64, fovV: 10, creep: 6 }
   };
   DD.cameraProfile = 'classic';
   DD.makeCamState = () => ({ pos: [0, 5, -10], look: [0, 0, 0], fov: 68, shake: [0, 0, 0], prevGrounded: true, prevVelY: 0 });

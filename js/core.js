@@ -129,7 +129,7 @@
     } catch (e) { /* corrupted */ }
     if (!save) {
       // garage.grad 0 = Dream (was 6 = Noir — a black default made the hero car invisible at dusk)
-      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tilt', glow: 'standard', camera: 'close', ghost: 'pb', crt: false }, garage: { grad: 0, finish: 1, form: 2, activeCustom: null }, customDesigns: [], tracks: {}, meta: { created: Date.now(), ver: SAVE_VER, customSeq: 0 } };
+      return { settings: { tilt: true, tiltSens: 1.0, invertTilt: false, sfx: 0.8, engine: 0.7, music: 0.5, quality: 'high', controlMode: 'tap', glow: 'standard', camera: 'close', ghost: 'pb', crt: false }, garage: { grad: 0, finish: 1, form: 2, activeCustom: null }, customDesigns: [], tracks: {}, meta: { created: Date.now(), ver: SAVE_VER, customSeq: 0 } };
     }
     // Migration: if the save predates this SAVE_VER, clear campaign track records (PBs/medals/
     // ghosts/author) so they re-derive against the new tracks. Daily/random PBs are keyed by their

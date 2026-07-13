@@ -288,11 +288,14 @@ viewports without any clipped/unreachable control.
 
 ## A19 — Tap-scheme polish (the new default mobile feel)  🔴 OPEN
 
-_The `tap` control scheme landed functional but raw. Known issues found in review:_
+_The `tap` control scheme landed functional but raw. Known issues found in review._
 
-1. **BUG — zones swallow the in-game buttons:** `.pad-zone` is full-height and `#touchControls`
-   paints after `#gameButtons` (both `z-index:6`), so restart/respawn/exit are unreachable in tap
-   mode. Fix: `#gameButtons { z-index:7 }` (buttons above zones; zone taps around them still steer).
+_Update session 30: `tap` is now the DEFAULT controlMode for fresh saves (core.js), and item 1
+below is already FIXED by Claude (`#gameButtons` → `z-index:7`) — don't redo it, but do verify it
+on-device as part of this brief's DoD._
+
+1. ~~**BUG — zones swallow the in-game buttons**~~ 🟢 fixed session 30 (`#gameButtons z-index:7`;
+   zones at z6 below).
 2. **Brake placement in tap mode:** `#padBrake` still sits at the old offset next to the (hidden)
    gas pad. In tap mode move it to the bottom-right corner slot (`right:max(24px, env(...))`) and
    enlarge to 112px — it's the only button, make it obvious. Body class exists? If not, toggle
