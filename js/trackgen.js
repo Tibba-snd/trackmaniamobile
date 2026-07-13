@@ -233,7 +233,7 @@
   // height and may rise to/above track level once it's laterally clear of the racing corridor
   const TERRAIN_RISE = { dune: 20, neon: 6, canyon: 48, frozen: 32 };
 
-  function buildTerrainData(samples, seedStr, theme, shortcuts) {
+  function buildTerrainData(samples, seedStr, theme, shortcuts, playgrounds) {
     const seed = DD.hashSeed(seedStr + '::terrain');
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, minY = 1e9;
     for (const s of samples) { minX = Math.min(minX, s.p[0]); maxX = Math.max(maxX, s.p[0]); minZ = Math.min(minZ, s.p[2]); maxZ = Math.max(maxZ, s.p[2]); minY = Math.min(minY, s.p[1]); }
@@ -330,6 +330,23 @@
 
         // terracing applies to the composed landform (terraced mesas, not just basin steps)
         if (theme.terraced) h = Math.round(h / 9) * 9 + (h - Math.round(h / 9) * 9) * 0.25;
+
+        // playground basins (5.2): blend the composed landform toward a smooth shallow dish —
+        // the off-track playground floor. Runs BEFORE the embankment conform and the safety
+        // clamps, so the road corridor always wins where they overlap.
+        if (playgrounds && playgrounds.length) {
+          for (const pg of playgrounds) {
+            const dxp = x - pg.x, dzp = z - pg.z;
+            const dp = Math.sqrt(dxp * dxp + dzp * dzp);
+            const R1 = pg.r * 1.45; // blend skirt
+            if (dp < R1) {
+              const t = DD.smoothstep(DD.clamp((R1 - dp) / (R1 - pg.r * 0.55), 0, 1));
+              const nd = dp / pg.r;
+              const dish = pg.y - 1.2 * Math.max(0, 1 - nd * nd);
+              h = DD.lerp(h, dish, t);
+            }
+          }
+        }
 
         // embankment conforming: raise terrain up to just under the road where it passes close
         // (only ever RAISES toward the road underside). On apron spans the conform target blends
@@ -1091,6 +1108,63 @@
       for (let i = 0; i < n; i++) { if (reach[i]) { samples[i].apronReach = reach[i]; samples[i].apronCapY = capY[i]; } }
     }
 
+    /* --- playground basin pockets (masterplan 5.2) ---
+       1-2 smooth driveable terrain pockets just off apron spans: the off-track playground's
+       floor. Selection here (needs natH + shortcuts); the heightfield relaxation happens inside
+       buildTerrainData. Own derived rng stream — main sequence untouched. Furniture (5.3 stamps)
+       builds on these later. */
+    const playgrounds = [];
+    if (!isMenu) {
+      const rngP = DD.makeRng(seedStr + '::playground');
+      const n = samples.length;
+      const clearOfAll = (px, pz, need) => {
+        for (let j = 0; j < n; j += 3) {
+          const dx = px - samples[j].p[0], dz = pz - samples[j].p[2];
+          if (dx * dx + dz * dz < need * need) return false;
+        }
+        return true;
+      };
+      const clearOfCuts = (px, pz, need) => {
+        for (const sc of shortcuts) {
+          const abx = sc.b[0] - sc.a[0], abz = sc.b[2] - sc.a[2];
+          const l2 = abx * abx + abz * abz || 1;
+          const t = DD.clamp(((px - sc.a[0]) * abx + (pz - sc.a[2]) * abz) / l2, 0, 1);
+          const dx = px - (sc.a[0] + abx * t), dz = pz - (sc.a[2] + abz * t);
+          if (dx * dx + dz * dz < need * need) return false;
+        }
+        return true;
+      };
+      for (let i = 20; i < n - 20 && playgrounds.length < 2; i += 9) {
+        const s = samples[i];
+        if (!s.apron) continue;
+        // no gaps near the anchor — a chasm clamp through the pocket would slice its floor
+        let gapNear = false;
+        for (let o = -30; o <= 30 && !gapNear; o += 3) {
+          const j = closed ? ((i + o) % n + n) % n : DD.clamp(i + o, 0, n - 1);
+          if (samples[j].gap) gapNear = true;
+        }
+        if (gapNear) continue;
+        const side = Math.sign(s.apron);
+        const r = rngP.range(16, 26);
+        const off = rngP.range(34, 52);
+        const px = s.p[0] + s.r[0] * side * off;
+        const pz = s.p[2] + s.r[2] * side * off;
+        // Playground floor anchors to the ROAD (a shallow drivable dish just below the apron
+        // shelf), NOT to natH — natH is the pre-conform landform, which sits ~8 m below the road
+        // by design (the embankment conform later raises it to road level near apron spans).
+        // Anchoring to natH made the floor a deep pit and rejected nearly every candidate.
+        // Sanity gate: the raw landform at the pocket must not already be a cliff face (slopier
+        // than ~18 m over the pocket radius) or the dish can't blend smoothly onto it.
+        const nyEdge = natH(px + r * 0.7, pz, s.p[1]);
+        const nyCtr = natH(px, pz, s.p[1]);
+        if (Math.abs(nyEdge - nyCtr) > 18) continue;
+        if (!clearOfAll(px, pz, r + s.w / 2 + 6)) continue; // pocket clear of every leg
+        if (!clearOfCuts(px, pz, r + 16)) continue;         // and of shortcut corridors
+        if (playgrounds.some(pg => { const dx = pg.x - px, dz = pg.z - pz; return dx * dx + dz * dz < 120 * 120; })) continue;
+        playgrounds.push({ x: px, z: pz, r, y: s.p[1] - 1.5, anchorIdx: i });
+      }
+    }
+
     const track = {
       seed: seedStr, tier, archetype,
       samples, ds: DS,
@@ -1101,11 +1175,12 @@
       pieceSpans,
       corners,
       shortcuts,
+      playgrounds,
       overlapForced,
       theme
     };
     track._cutStats = cutStats; // shortcut-candidate funnel (debug/telemetry, deterministic)
-    track.terrain = buildTerrainData(samples, seedStr, theme, shortcuts);
+    track.terrain = buildTerrainData(samples, seedStr, theme, shortcuts, playgrounds);
 
     // apron audit — CLOSED LOOP: the conform/clamp interplay on a 10-13 m grid can still miss
     // flush in odd noise/undulation spots. Re-measure every apron span against the ACTUAL grid
