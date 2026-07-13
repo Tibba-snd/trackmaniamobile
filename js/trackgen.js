@@ -910,24 +910,31 @@
         }
         return true;
       };
+      // 5.1 "a way back, everywhere": piece BLACKLIST instead of whitelist — every piece whose
+      // hazard isn't already encoded in the per-sample checks below (pitch/bank/gap/elev) or the
+      // closed-loop audit. Coverage pattern flipped from "rare windows" (10-18 m gaps, 20-36 m
+      // spans) to near-continuous (4-8 m gaps, 36-68 m spans): off-track is a place to play now,
+      // so the fence-free flush shelf is the DEFAULT wherever terrain allows. The audit still
+      // trims every span the built grid can't actually deliver — same guarantee as before.
+      const APRON_HOSTILE = { wallride: 1, glass: 1, kicker: 1, jumpgap: 1, bigjump: 1, crest: 1 };
       for (const span of pieceSpans) {
-        if (span.name !== 'straight' && span.name !== 'sweeper' && span.name !== 'boost') continue;
+        if (APRON_HOSTILE[span.name]) continue;
         let i = span.start + 2;
         const end = span.end - 2;
         while (i < end) {
-          const gapN = rngA.int(5, 9);    // 10-18 m between apron spans
-          const apN = rngA.int(10, 18);   // 20-36 m apron span
+          const gapN = rngA.int(2, 4);    // 4-8 m between apron spans
+          const apN = rngA.int(18, 34);   // 36-68 m apron span
           const sidePick = rngA.sign();   // used when the span has no curvature (straights)
           const a0 = i + gapN, a1 = Math.min(a0 + apN, end);
           i = a1;
           if (a1 - a0 < RAMP * 2) continue;
-          // eligibility: flat, plain surface, NEAR GROUND LEVEL (elevated decks can't be
-          // conformed flush — embankment cap). Railed spans are allowed: the audit's survivors
-          // OPEN the rail there (wallOpen), reading as gateway breaks in the fence.
+          // eligibility: flat (bank AND pitch), plain surface, NEAR GROUND LEVEL (elevated decks
+          // can't be conformed flush — embankment cap). Railed spans are allowed: the audit's
+          // survivors OPEN the rail there (wallOpen), reading as gateway breaks in the fence.
           let ok = true;
           for (let k = a0; k < a1; k++) {
             const s = samples[k];
-            if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || s.p[1] - minTrackY > 12.0) { ok = false; break; }
+            if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || Math.abs(s.pitch) > 0.05 || s.p[1] - minTrackY > 12.0) { ok = false; break; }
           }
           // no aprons where ANOTHER stretch of track runs close by (closure beside the opening
           // straight, near-parallel passes): the flush shelf would sit in the other road's space

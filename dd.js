@@ -196,6 +196,14 @@ function handleSync() {
     fs.cpSync(jsSrc, jsDest, { recursive: true });
     console.log(`Copied js/ -> apk-build/www/js/`);
 
+    // Copy audio folder recursively if it exists
+    const audioSrc = path.join(ROOT_DIR, 'audio');
+    const audioDest = path.join(wwwDir, 'audio');
+    if (fs.existsSync(audioSrc)) {
+      fs.cpSync(audioSrc, audioDest, { recursive: true });
+      console.log(`Copied audio/ -> apk-build/www/audio/`);
+    }
+
     // 5. Run npx cap sync android
     console.log(`Executing: npx cap sync android...`);
     execSync('npx cap sync android', { cwd: apkBuildDir, stdio: 'inherit' });

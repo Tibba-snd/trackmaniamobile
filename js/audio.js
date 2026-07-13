@@ -256,4 +256,103 @@
     }
   };
 
+  const MUSIC_TRACKS = {
+    menu: 'audio/music/MainMenu.mp3',
+    garage: 'audio/music/Garage.mp3',
+    finish: 'audio/music/resultsfinish.mp3',
+    dune: 'audio/music/Dune1.mp3',
+    canyon: 'audio/music/canyon.mp3',
+    frozen: 'audio/music/frozen.mp3',
+    neon: 'audio/music/neon.mp3'
+  };
+
+  A.activeMusic = null;
+  A.fadingMusic = [];
+  let musicInterval = null;
+
+  function startMusicLoop() {
+    if (musicInterval) return;
+    musicInterval = setInterval(() => {
+      const step = 50 / 1500; // 1.5s crossfade
+      let changed = false;
+
+      if (A.activeMusic) {
+        if (A.activeMusic.volumeScale < 1) {
+          A.activeMusic.volumeScale = Math.min(1, A.activeMusic.volumeScale + step);
+          changed = true;
+        }
+      }
+
+      for (let i = A.fadingMusic.length - 1; i >= 0; i--) {
+        const item = A.fadingMusic[i];
+        item.volumeScale = Math.max(0, item.volumeScale - step);
+        changed = true;
+        if (item.volumeScale <= 0) {
+          try {
+            item.audio.pause();
+            item.audio.src = '';
+          } catch (e) {}
+          A.fadingMusic.splice(i, 1);
+        }
+      }
+
+      if (changed) {
+        DD.updateMusicVolume();
+      }
+    }, 50);
+  }
+
+  DD.updateMusicVolume = function () {
+    const targetVol = A.volumes.music;
+    if (A.activeMusic) {
+      A.activeMusic.audio.volume = A.activeMusic.volumeScale * targetVol;
+    }
+    for (const item of A.fadingMusic) {
+      item.audio.volume = item.volumeScale * targetVol;
+    }
+  };
+
+  DD.playMusic = function (slot) {
+    if (!A.started || typeof Audio === 'undefined') return;
+    DD.stopPads(); // stop procedural pads
+
+    const url = MUSIC_TRACKS[slot];
+    if (!url) {
+      if (A.activeMusic) {
+        A.fadingMusic.push(A.activeMusic);
+        A.activeMusic = null;
+      }
+      return;
+    }
+
+    if (A.activeMusic && A.activeMusic.slot === slot) {
+      return;
+    }
+
+    if (A.activeMusic) {
+      A.fadingMusic.push(A.activeMusic);
+      A.activeMusic = null;
+    }
+
+    try {
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.volume = 0;
+
+      A.activeMusic = {
+        audio: audio,
+        slot: slot,
+        volumeScale: 0
+      };
+
+      audio.play().catch(err => {
+        if (DD.debugAudio) console.warn('[Audio] Music play blocked/failed for ' + slot, err);
+      });
+
+      startMusicLoop();
+    } catch (e) {
+      console.error('[Audio] playMusic error:', e);
+    }
+  };
+
 })(typeof window !== 'undefined' ? window : globalThis);

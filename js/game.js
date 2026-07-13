@@ -1389,8 +1389,25 @@
     }, 16);
   }
 
+  function updateMusicForScreen(name) {
+    if (!DD.playMusic) return;
+    if (name === 'menu' || name === 'campaign' || name === 'settings') {
+      DD.playMusic('menu');
+    } else if (name === 'garage') {
+      DD.playMusic('garage');
+    } else if (name === 'finish') {
+      DD.playMusic('finish');
+    } else if (name === 'game' || name === 'replay') {
+      if (G.track && G.track.theme && G.track.theme.biome) {
+        DD.playMusic(G.track.theme.biome);
+      }
+    }
+  }
+
   /* ---------------- screens & menus ---------------- */
   function showScreen(name) {
+    G.currentScreen = name;
+    updateMusicForScreen(name);
     for (const id of ['menu', 'loading', 'finish', 'gameHud', 'campaign', 'settings', 'garage', 'replayHud']) {
       const el = $(id === 'gameHud' ? 'gameHud' : id);
       if (el) el.style.display = 'none';
@@ -2350,7 +2367,14 @@
       return { dpr: +G.renderer.getPixelRatio().toFixed(3), cap: G._dprCap, adaptive: DD.adaptiveDPR };
     };
 
-    const audioKick = () => { DD.initAudio(G.save.settings); };
+    const audioKick = () => {
+      DD.initAudio(G.save.settings);
+      if (G.currentScreen) {
+        updateMusicForScreen(G.currentScreen);
+      } else {
+        DD.playMusic('menu');
+      }
+    };
     window.addEventListener('pointerdown', audioKick, { once: true });
     window.addEventListener('keydown', audioKick, { once: true });
 
@@ -2445,7 +2469,7 @@
     $('setInvert').onchange = (e) => { G.save.settings.invertTilt = e.target.checked; saveSet(); };
     $('setEngine').oninput = (e) => { G.save.settings.engine = parseFloat(e.target.value); DD.audio.volumes.engine = G.save.settings.engine; saveSet(); };
     $('setSfx').oninput = (e) => { G.save.settings.sfx = parseFloat(e.target.value); DD.audio.volumes.sfx = G.save.settings.sfx; saveSet(); };
-    $('setMusic').oninput = (e) => { G.save.settings.music = parseFloat(e.target.value); DD.audio.volumes.music = G.save.settings.music; if (DD.audio.nodes.padMaster) DD.audio.nodes.padMaster.gain.value = 0.1 * G.save.settings.music; saveSet(); };
+    $('setMusic').oninput = (e) => { G.save.settings.music = parseFloat(e.target.value); DD.audio.volumes.music = G.save.settings.music; if (DD.audio.nodes.padMaster) DD.audio.nodes.padMaster.gain.value = 0.1 * G.save.settings.music; if (DD.updateMusicVolume) DD.updateMusicVolume(); saveSet(); };
     $('setQuality').onchange = (e) => { G.save.settings.quality = e.target.value; saveSet(); };
     $('setGlow').onchange = (e) => { G.save.settings.glow = e.target.value; saveSet(); }; // live — bloom recomposes per frame
     $('setCamera').onchange = (e) => { G.save.settings.camera = e.target.value; DD.cameraProfile = e.target.value; saveSet(); };
