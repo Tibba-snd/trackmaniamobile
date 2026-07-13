@@ -187,6 +187,40 @@ up — flag it in the walkthrough, Claude decides on re-baseline.
 
 ---
 
+## A16 — Track dressing (MASTERPLAN 3.4, session 29)  🔴 OPEN
+
+_Corner furniture + race framing so the new Phase 3 pieces read at speed. Scene-decor only —
+zero trackgen/physics edits._
+
+**The set (all instanced/merged, decal-ladder heights, light-pool rule — no real-time lights):**
+1. **Braking boards** — "100 / 50" distance boards before each detected corner (`track.corners`;
+   the corner entry sample is `corners[i].entry`, boards at −100 m / −50 m along the sample walk,
+   OUTSIDE edge = `-insideSign`). Reuse the corner-sign panel/post pattern (`buildCornerSigns`).
+2. **Apex cones** — 3-4 small cones on the inside edge over each corner's apex span
+   (`corners[i].apex ± 3`), just off the kerb band (lateral `w/2 + 1.4`). One InstancedMesh.
+3. **Hazard chevron paint** on `tighten` pieces — alternating chevron decal on the deck along the
+   tightening span (pieceName === 'tighten'), `DD.DECAL.centre` height, polygonOffset like every
+   NormalBlending decal (A15).
+4. **Start grid slab** — dark rectangular slab + painted grid box lines under the start
+   (`startIdx ± 6`), below the existing start texture rung (`DD.DECAL.start`).
+5. **Distance-to-finish boards** each 25% of `track.length` — small roadside panel, plain text
+   texture ("75% / 50% / 25%"), skip if within 80 m of a checkpoint gate (visual clutter).
+6. **Checkpoint ring variety** — per-biome accent on the existing checkpoint gates: frozen =
+   icy blue-white halo, canyon = amber, dune = warm white, neon = magenta. Colour swap only
+   (`theme.biome` branch where gates get their material) — no geometry change.
+
+**Hard rules:** deterministic (any randomness = derived stream `seed + '::dressing'`, NEVER main
+rng draws); every new mesh instanced or merged (GPU is fill-rate bound — overdraw is the enemy,
+geometry is cheap); decals on the `DD.DECAL` ladder; `addLightSource()` pool only, and sparingly;
+NOTHING may spawn on apron spans (`s.apron`), shortcut corridors (`track.shortcuts` chords ± 16 m),
+or gap/landing spans. Wrap modulo N for any sample scan when `track.closed`.
+
+**DoD:** all suites green (render-only — `drivability`/`verify_slide`/`verify_world` untouched);
+game launched + one track per biome eyeballed; `?v=` bumps for every touched js file; walkthrough
+in INBOX with screenshots.
+
+---
+
 # TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)
 
 _Tibba: "tracks are too narrow for creative driving — you always hit the fence drifting. I want

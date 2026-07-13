@@ -1108,7 +1108,7 @@
       DD.updateSparks(G.sparks, G.car, G.track, dtReal, (G.car.hitWall && speed > 10) || isDrifting, isDrifting);
       if (G.car.hitWall && speed > 5 && !G.prevHitWall) { DD.sfxWallThud(speedNorm); } G.prevHitWall = G.car.hitWall && speed > 5;
     }
-    DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt, G.car.hitWall, G.car.kerb || 0);
+    DD.updateSurfaceAudio(G.car.sliding ? DD.clamp(slideAmt * 3, 0, 1) : 0, speed, G.car.onDirt || G.car.surf === DD.SURF.DIRT, G.car.hitWall, G.car.kerb || 0);
     // off-track / missed checkpoint warnings
     const warnEl = cachedHudWarn;
     if (G.car.missedCkpt) { warnEl.textContent = 'checkpoint missed — respawn (⚑)'; warnEl.style.opacity = 1; }

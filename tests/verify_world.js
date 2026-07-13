@@ -157,6 +157,43 @@ console.log('[1] apron/shortcut/kerb generation contract');
   check('shortcuts appear across the matrix (>=3)', shortcutsTotal >= 3, shortcutsTotal + ' total');
 }
 
+/* 1b — Phase 3 grammar: new pieces spawn, crossings exist, signatures DELIVER their pieces */
+console.log('[1b] phase 3 grammar + signature delivery');
+{
+  const counts = {};
+  let crossTracks = 0;
+  for (const seed of SEEDS) {
+    for (let tier = 1; tier <= 5; tier++) {
+      const t = DD.generateTrack(seed, tier, 0);
+      for (const sp of t.pieceSpans) counts[sp.name] = (counts[sp.name] || 0) + 1;
+      const ss = t.samples;
+      let found = false;
+      for (let i = 0; i < ss.length && !found; i += 4) {
+        for (let j = i + 120; j < ss.length; j += 4) {
+          const dx = ss[i].p[0] - ss[j].p[0], dz = ss[i].p[2] - ss[j].p[2];
+          if (dx * dx + dz * dz < 100 && Math.abs(ss[i].p[1] - ss[j].p[1]) >= 14) { crossTracks++; found = true; break; }
+        }
+      }
+    }
+  }
+  for (const nm of ['corkscrew', 'bowl', 'overunder', 'ridge', 'dirtcut']) {
+    check(nm + ' spawns across the matrix', (counts[nm] || 0) >= 1, (counts[nm] || 0) + 'x');
+  }
+  check('over/under crossings exist (dY>=14 pass-overs)', crossTracks >= 2, crossTracks + ' tracks');
+
+  // signature integrity: the queue bypasses sequencing rewrites + retries collisions — the
+  // campaign's promised set-pieces must actually be on the track
+  let t2 = 0, t3 = 0;
+  for (let i = 1; i <= 10; i++) {
+    const s2 = String(i).padStart(2, '0');
+    if (DD.generateTrack('CAMP-T2-' + s2, 2, 0).pieceSpans.some(p => p.name === 'corkscrew')) t2++;
+    const nm = DD.generateTrack('CAMP-T3-' + s2, 3, 0).pieceSpans.map(p => p.name);
+    if (nm.includes('ridge') && nm.includes('corkscrew') && nm.includes('bowl')) t3++;
+  }
+  check('CAMP-T2 delivers its corkscrew (>=8/10)', t2 >= 8, t2 + '/10');
+  check('CAMP-T3 delivers full mountain_pass (>=7/10)', t3 >= 7, t3 + '/10');
+}
+
 /* 2 — drivability: leave over an apron, come back, re-ground on the ribbon */
 console.log('[2] apron drive-off + re-entry');
 {

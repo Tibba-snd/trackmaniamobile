@@ -94,7 +94,47 @@ These are real today (the code, not the marketing). Roughly high→low impact.
 
 ---
 
-## Resolved this pass — Phase 2 feedback round: Tibba playtest fixes (2026-07-07, session 28)
+## Resolved this pass — Phase 3 grammar: five new pieces, real signatures, taller world (2026-07-07, session 29)
+
+Masterplan 3.1 + 3.2 + 3.3 landed; 3.4 (track dressing) briefed as **A16** for Antigravity.
+
+**3.1 Five new pieces** (`js/trackgen.js`, params from derived streams
+`seed::<piece>::<occurrence>` — the selection draw is the only main-rng cost):
+- `corkscrew` — 270-435° constant-radius spiral (rad 22-30), climb OR descend, pitch floored at
+  17 m per loop so one revolution always clears its own entry corridor (the collision grid wants
+  |dY| ≥ 14 — below the floor every corkscrew self-rejected).
+- `bowl` — 140-180° huge-radius carousel, bank 0.5-0.7, `wall:1` = half-pipe rails both sides.
+- `overunder` — climbing return-hook (150-210°, pitch 0.11-0.14): re-crosses its own earlier
+  corridor at dY ≥ 16 where the grid legally allows it. 10/50 matrix tracks now have true
+  pass-overs.
+- `ridge` — crest run; `s.ridge` pulls terrain uplift TIGHT (C1 roadEdge+8, riseMax ×1.4) —
+  canyon-rim feel.
+- `dirtcut` — SURF.DIRT ribbon span (rally sector). Physics: dirt now keyed on SURFACE, not just
+  terrain mode (`js/physics.js`); matte earth overlay strip (`js/scene-core.js`); rumble sfx on
+  ribbon dirt too. `car.onDirt` (off-track warning/respawn semantics) unchanged.
+
+**3.2 Signature recipes** — `mountain_pass` (ridge→corkscrew→bowl), `spaghetti`
+(overunder→banked→overunder), `rally_stage` (dirtcut→crest→dirtcut); the `corkscrew` signature
+uses the real piece now; CAMP-T3 = mountain_pass. **The big fix: signature queues BYPASS the
+sequencing rewrites.** The 180 m special-spacing rule fired off the queue's own previous piece
+and silently rewrote every queued corkscrew/bowl/jumpgap into a sweeper — campaign signatures
+mostly never existed (CAMP-T2 delivered its corkscrew on 1/10 seeds; now 10/10, and gorge/void
+jumpgaps deliver 10/10). Queue pieces also retry once from a shifted position on collision
+downgrade, and every piece gets two fresh same-name rerolls (derived streams give new geometry
+each call).
+
+**3.3 Elevation** — soft y-corridor top 55 → 90 for `vertical`/`speedway` archetypes.
+
+**Migration:** new grammar re-rolls ALL layouts → `SAVE_VER` 2 → 3 (campaign PBs/medals/ghosts
+wiped and re-derived; daily/random keyed by seed, preserved). Suite: `verify_world` grew to 34
+checks (piece presence, crossings, signature delivery ≥8/10 T2 / ≥7/10 T3); apron/shortcut
+machinery adapted to the new grammar (mouth heights now use the chord-side edge on banked
+sweepers, mouths reject foreign deck footprints within 16 m, apron elevation gate 8 → 12 m,
+boost pieces apron-eligible). Full suite green; 0 `buildValidTrack` fallbacks.
+
+---
+
+## Resolved earlier this day — Phase 2 feedback round: Tibba playtest fixes (2026-07-07, session 28)
 
 Tibba playtested session 27's Phase 2 drop. Five findings, all addressed:
 

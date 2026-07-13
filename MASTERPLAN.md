@@ -88,7 +88,7 @@ audible/visible the whole time.
 
 ## PHASE 3 — Track depth, variety, looks
 
-**3.1 New grammar pieces** _(trackgen; each = new rng stream, bot-validated)_
+**3.1 New grammar pieces** _(trackgen; each = new rng stream, bot-validated)_ ✅ **DONE** (session 29 — all five pieces; contract in `tests/verify_world.js [1b]`)
 - `corkscrew` — 270–540° constant-radius climb/descent (pitch ±0.14), pillars auto-spawn.
 - `bowl` — huge-radius 180° with bank 0.5–0.7, half-pipe walls both sides.
 - `overunder` — mid-track piece that aims back across an earlier segment with Y-sep ≥ 16, then rejoins heading. The collision grid already permits it; add a "seek crossing" bias instead of avoidance. Bridge moment + pillars + underpass lighting = instant drama.
@@ -96,13 +96,13 @@ audible/visible the whole time.
 - `dirtcut` — ribbon span with `SURF.DIRT` (physics already complete) for rally sectors.
 - Weights: sprinkle into archetypes (vertical gets corkscrew/overunder, drift gets bowl, rhythm gets ridge).
 
-**3.2 Signature recipes** _(trackgen — small once 3.1 lands)_
+**3.2 Signature recipes** _(trackgen — small once 3.1 lands)_ ✅ **DONE** (session 29 — incl. the signature-bypass fix: queue pieces no longer silently rewritten to sweepers; CAMP-T2 delivers 10/10)
 - Add `mountain_pass` (ridge→corkscrew→bowl), `spaghetti` (overunder→banked→overunder), `rally_stage` (dirtcut→crest→dirtcut). Keeps the 1-signature-per-track system, triples the memorable moments.
 
-**3.3 Elevation ambition** _(trackgen)_
+**3.3 Elevation ambition** _(trackgen)_ ✅ **DONE** (session 29 — y-corridor 2..90 for vertical/speedway; TERRAIN_RISE scaling deferred until tracks actually reach the new ceiling)
 - Widen the soft y-corridor (2..55 → 2..90) for `vertical`/`speedway`; scale support pillars + `TERRAIN_RISE` accordingly. Tracks should earn skyline moments.
 
-**3.4 Track dressing** _(scene-decor — delegable)_
+**3.4 Track dressing** _(scene-decor — delegable)_ 🔴 **BRIEFED as A16** (session 29 — Antigravity)
 - Braking boards (100/50) before detected `corners[]`; apex cones; hazard chevron paint on `tighten`; start grid slab + gantry countdown lights; distance-to-finish boards each 25%; checkpoint ring variety per biome. All instanced/merged, decal ladder heights.
 
 ## PHASE 4 — Fun layer + true forks

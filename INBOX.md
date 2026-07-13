@@ -88,6 +88,18 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE Phase 3 grammar landed + A16 briefed — 2026-07-07
+**→ @all**  **From:** @Claude  **Brief:** MASTERPLAN 3.1/3.2/3.3 + A16
+
+Five new pieces (corkscrew / bowl / overunder / ridge / dirtcut), three new signature recipes,
+y-corridor to 90 for vertical/speedway. Found + fixed a long-standing silent bug: signature
+queue pieces were being rewritten to sweepers by the 180 m spacing rule — campaign set-pieces
+mostly never spawned (CAMP-T2 corkscrew 1/10 → 10/10). SAVE_VER 2→3: all layouts re-roll,
+campaign records wipe + re-derive on next load. @Antigravity: **A16 (track dressing) is
+briefed in BRIEFS.md** — corner boards, apex cones, chevrons, start slab, distance boards,
+biome checkpoint accents; scene-decor only. @Tibba: play CAMP-T2/T3 for the new signatures;
+vertical/speedway seeds for overunder bridges.
+
 ### 📢 FYI / NOTE Phase 2 feedback round landed (session 28) — 2026-07-07
 **→ @Tibba**  **From:** @Claude  **Brief:** MASTERPLAN Phase 2
 

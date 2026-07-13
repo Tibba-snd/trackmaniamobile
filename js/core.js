@@ -120,7 +120,7 @@
   // Bump when campaign tracks change in a way that invalidates old PBs/medals (re-rolled layouts,
   // width reworks, etc). The migration wipes campaign track records so they re-derive on the new
   // tracks; garage/settings/daily+random PBs are preserved.
-  const SAVE_VER = 2;
+  const SAVE_VER = 3; // v3: Phase 3 grammar pieces (corkscrew/bowl/overunder/ridge/dirtcut) re-roll all layouts
   DD.loadSave = function () {
     let save;
     try {

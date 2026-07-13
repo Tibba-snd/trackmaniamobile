@@ -1,16 +1,16 @@
-# Graph Report - trackmaniamobile  (2026-07-07)
+# Graph Report - trackmaniamobile  (2026-07-13)
 
 ## Corpus Check
-- 122 files · ~2,617,325 words
+- 122 files · ~2,619,313 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4008 nodes · 6966 edges · 272 communities (141 shown, 131 thin omitted)
+- 4008 nodes · 6966 edges · 279 communities (150 shown, 129 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 136 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `be6f627c`
+- Built from commit: `49e9321a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,7 +34,6 @@
 - [[_COMMUNITY_St|St]]
 - [[_COMMUNITY_.setAttribute|.setAttribute]]
 - [[_COMMUNITY_i|i]]
-- [[_COMMUNITY_.subVectors|.subVectors]]
 - [[_COMMUNITY_tn|tn]]
 - [[_COMMUNITY_.setAttribute|.setAttribute]]
 - [[_COMMUNITY_bl|bl]]
@@ -60,6 +59,7 @@
 - [[_COMMUNITY_no|no]]
 - [[_COMMUNITY_jc|jc]]
 - [[_COMMUNITY_Ce|Ce]]
+- [[_COMMUNITY_scene-car.js|scene-car.js]]
 - [[_COMMUNITY_What You Must Do When Invoked|What You Must Do When Invoked]]
 - [[_COMMUNITY_update|update]]
 - [[_COMMUNITY_scene-decor.js|scene-decor.js]]
@@ -164,15 +164,12 @@
 - [[_COMMUNITY_DRIFTDREAM — Android APK build|DRIFTDREAM — Android APK build]]
 - [[_COMMUNITY_ClearMaskPass|ClearMaskPass]]
 - [[_COMMUNITY_cl|cl]]
-- [[_COMMUNITY_.count|.count]]
 - [[_COMMUNITY_bt|bt]]
 - [[_COMMUNITY_.constructor|.constructor]]
-- [[_COMMUNITY_buildGarageMenu|buildGarageMenu]]
 - [[_COMMUNITY_ca|ca]]
 - [[_COMMUNITY_physics.js|physics.js]]
 - [[_COMMUNITY_DRIFTDREAM Testing and Determinism|DRIFTDREAM Testing and Determinism]]
 - [[_COMMUNITY_graphify reference query, path, explain|graphify reference: query, path, explain]]
-- [[_COMMUNITY_seedKey|seedKey]]
 - [[_COMMUNITY_el|el]]
 - [[_COMMUNITY_addLightSource|addLightSource]]
 - [[_COMMUNITY_Division of labor — Claude (orchestrator) × Antigravity (implementer)|Division of labor — Claude (orchestrator) × Antigravity (implementer)]]
@@ -250,16 +247,22 @@
 - [[_COMMUNITY_rh|rh]]
 - [[_COMMUNITY_Resolved this pass — HUD checkup fixes (2026-06-24, session 8)|Resolved this pass — HUD checkup fixes (2026-06-24, session 8)]]
 - [[_COMMUNITY_Division of labor — Claude (orchestrator) × Antigravity (implementer)|Division of labor — Claude (orchestrator) × Antigravity (implementer)]]
-- [[_COMMUNITY_pl|pl]]
 - [[_COMMUNITY_ic|ic]]
 - [[_COMMUNITY_How to use it|How to use it]]
 - [[_COMMUNITY_.applyMatrix3|.applyMatrix3]]
 - [[_COMMUNITY_scene-fx.js|scene-fx.js]]
 - [[_COMMUNITY_.constructor|.constructor]]
 - [[_COMMUNITY_Ll|Ll]]
-- [[_COMMUNITY_jo|jo]]
-- [[_COMMUNITY_Wl|Wl]]
+- [[_COMMUNITY_Ba|Ba]]
+- [[_COMMUNITY_cn|cn]]
 - [[_COMMUNITY_DRIFTDREAM — Antigravity Briefs (BRIEFS.md)|DRIFTDREAM — Antigravity Briefs (BRIEFS.md)]]
+- [[_COMMUNITY_gs|gs]]
+- [[_COMMUNITY_$l|$l]]
+- [[_COMMUNITY_li|li]]
+- [[_COMMUNITY_pn|pn]]
+- [[_COMMUNITY_Ql|Ql]]
+- [[_COMMUNITY_Ra|Ra]]
+- [[_COMMUNITY_sh|sh]]
 - [[_COMMUNITY_.count|.count]]
 
 ## God Nodes (most connected - your core abstractions)
@@ -289,55 +292,71 @@
 ## Import Cycles
 - None detected.
 
-## Communities (272 total, 131 thin omitted)
+## Communities (279 total, 129 thin omitted)
 
 ### Community 0 - "three.min.js"
-Cohesion: 0.02
-Nodes (42): an, Ba, br(), bs, cn, dn, er(), fs (+34 more)
+Cohesion: 0.03
+Nodes (41): br(), bs, compileCubemapShader(), compileEquirectangularShader(), _compileMaterial(), Da, dn, er() (+33 more)
 
 ### Community 1 - "three.min.js"
 Cohesion: 0.02
-Nodes (35): an, Ba, br(), bs, cn, compileCubemapShader(), compileEquirectangularShader(), _compileMaterial() (+27 more)
+Nodes (42): an, Ba, br(), bs, cn, compileCubemapShader(), compileEquirectangularShader(), _compileMaterial() (+34 more)
 
 ### Community 2 - ".multiplyScalar"
 Cohesion: 0.06
-Nodes (13): bo, constructor(), en, ht(), Mh, pi(), setDirection(), Si() (+5 more)
+Nodes (10): as(), en, fi(), Mh, pi(), setFromCamera(), Si(), ti (+2 more)
+
+### Community 3 - "pt"
+Cohesion: 0.05
+Nodes (3): eh, pt(), updateMatrixWorld()
+
+### Community 4 - "copy"
+Cohesion: 0.08
+Nodes (3): ec, je, jn()
 
 ### Community 5 - "Ce"
-Cohesion: 0.08
-Nodes (5): Ea(), hh, jn(), _s(), updateMatrixWorld()
+Cohesion: 0.11
+Nodes (5): bo, constructor(), ht(), setDirection(), yn()
+
+### Community 6 - "sn"
+Cohesion: 0.06
+Nodes (3): Ga, ls(), sn
+
+### Community 7 - "pt"
+Cohesion: 0.05
+Nodes (4): eh, Mh, pt(), updateMatrixWorld()
 
 ### Community 9 - "At"
-Cohesion: 0.10
-Nodes (3): At, buildWheels(), makePieces()
+Cohesion: 0.06
+Nodes (5): At, fe, ps(), buildWheels(), makePieces()
 
 ### Community 12 - "DRIFTDREAM — Car (design system · engine contract · physics)"
 Cohesion: 0.04
 Nodes (44): 10. File touchpoints, 1.5 How players edit a part (the editing model), 1. The three layers (all JSON-serializable, all deterministic), 2. The renderer — `DD.buildCarFromSpec(spec, ctx)`, 3. Materials — slots, so garage paint still works, 4. `normalizeSpec(spec)` — the guardrail, 5. Contact shadow — spec-driven (kills the last hardcode), 6. Persistence & sharing (Phase 3) (+36 more)
 
-### Community 17 - ".setAttribute"
-Cohesion: 0.12
-Nodes (5): _s(), Si(), ti, updateMatrixWorld(), Yl
+### Community 13 - "se"
+Cohesion: 0.05
+Nodes (3): ia, parseTextures(), se
 
 ### Community 18 - "i"
-Cohesion: 0.08
-Nodes (13): hl, i(), load(), oc, ol, parse(), parseAnimations(), parseImages() (+5 more)
+Cohesion: 0.11
+Nodes (10): load(), oc, ol, parse(), parseAnimations(), parseImages(), rc, setTexturePath() (+2 more)
 
 ### Community 20 - "tn"
 Cohesion: 0.08
 Nodes (5): dt(), $e(), Qe(), tn, ut()
 
 ### Community 21 - ".setAttribute"
-Cohesion: 0.06
-Nodes (14): Ah, bo, ci, Da, gn(), ht(), mo(), Pa (+6 more)
+Cohesion: 0.05
+Nodes (6): as(), ht(), je, re, rh, Vs
 
-### Community 22 - "bl"
-Cohesion: 0.11
-Nodes (9): fi(), hh, Mh, ni, pi(), update(), wh(), Xn() (+1 more)
+### Community 23 - ".applyMatrix4"
+Cohesion: 0.16
+Nodes (4): gi(), mi(), parseObject(), ys
 
 ### Community 24 - "i"
-Cohesion: 0.26
-Nodes (8): appendPiece(), buildTerrainData(), collides(), commit(), decorate(), integratePiece(), noise2(), valueNoise()
+Cohesion: 0.07
+Nodes (14): bl, dc, mc(), pc, appendPiece(), buildTerrainData(), collides(), commit() (+6 more)
 
 ### Community 25 - "Lc"
 Cohesion: 0.08
@@ -356,12 +375,12 @@ Cohesion: 0.18
 Nodes (3): jo, wo, xo
 
 ### Community 29 - "tn"
-Cohesion: 0.08
-Nodes (5): dt(), $e(), Qe(), tn, ut()
+Cohesion: 0.07
+Nodes (6): dt(), $e(), Ke(), Qe(), tn, ut()
 
 ### Community 30 - "game.js"
-Cohesion: 0.10
-Nodes (33): applyCssTheme(), buildCampaignMenu(), buildGarageMenu(), decodeGhost(), dialInText(), drawTrackMiniMap(), encodeGhost(), ensureTilt() (+25 more)
+Cohesion: 0.17
+Nodes (12): applyCssTheme(), ensureTilt(), isTouch(), loop(), resetRun(), showScreen(), startReplay(), startTrack() (+4 more)
 
 ### Community 31 - "game.js"
 Cohesion: 0.09
@@ -371,97 +390,117 @@ Nodes (36): applyBloom(), applyCssTheme(), applySpeedBlur(), buildCampaignMenu()
 Cohesion: 0.18
 Nodes (13): CHROME_PATHS, connectToChrome(), features, fs, getCompareExpression(), getWebSocketDebuggerUrl(), http, main() (+5 more)
 
+### Community 34 - ".applyMatrix4"
+Cohesion: 0.09
+Nodes (4): Ea(), ls(), setFromCamera(), wh()
+
+### Community 37 - "updateMatrixWorld"
+Cohesion: 0.14
+Nodes (11): er(), Hi(), ji(), ki(), ni, qi(), tr(), vi() (+3 more)
+
 ### Community 38 - "no"
-Cohesion: 0.10
+Cohesion: 0.11
 Nodes (18): ao(), co(), eo(), ho(), io(), ja(), ka(), lo() (+10 more)
 
 ### Community 39 - ".dot"
-Cohesion: 0.11
-Nodes (5): Ea(), fa, Ga, ta, Wn
+Cohesion: 0.17
+Nodes (3): fa, ta, Wn
+
+### Community 40 - ".fromArray"
+Cohesion: 0.06
+Nodes (5): Ce, parseObject(), qn, _s(), Wl
 
 ### Community 42 - "no"
 Cohesion: 0.11
 Nodes (18): ao(), co(), eo(), ho(), io(), ja(), ka(), lo() (+10 more)
 
 ### Community 43 - "jc"
-Cohesion: 0.12
-Nodes (4): cl, parseGeometries(), parseShapes(), pl
+Cohesion: 0.06
+Nodes (7): cl, dl, fl, parseGeometries(), parseShapes(), pl, Rl
+
+### Community 44 - "Ce"
+Cohesion: 0.15
+Nodes (3): ds(), ge, ps()
 
 ### Community 46 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
 ### Community 48 - "scene-decor.js"
-Cohesion: 0.10
-Nodes (5): buildAurora(), buildTerrain(), getAuroraTexture(), noise2(), valueNoise()
+Cohesion: 0.09
+Nodes (6): buildAurora(), buildDecor(), buildTerrain(), getAuroraTexture(), noise2(), valueNoise()
 
 ### Community 50 - "scene-decor.js"
-Cohesion: 0.09
-Nodes (9): buildAprons(), buildAurora(), buildGodrays(), buildRoadBody(), buildStrip(), buildTerrain(), getAuroraTexture(), noise2() (+1 more)
+Cohesion: 0.08
+Nodes (15): addLightSource(), buildAprons(), buildAurora(), buildBoostPads(), buildEmissiveElements(), buildGodrays(), buildLightPoles(), buildNeonArches() (+7 more)
 
 ### Community 52 - "DRIFTDREAM — Status & Known Issues"
 Cohesion: 0.07
-Nodes (29): Car: tried glTF model, reverted to patched loft (2026-06-25, session 12), DRIFTDREAM — Status & Known Issues, Gotchas for whoever continues, Resolved earlier this day — Phase 1 physics: powerslide rework + impulse walls + grounding rules (2026-07-07, session 26), Resolved earlier this day — Phase 2 world: re-entry aprons, dirt shortcuts, kerb feedback, fake forks (2026-07-07, session 27), Resolved this pass — A1 theme knobs landed (Antigravity impl, Claude review + fixes) (2026-07-02, session 19), Resolved this pass — A2/A3/A4/A6 landed (Antigravity impl, Claude review + 2 crash fixes); A5 NOT done (2026-07-03, session 21), Resolved this pass — A5/A7/A8/A9/A10 reviewed & verified (2026-07-03, session 23) (+21 more)
+Nodes (30): Car: tried glTF model, reverted to patched loft (2026-06-25, session 12), DRIFTDREAM — Status & Known Issues, Gotchas for whoever continues, Resolved earlier this day — Phase 1 physics: powerslide rework + impulse walls + grounding rules (2026-07-07, session 26), Resolved earlier this day — Phase 2 feedback round: Tibba playtest fixes (2026-07-07, session 28), Resolved earlier this day — Phase 2 world: re-entry aprons, dirt shortcuts, kerb feedback, fake forks (2026-07-07, session 27), Resolved this pass — A1 theme knobs landed (Antigravity impl, Claude review + fixes) (2026-07-02, session 19), Resolved this pass — A2/A3/A4/A6 landed (Antigravity impl, Claude review + 2 crash fixes); A5 NOT done (2026-07-03, session 21) (+22 more)
+
+### Community 54 - ".toJSON"
+Cohesion: 0.15
+Nodes (4): dispose(), ft(), Tt, ws()
 
 ### Community 56 - ".updateProjectionMatrix"
-Cohesion: 0.14
+Cohesion: 0.12
 Nodes (3): Jl, Kn, vl()
 
 ### Community 59 - "EffectComposer"
 Cohesion: 0.13
 Nodes (3): EffectComposer, FullScreenQuad, Pass
 
-### Community 60 - ".constructor"
-Cohesion: 0.04
-Nodes (9): Ce, dispose(), ft(), parseObject(), qn, Tt, ws(), xs (+1 more)
-
 ### Community 62 - "EffectComposer"
 Cohesion: 0.13
 Nodes (3): EffectComposer, FullScreenQuad, Pass
-
-### Community 63 - "At"
-Cohesion: 0.05
-Nodes (7): At, ds(), fe, gi(), mi(), ps(), makePieces()
 
 ### Community 67 - ".updateProjectionMatrix"
 Cohesion: 0.12
 Nodes (3): Jl, Kn, vl()
 
+### Community 68 - ".setFromMatrixPosition"
+Cohesion: 0.06
+Nodes (8): ai, copy(), Ea(), fa, ta, Vs, Wn, xs
+
 ### Community 71 - "_fromTexture"
-Cohesion: 0.16
-Nodes (15): _allocateTargets(), _applyPMREM(), _blur(), _cleanup(), fromCubemap(), fromEquirectangular(), fromScene(), _fromTexture() (+7 more)
+Cohesion: 0.22
+Nodes (13): _allocateTargets(), _applyPMREM(), _blur(), _cleanup(), fromCubemap(), fromEquirectangular(), fromScene(), _fromTexture() (+5 more)
 
 ### Community 72 - "rh"
-Cohesion: 0.13
-Nodes (8): $c(), ge, intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
+Cohesion: 0.22
+Nodes (7): $c(), intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
 
 ### Community 73 - "re"
 Cohesion: 0.12
 Nodes (16): Build path (`js/scene-car.js` `buildHull`), Camera tween (the headline interaction), Data model, Definition of done, G-CROSS — Cross-Section Editor Mode (Garage P2 deep slice), Goal, Handle projection, Implementation surface (delegable brief) (+8 more)
 
 ### Community 76 - "ge"
-Cohesion: 0.13
-Nodes (4): ac, fh, oi(), tc
+Cohesion: 0.11
+Nodes (5): ac, fh, go, oi(), tc
 
 ### Community 77 - "DRIFTDREAM — Game Design Prompt"
 Cohesion: 0.12
 Nodes (15): 10. Scope Guardrails (v1), 11. Definition of Done (v1), 1. Core Fantasy, 2. Pillars, 3. Tech Stack, 4. Physics (the heart), 5. Track Generation, 6. Visual Style — "Dreamstate Minimal" (+7 more)
 
 ### Community 78 - "ds"
-Cohesion: 0.29
-Nodes (5): bind(), bindSkeletons(), getValue(), parseSkeletons(), setValue()
+Cohesion: 0.26
+Nodes (8): appendPiece(), buildTerrainData(), collides(), commit(), decorate(), integratePiece(), noise2(), valueNoise()
 
 ### Community 80 - ".multiplyScalar"
-Cohesion: 0.11
-Nodes (5): ai, copy(), parseObject(), sc, Vs
+Cohesion: 0.06
+Nodes (10): clone(), copy(), ec, jn(), kl, pi(), _sceneToCubeUV(), us() (+2 more)
+
+### Community 81 - "Hi"
+Cohesion: 0.18
+Nodes (3): jo, wo, xo
 
 ### Community 82 - "verify_m2_features.js"
 Cohesion: 0.13
 Nodes (12): canopyMesh, carbonMesh, carGroup, fs, garage, mockScene, path, shadow (+4 more)
 
 ### Community 84 - "ct"
-Cohesion: 0.11
-Nodes (3): dl, la, parseTextures()
+Cohesion: 0.10
+Nodes (5): cl, dl, parseGeometries(), parseShapes(), pl
 
 ### Community 85 - "scene-core.js"
 Cohesion: 0.15
@@ -476,8 +515,8 @@ Cohesion: 0.18
 Nodes (3): ct(), es(), Xe()
 
 ### Community 88 - ".fromJSON"
-Cohesion: 0.07
-Nodes (5): ac, Al, go, sc, tc
+Cohesion: 0.06
+Nodes (8): ac, Al, fh, go, oi(), sc, tc, ts()
 
 ### Community 89 - "scene-core.js"
 Cohesion: 0.14
@@ -495,13 +534,9 @@ Nodes (12): 0. What changed since you last saw the project, 1. The two-agent mod
 Cohesion: 0.13
 Nodes (19): _allocateTargets(), _applyPMREM(), _blur(), _cleanup(), fromCubemap(), fromEquirectangular(), fromScene(), _fromTexture() (+11 more)
 
-### Community 94 - "._onChangeCallback"
-Cohesion: 0.14
-Nodes (3): fh, la, oi()
-
 ### Community 96 - "ml"
-Cohesion: 0.12
-Nodes (6): dispose(), ft(), gi(), mi(), Tt, ws()
+Cohesion: 0.06
+Nodes (18): constructor(), dispose(), ft(), gi(), $h(), i(), Kh(), mi() (+10 more)
 
 ### Community 98 - "dd.js"
 Cohesion: 0.17
@@ -512,12 +547,12 @@ Cohesion: 0.13
 Nodes (14): Accent color binding, Antigravity brief — received + locked, Art direction — LOCKED (antigravity brief 2026-07-05), Back-and-forth loop with antigravity (post-build polish), Backdrop, Camera, Definition of done (post-build), Environment map (reflections) (+6 more)
 
 ### Community 101 - "trackgen.js"
-Cohesion: 0.12
-Nodes (8): $c(), ge, intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
+Cohesion: 0.22
+Nodes (7): $c(), intersectObject(), intersectObjects(), Kc(), mt(), sl, _t
 
 ### Community 102 - "constructor"
-Cohesion: 0.21
-Nodes (3): dc, mc(), pc
+Cohesion: 0.22
+Nodes (10): decodeGhost(), dialInText(), encodeGhost(), finishRun(), medalFor(), precomputeGhostTimes(), pruneGhosts(), updateActiveGhost() (+2 more)
 
 ### Community 103 - "us"
 Cohesion: 0.33
@@ -536,12 +571,12 @@ Cohesion: 0.20
 Nodes (9): 1. Timestep and Simulation, 2. Vehicle Model (Two-axle Slip Model), 3. Gearbox and Engine RPM, 4. Surfaces (`DD.SURF`), 5. Headless Bot & Medals, DRIFTDREAM Vehicle Physics and AI Bot, File Map, Rules & Gotchas (+1 more)
 
 ### Community 108 - "zl"
-Cohesion: 0.11
-Nodes (4): bt, ct(), es(), Xe()
+Cohesion: 0.05
+Nodes (7): bt, ct(), es(), qc, ts(), Xe(), ys
 
 ### Community 109 - "verify_carspec.js"
-Cohesion: 0.09
-Nodes (22): badK, cd, clampedRing, clampPts, def, designs, eq(), foreignCode (+14 more)
+Cohesion: 0.08
+Nodes (23): badK, cd, clampedRing, clampPts, def, designs, eq(), foreignCode (+15 more)
 
 ### Community 110 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -551,21 +586,21 @@ Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only
 Cohesion: 0.22
 Nodes (9): 0. Who's who (don't get this wrong), 1. What the project is, 2. File map (what lives where, what you may touch), 3. Hard rules (these are non-negotiable), 4. Definition of Done — every brief, no exceptions, 5. How to read a brief, 6. Your first action, every drop, 7. Talking to the team — `INBOX.md` (+1 more)
 
-### Community 113 - "la"
-Cohesion: 0.07
-Nodes (3): ec, je, jn()
+### Community 112 - "mo"
+Cohesion: 0.25
+Nodes (3): fo(), mo(), po
 
 ### Community 114 - "qc"
 Cohesion: 0.22
 Nodes (8): Build path, Data model (CAR.md §1.5), Decision, G-LATTICE — Lattice Warp Deformer (advanced authoring, lowest priority), Goal, Implementation surface (deferred), Risks, Why lowest priority
 
 ### Community 115 - "DRIFTDREAM"
-Cohesion: 0.22
+Cohesion: 0.33
 Nodes (6): Controls, DRIFTDREAM, Game modes & progression, Repository layout, Run it, Tests
 
 ### Community 116 - "OPPORTUNISTIC BRIEFS (improve the game bit-by-bit; pick up when C4 is blocked or interleaved)"
-Cohesion: 0.18
-Nodes (9): KNOWLEDGE BASE, A11 — Impact audio fix  🟢 LANDED (session 24), A12 — Campaign flow fixes + track caching  🟢 LANDED (session 24), A13 — Campaign UI rebuild + gamification  🟢 LANDED (session 24), A14 — Campaign polish + progression feel  🟢 LANDED (session 24, folded into A13), A15 — Road-decal height ladder (z-fight elimination)  🟢 LANDED (drop reviewed clean + committed by Claude, session 27 — `DD.DECAL` in core.js, polygonOffset on NormalBlending decals, ?v= bumped), C4 BRIEFS (balance/audio/campaign) — all 🟢 LANDED session 24, kept for reference, DEFERRED / PARKED (do NOT pick up without explicit Tibba sign-off) (+1 more)
+Cohesion: 0.22
+Nodes (7): KNOWLEDGE BASE, DEFERRED / PARKED (do NOT pick up without explicit Tibba sign-off), DRIFTDREAM — Antigravity Briefs (BRIEFS.md), FIELD NOTES (hard-won from review cycles — READ BEFORE EVERY DROP), HARD INVARIANTS (nobody crosses without a Claude-reviewed design note), LANDED (reference — don't redo), PROTOCOL (re-read every drop)
 
 ### Community 117 - "verify_sky_stars.js"
 Cohesion: 0.24
@@ -580,8 +615,8 @@ Cohesion: 0.25
 Nodes (3): fo(), mo(), po
 
 ### Community 120 - "zl"
-Cohesion: 0.10
-Nodes (17): er(), Hi(), ji(), Jr(), ki(), kr(), ni, nr() (+9 more)
+Cohesion: 0.22
+Nodes (5): Antigravity briefs, Claude-owned (hard problems, architecture, judgment), Division of labor — Claude (orchestrator) × Antigravity (implementer), Field notes for Antigravity (accumulated from review cycles — READ BEFORE EVERY DROP), Working protocol (both agents + Tibba)
 
 ### Community 121 - "qc"
 Cohesion: 0.22
@@ -591,9 +626,9 @@ Nodes (8): Boundaries, Intensity, Output, Persistence, Ponytail, Rules, The ladd
 Cohesion: 0.25
 Nodes (7): 1. Piece Grammar & Pacing, 2. Occupancy Grid, 3. Terrain Basin, DRIFTDREAM Track and Terrain Generation, File Map, Rules & Gotchas, Technical Details
 
-### Community 125 - "._update"
-Cohesion: 0.06
-Nodes (6): ai, as(), copy(), ec, Ne, setFromCamera()
+### Community 124 - "qc"
+Cohesion: 0.25
+Nodes (5): bind(), bindSkeletons(), getValue(), parseSkeletons(), setValue()
 
 ### Community 128 - "DRIFTDREAM car"
 Cohesion: 0.25
@@ -619,29 +654,29 @@ Nodes (9): O1 — E2E golden re-baseline  🟢 LANDED (session 24), O2 — Perfo
 Cohesion: 0.15
 Nodes (7): makeCarMaterials(), getAsphaltNormalTexture(), getAsphaltRoughnessTexture(), getCarbonTexture(), getNebulaTexture(), buildNebulae(), buildRibbon()
 
+### Community 135 - "._update"
+Cohesion: 0.36
+Nodes (7): buildCampaignMenu(), drawTrackMiniMap(), formatTimeAgo(), seedKey(), selectCampaignTrack(), tierMedalCount(), tierUnlocked()
+
 ### Community 136 - "la"
 Cohesion: 0.22
 Nodes (9): T1 — Widen all tracks (Claude-owned, physics-adjacent)  🟢 LANDED (session 24), T2 — Boost pad visuals  🟢 LANDED (session 24), T3 — Dedicated start line + finish gantry  🟢 LANDED (session 24, integrated into buildGates), T4 — Checkpoint rework  🟢 LANDED (session 24, integrated into buildGates), T5 — Tunnels  🟢 LANDED (session 24), T6 — Big ramp jumps  🟢 LANDED (session 24), T7 — Vertical loops (the big one — Claude specs, then delegable)  🔴, T8 — Wallride rework  🟢 LANDED (session 24, banking in trackgen) (+1 more)
 
 ### Community 137 - ".crossFadeFrom"
 Cohesion: 0.18
-Nodes (11): 🚫 BLOCKER, 🚫 BLOCKER A12 track cache key collision — 2026-07-05, DRIFTDREAM — INBOX (async message channel between team members), 🟠 FLAG, 📢 FYI / NOTE, 📢 FYI / NOTE A15 landed + masterplan Phase 2 complete — 2026-07-07, 📢 FYI / NOTE Integration of ponytail and caveman skills — 2026-07-05, 📢 FYI / NOTE Phase 2 feedback round landed (session 28) — 2026-07-07 (+3 more)
+Nodes (11): 🚫 BLOCKER, 🚫 BLOCKER A12 track cache key collision — 2026-07-05, DRIFTDREAM — INBOX (async message channel between team members), 🟠 FLAG, How to use it, Lifecycle, Message format, 👀 NEEDS EYES (+3 more)
 
 ### Community 139 - "DRIFTDREAM — Developer Agent Guidelines"
-Cohesion: 0.20
-Nodes (9): 0. Graphify-First Navigation (do this before any code task), 0b. Ponytail — Lazy / YAGNI (on every coding task), 0c. Caveman — Ultra-Terse Replies (on every response), 1. Architectural Integrity (Three-free Split), 2. Strict Determinism, 3. WebGL & Rendering Constraints, 4. Mobile & WebView Compatibility, 5. Performance Optimizations (+1 more)
+Cohesion: 0.29
+Nodes (6): 1. Architectural Integrity (Three-free Split), 2. Strict Determinism, 3. WebGL & Rendering Constraints, 4. Mobile & WebView Compatibility, 5. Performance Optimizations, DRIFTDREAM — Developer Agent Guidelines
 
 ### Community 140 - "DRIFTDREAM HUD and UI System"
 Cohesion: 0.29
 Nodes (6): 1. HUD Animations and Visual Cues, 2. Input Modes, DRIFTDREAM HUD and UI System, File Map, Rules & Gotchas, Technical Details
 
 ### Community 142 - "finishRun"
-Cohesion: 0.17
-Nodes (17): hn, boundLabel(), build(), envInfo(), finalizeRec(), fmt(), fmtK(), low1() (+9 more)
-
-### Community 143 - "el"
-Cohesion: 0.09
-Nodes (5): Al, Ll, parseGeometries(), parseShapes(), pl
+Cohesion: 0.11
+Nodes (18): el, hn, boundLabel(), build(), envInfo(), finalizeRec(), fmt(), fmtK() (+10 more)
 
 ### Community 146 - "physics.js"
 Cohesion: 0.38
@@ -655,13 +690,13 @@ Nodes (6): After you edit the game, Details, DRIFTDREAM — Android APK build, I
 Cohesion: 0.40
 Nodes (4): Available Workspace Skills, caveman, ponytail, tool_graphify
 
-### Community 150 - ".count"
-Cohesion: 0.12
-Nodes (4): clone(), kl, ts(), us()
+### Community 151 - "bt"
+Cohesion: 0.08
+Nodes (4): bo, en, Ga, ti
 
-### Community 152 - ".constructor"
-Cohesion: 0.12
-Nodes (10): bl, appendPiece(), buildTerrainData(), collides(), commit(), cscEndpoint(), decorate(), integratePiece() (+2 more)
+### Community 154 - "ca"
+Cohesion: 0.05
+Nodes (3): ai, jt(), Ne
 
 ### Community 155 - "physics.js"
 Cohesion: 0.38
@@ -675,17 +710,17 @@ Nodes (5): Determinism Guidelines, DRIFTDREAM Testing and Determinism, File Map,
 Cohesion: 0.33
 Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
 
-### Community 161 - "Division of labor — Claude (orchestrator) × Antigravity (implementer)"
-Cohesion: 0.17
-Nodes (3): fa, ta, Wn
+### Community 159 - "el"
+Cohesion: 0.29
+Nodes (7): A11 — Impact audio fix  🟢 LANDED (session 24), A12 — Campaign flow fixes + track caching  🟢 LANDED (session 24), A13 — Campaign UI rebuild + gamification  🟢 LANDED (session 24), A14 — Campaign polish + progression feel  🟢 LANDED (session 24, folded into A13), A15 — Road-decal height ladder (z-fight elimination)  🟢 LANDED (drop reviewed clean + committed by Claude, session 27 — `DD.DECAL` in core.js, polygonOffset on NormalBlending decals, ?v= bumped), A16 — Track dressing (MASTERPLAN 3.4, session 29)  🔴 OPEN, C4 BRIEFS (balance/audio/campaign) — all 🟢 LANDED session 24, kept for reference
 
 ### Community 162 - "fl"
-Cohesion: 0.24
-Nodes (10): compileCubemapShader(), compileEquirectangularShader(), _compileMaterial(), constructor(), $h(), Kh(), qh(), setDirection() (+2 more)
+Cohesion: 0.40
+Nodes (4): buildGarageMenu(), updateEditHandles(), updateShowcaseCar(), fn
 
 ### Community 164 - "addLightSource"
-Cohesion: 0.10
-Nodes (5): clone(), kl, ts(), us(), Wl
+Cohesion: 0.16
+Nodes (4): clone(), kl, us(), Xn()
 
 ### Community 165 - "DRIFTDREAM player car system"
 Cohesion: 0.40
@@ -700,8 +735,8 @@ Cohesion: 0.60
 Nodes (3): ExampleInstrumentedTest, Test, RunWith
 
 ### Community 171 - "Ah"
-Cohesion: 0.15
-Nodes (8): bind(), bindSkeletons(), ds(), getValue(), parseSkeletons(), setValue(), uh(), k
+Cohesion: 0.09
+Nodes (10): bind(), bindSkeletons(), ds(), ge, getValue(), hh, parseSkeletons(), setValue() (+2 more)
 
 ### Community 174 - "Known issues & reality gaps"
 Cohesion: 0.40
@@ -736,40 +771,28 @@ Cohesion: 0.33
 Nodes (6): addLightSource(), buildBoostPads(), buildEmissiveElements(), buildLightPoles(), buildNeonArches(), buildTunnels()
 
 ### Community 226 - "fl"
-Cohesion: 0.33
-Nodes (6): addLightSource(), buildBoostPads(), buildEmissiveElements(), buildLightPoles(), buildNeonArches(), buildTunnels()
-
-### Community 260 - "Division of labor — Claude (orchestrator) × Antigravity (implementer)"
-Cohesion: 0.33
-Nodes (5): Antigravity briefs, Claude-owned (hard problems, architecture, judgment), Division of labor — Claude (orchestrator) × Antigravity (implementer), Field notes for Antigravity (accumulated from review cycles — READ BEFORE EVERY DROP), Working protocol (both agents + Tibba)
-
-### Community 263 - "How to use it"
-Cohesion: 0.50
-Nodes (4): How to use it, Lifecycle, Message format, Tags
-
-### Community 270 - "DRIFTDREAM — Antigravity Briefs (BRIEFS.md)"
-Cohesion: 0.50
-Nodes (4): DRIFTDREAM — Antigravity Briefs (BRIEFS.md), FIELD NOTES (hard-won from review cycles — READ BEFORE EVERY DROP), HARD INVARIANTS (nobody crosses without a Claude-reviewed design note), PROTOCOL (re-read every drop)
+Cohesion: 0.40
+Nodes (5): 📢 FYI / NOTE, 📢 FYI / NOTE A15 landed + masterplan Phase 2 complete — 2026-07-07, 📢 FYI / NOTE Integration of ponytail and caveman skills — 2026-07-05, 📢 FYI / NOTE Phase 2 feedback round landed (session 28) — 2026-07-07, 📢 FYI / NOTE Phase 3 grammar landed + A16 briefed — 2026-07-07
 
 ## Knowledge Gaps
 - **428 isolated node(s):** `bs`, `tl`, `name`, `version`, `description` (+423 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **131 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **129 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `k` connect `Ah` to `ml`, `.constructor`, `verify_carspec.js`, `At`?**
+- **Why does `k` connect `Ah` to `ml`, `Ce`, `verify_carspec.js`, `.toJSON`?**
   _High betweenness centrality (0.209) - this node is a cross-community bridge._
-- **Why does `ws()` connect `ml` to `three.min.js`, `pl`, `pt`, `At`, `.setAttribute`, `i`, `.subVectors`, `.setAttribute`, `bl`, `tn`, `seedKey`, `copy`, `.dot`, `Ah`, `update`, `xc`, `yo`, `rh`, `.multiplyScalar`, `zl`?**
+- **Why does `ws()` connect `ml` to `three.min.js`, `.applyMatrix4`, `yo`, `pt`, `rh`, `At`, `Ah`, `zl`, `se`, `update`, `.multiplyScalar`, `.setAttribute`, `xc`, `bt`?**
   _High betweenness centrality (0.130) - this node is a cross-community bridge._
-- **Why does `ws()` connect `.constructor` to `addLightSource`, `three.min.js`, `.multiplyScalar`, `pt`, `nc`, `trackgen.js`, `bt`, `Ce`, `yo`, `Ah`, `ds`, `.toJSON`, `zl`, `xc`, `parse`, `._update`, `At`?**
+- **Why does `ws()` connect `.toJSON` to `three.min.js`, `.multiplyScalar`, `pt`, `Ce`, `bt`, `bl`, `.applyMatrix4`, `buildGarageMenu`, `parse`, `addLightSource`, `Division of labor — Claude (orchestrator) × Antigravity (implementer)`, `Rl`, `updateMatrixWorld`, `Ah`, `Ce`, `xc`, `At`, `.setFromMatrixPosition`, `yo`, `trackgen.js`, `qc`?**
   _High betweenness centrality (0.120) - this node is a cross-community bridge._
 - **What connects `bs`, `tl`, `name` to the rest of the system?**
   _428 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `three.min.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.022653721682847898 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.026039178213091256 - nodes in this community are weakly interconnected._
 - **Should `three.min.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.022420498741706704 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.021511517228250523 - nodes in this community are weakly interconnected._
 - **Should `.multiplyScalar` be split into smaller, more focused modules?**
-  _Cohesion score 0.06041986687147977 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05660377358490566 - nodes in this community are weakly interconnected._

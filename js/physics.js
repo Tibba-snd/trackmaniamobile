@@ -330,7 +330,9 @@
     const sv = DD.clamp(speed / P.vmax, 0, 1);
     const glass = gf.surf === DD.SURF.GLASS;
     const boost = gf.surf === DD.SURF.BOOST;
-    const dirt = gf.mode === 'dirt';
+    // dirt physics on terrain AND on dirtcut ribbon spans (3.1) — surface, not just mode.
+    // car.onDirt stays mode-based (off-track warning/respawn semantics unchanged).
+    const dirt = gf.mode === 'dirt' || gf.surf === DD.SURF.DIRT;
 
     // ---- steering ramp (the "wheel") ----
     const target = DD.clamp(input.steer || 0, -1, 1);

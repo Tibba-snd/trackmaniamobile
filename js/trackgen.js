@@ -13,21 +13,22 @@
   const ARCHETYPES = ['speedway', 'technical', 'rhythm', 'drift', 'vertical', 'mixed'];
 
   const WEIGHTS = {
-    speedway:  { straight: 3.0, sweeper: 2.5, banked: 2.0, boost: 2.0, kicker: 0.6, chicane: 0.5, hairpin: 0.2, glass: 0.4, weave: 0.5, crest: 1.0, wallride: 0.6, dip: 1.0, jumpgap: 0.8, tighten: 0.4 },
-    technical: { straight: 0.8, sweeper: 1.0, banked: 0.6, boost: 0.5, kicker: 0.4, chicane: 2.2, hairpin: 2.0, glass: 1.0, weave: 2.0, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.4 },
-    rhythm:    { straight: 1.0, sweeper: 1.0, banked: 0.8, boost: 1.0, kicker: 2.0, chicane: 0.8, hairpin: 0.4, glass: 0.6, weave: 1.8, crest: 1.8, wallride: 0.6, dip: 1.5, jumpgap: 1.4, tighten: 0.5, bigjump: 0.2 },
-    drift:     { straight: 1.0, sweeper: 2.6, banked: 1.4, boost: 0.8, kicker: 0.4, chicane: 0.8, hairpin: 1.5, glass: 0.8, weave: 1.2, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.2 },
-    vertical:  { straight: 0.8, sweeper: 1.2, banked: 1.4, boost: 1.0, kicker: 1.6, chicane: 0.6, hairpin: 0.5, glass: 0.5, weave: 0.8, crest: 2.0, wallride: 0.8, dip: 2.0, jumpgap: 1.2, tighten: 0.4, bigjump: 0.3 },
-    mixed:     { straight: 1.2, sweeper: 1.2, banked: 1.0, boost: 0.8, kicker: 0.9, chicane: 1.0, hairpin: 0.8, glass: 0.8, weave: 1.0, crest: 1.0, wallride: 0.8, dip: 1.0, jumpgap: 0.7, tighten: 0.7, bigjump: 0.15 }
+    speedway:  { straight: 3.0, sweeper: 2.5, banked: 2.0, boost: 2.0, kicker: 0.6, chicane: 0.5, hairpin: 0.2, glass: 0.4, weave: 0.5, crest: 1.0, wallride: 0.6, dip: 1.0, jumpgap: 0.8, tighten: 0.4, bowl: 0.5, overunder: 0.2 },
+    technical: { straight: 0.8, sweeper: 1.0, banked: 0.6, boost: 0.5, kicker: 0.4, chicane: 2.2, hairpin: 2.0, glass: 1.0, weave: 2.0, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.4, overunder: 0.5, corkscrew: 0.3 },
+    rhythm:    { straight: 1.0, sweeper: 1.0, banked: 0.8, boost: 1.0, kicker: 2.0, chicane: 0.8, hairpin: 0.4, glass: 0.6, weave: 1.8, crest: 1.8, wallride: 0.6, dip: 1.5, jumpgap: 1.4, tighten: 0.5, bigjump: 0.2, ridge: 1.2, dirtcut: 0.6 },
+    drift:     { straight: 1.0, sweeper: 2.6, banked: 1.4, boost: 0.8, kicker: 0.4, chicane: 0.8, hairpin: 1.5, glass: 0.8, weave: 1.2, crest: 0.6, wallride: 1.0, dip: 0.6, jumpgap: 0.3, tighten: 1.2, bowl: 1.2, dirtcut: 0.5, ridge: 0.4 },
+    vertical:  { straight: 0.8, sweeper: 1.2, banked: 1.4, boost: 1.0, kicker: 1.6, chicane: 0.6, hairpin: 0.5, glass: 0.5, weave: 0.8, crest: 2.0, wallride: 0.8, dip: 2.0, jumpgap: 1.2, tighten: 0.4, bigjump: 0.3, corkscrew: 1.2, overunder: 0.8, ridge: 0.5 },
+    mixed:     { straight: 1.2, sweeper: 1.2, banked: 1.0, boost: 0.8, kicker: 0.9, chicane: 1.0, hairpin: 0.8, glass: 0.8, weave: 1.0, crest: 1.0, wallride: 0.8, dip: 1.0, jumpgap: 0.7, tighten: 0.7, bigjump: 0.15, corkscrew: 0.3, bowl: 0.4, overunder: 0.3, ridge: 0.4, dirtcut: 0.35 }
   };
 
   const RAIL_CHANCE = {
     straight: 0.65, sweeper: 0.8, banked: 0.7, boost: 0.7, kicker: 0, chicane: 0.85, hairpin: 0.9,
-    glass: 0.9, weave: 0.8, crest: 0.45, wallride: 1, dip: 0.6, jumpgap: 0, bigjump: 0, tighten: 0.85
+    glass: 0.9, weave: 0.8, crest: 0.45, wallride: 1, dip: 0.6, jumpgap: 0, bigjump: 0, tighten: 0.85,
+    corkscrew: 0.95, bowl: 0, overunder: 0.95, ridge: 0.3, dirtcut: 0 // bowl carries wall:1 itself
   };
 
   // expected corner speeds (m/s) — for braking-straight insertion
-  const CORNER_V = { hairpin: 26, tighten: 30, chicane: 46, weave: 50, wallride: 44, glass: 34 };
+  const CORNER_V = { hairpin: 26, tighten: 30, chicane: 46, weave: 50, wallride: 44, glass: 34, corkscrew: 27, overunder: 32, bowl: 56, dirtcut: 42 };
 
   function makePieces(rng, tier, seedStr) {
     const t01 = (tier - 1) / 4;
@@ -38,6 +39,7 @@
     const wBase = DD.lerp(20, 14, t01);
     const sharp = DD.lerp(0.75, 1.25, t01);
     const wVar = () => wBase * rng.range(0.92, 1.35);
+    let ck3N = 0, bw3N = 0, ou3N = 0, rg3N = 0, dc3N = 0; // phase-3 piece occurrence counters (derived-stream variety)
 
     return {
       straight: () => {
@@ -151,6 +153,62 @@
           const k = Math.floor(d / seg) % 2 === 0 ? dir : -dir;
           return { curv: k / rad, pitchT: 0, bankT: 0, widthT: w };
         } };
+      },
+      /* ---- Phase 3.1 pieces — params from DERIVED streams (seed::name::occurrence), so the
+         piece's internals never consume main-rng draws; the selection draw is the only main
+         cost, same as every other piece. Occurrence counter keeps repeats varied. */
+      corkscrew: () => {
+        const r2 = DD.makeRng(seedStr + '::corkscrew::' + (ck3N++));
+        // tight spiral: loop diameter 48-68 m — mid-track signature placement needs to CLEAR
+        // earlier geometry (delivery rate died at rad 30-42)
+        const dir = r2.sign(), ang = r2.range(4.7, 7.6), rad = r2.range(22, 30) / sharp;
+        const climb = r2.sign();
+        // one full loop MUST clear its own entry corridor (collision grid wants |dY| >= 14):
+        // floor the pitch at 17 m per 2*pi*rad of arc, plus the draw for variety above it
+        const pitch = climb * Math.max(r2.range(0.10, 0.14), 17 / (2 * Math.PI * rad));
+        const bank = dir * r2.range(0.15, 0.3);
+        const len = ang * rad, w = wBase * 1.05;
+        return { name: 'corkscrew', len, fn: () => ({ curv: dir / rad, pitchT: pitch, bankT: bank, widthT: w }) };
+      },
+      bowl: () => {
+        const r2 = DD.makeRng(seedStr + '::bowl::' + (bw3N++));
+        const dir = r2.sign(), ang = r2.range(2.4, 3.14), rad = r2.range(68, 100) / sharp;
+        const bank = dir * r2.range(0.5, 0.7);
+        const len = ang * rad, w = wBase * 1.35;
+        // wall:1 = half-pipe rails both sides (railWall renders both when s.wall)
+        return { name: 'bowl', len, fn: () => ({ curv: dir / rad, pitchT: 0, bankT: bank, widthT: w, wall: 1 }) };
+      },
+      overunder: () => {
+        // climbing return-hook: turns 150-210 deg back across where you came from while gaining
+        // ~16-24 m — the collision grid ALLOWS the re-cross once dY >= 14, so the path legally
+        // bridges its own earlier corridor (probabilistic crossing; a miss is still a dramatic
+        // climbing hook). Exit levels off pointing back-ish; the grammar takes it from there.
+        const r2 = DD.makeRng(seedStr + '::overunder::' + (ou3N++));
+        const dir = r2.sign(), ang = r2.range(2.6, 3.6), rad = r2.range(46, 70) / sharp;
+        const pitch = r2.range(0.11, 0.14);
+        const turnLen = ang * rad, out = 34;
+        const len = turnLen + out, w = wBase * 1.1;
+        return { name: 'overunder', len, fn: (d) => {
+          if (d < turnLen) return { curv: dir / rad, pitchT: pitch, bankT: dir * 0.15, widthT: w };
+          return { curv: 0, pitchT: -0.05, bankT: 0, widthT: w };
+        } };
+      },
+      ridge: () => {
+        const r2 = DD.makeRng(seedStr + '::ridge::' + (rg3N++));
+        const dir = r2.sign(), rad = r2.range(380, 650), len = r2.range(90, 150);
+        const mag = r2.range(0.04, 0.07);
+        const w = wVar() * 0.95;
+        // s.ridge -> terrain uplift pulled TIGHT both sides (canyon-rim feel, see buildTerrainData)
+        return { name: 'ridge', len, fn: (d) => {
+          const t = d / len;
+          return { curv: dir / rad, pitchT: mag * Math.sin(t * Math.PI * 2), bankT: 0, widthT: w, ridge: 1 };
+        } };
+      },
+      dirtcut: () => {
+        const r2 = DD.makeRng(seedStr + '::dirtcut::' + (dc3N++));
+        const curved = r2.chance(0.5), dir = r2.sign(), rad = r2.range(250, 420);
+        const len = r2.range(70, 130), w = wVar() * 1.15;
+        return { name: 'dirtcut', len, fn: () => ({ curv: curved ? dir / rad : 0, pitchT: 0, bankT: 0, widthT: w, surf: DD.SURF.DIRT }) };
       }
     };
   }
@@ -252,13 +310,15 @@
 
         // landform uplift OUTSIDE the racing corridor: fades in from corridor edge (C1) to
         // open terrain (C2); placement driven by a large-feature noise so it reads as hills /
-        // walls / ridges, not a uniform berm ringing the road
+        // walls / ridges, not a uniform berm ringing the road. RIDGE pieces (3.1) pull the
+        // uplift TIGHT against the road and boost it — canyon-rim crest run.
         const roadEdgeN = nearestSample.w / 2 + 1.0;
-        const C1 = roadEdgeN + 26.0, C2 = C1 + 85.0;
+        const onRidge = !!nearestSample.ridge;
+        const C1 = roadEdgeN + (onRidge ? 8.0 : 26.0), C2 = C1 + (onRidge ? 38.0 : 85.0);
         const zoneT = DD.smoothstep(DD.clamp((dist - C1) / (C2 - C1), 0, 1));
         if (zoneT > 0) {
           const rise01 = valueNoise(seed ^ 0x51ab, x / 380, z / 380);
-          let uplift = zoneT * rise01 * riseMax;
+          let uplift = zoneT * rise01 * riseMax * (onRidge ? 1.4 : 1);
           if (theme.biome === 'canyon') {
             // ridged component: sharp mesa/wall crests instead of soft mounds
             const rn = valueNoise(seed ^ 0x77cd, x / 210, z / 210);
@@ -399,6 +459,8 @@
     }
 
     // incremental integration
+    // 3.3 elevation ambition: vertical/speedway earn a taller soft y-corridor (skyline moments)
+    const yTop = (archetype === 'vertical' || archetype === 'speedway') ? 90 : 55;
     let st = { pos: [0, 4, 0], yaw: 0, pitch: 0, bank: 0, width: 12 };
     function integratePiece(piece, st0) {
       const s1 = { pos: V.clone(st0.pos), yaw: st0.yaw, pitch: st0.pitch, bank: st0.bank, width: st0.width };
@@ -415,12 +477,12 @@
         s1.width += ((c.widthT || 12) - s1.width) * k;
         let pitchEff = s1.pitch;
         if (s1.pos[1] < 2) pitchEff += 0.022;
-        if (s1.pos[1] > 55) pitchEff -= 0.022;
+        if (s1.pos[1] > yTop) pitchEff -= 0.022;
         s1.yaw += (c.curv || 0) * DS;
         const cosP = Math.cos(pitchEff);
         const f = [Math.sin(s1.yaw) * cosP, Math.sin(pitchEff), Math.cos(s1.yaw) * cosP];
         s1.pos = V.addS(s1.pos, f, DS);
-        arr.push({ p: V.clone(s1.pos), yaw: s1.yaw, pitch: pitchEff, bank: s1.bank, w: s1.width, surf: c.surf || 0, wall: c.wall ? 1 : (piece.rail && !c.gap ? 1 : 0), gap: c.gap ? 1 : 0, pieceName: piece.name, landing: c.landing ? 1 : 0 });
+        arr.push({ p: V.clone(s1.pos), yaw: s1.yaw, pitch: pitchEff, bank: s1.bank, w: s1.width, surf: c.surf || 0, wall: c.wall ? 1 : (piece.rail && !c.gap ? 1 : 0), gap: c.gap ? 1 : 0, pieceName: piece.name, landing: c.landing ? 1 : 0, ridge: c.ridge ? 1 : 0 });
       }
       return { arr, st: s1 };
     }
@@ -434,7 +496,7 @@
 
     function decorate(p, name) {
       p.rail = rng.chance(RAIL_CHANCE[name] != null ? RAIL_CHANCE[name] : 0.7);
-      if (['straight', 'sweeper', 'weave', 'boost', 'chicane', 'banked'].includes(name) && !p.brakingZone && rng.chance(0.55)) {
+      if (['straight', 'sweeper', 'weave', 'boost', 'chicane', 'banked', 'dirtcut'].includes(name) && !p.brakingZone && rng.chance(0.55)) {
         // gentler + longer-wavelength surface undulation — old amplitude/frequency read as a
         // "weird wiggle" up and down rather than a subtle rolling surface.
         p.bumpA = rng.range(0.008, 0.022) + (tier - 1) * 0.003;
@@ -445,8 +507,10 @@
     }
 
     function appendPiece(piece, name, allowCkpt) {
-      // collision-aware: re-roll up to 3 alternates if this geometry hits existing track
+      // collision-aware: re-roll alternates if this geometry hits existing track — two fresh
+      // same-name rolls first (derived-stream pieces get NEW params each call), then downgrades
       const candidates = [piece];
+      candidates.push(decorate(builders[name](), name));
       candidates.push(decorate(builders[name](), name));
       candidates.push(decorate(builders.straight(), 'straight'));
       candidates.push(decorate(builders.sweeper(), 'sweeper'));
@@ -485,7 +549,10 @@
     let guard = 0;
     let hasSignature = false;
     let forcedQueue = [];
-    const signatures = ['gorge', 'corkscrew', 'ice_slalom'];
+    const sigRetried = {};
+    // 3.2 signature recipes: mountain_pass / spaghetti / rally_stage joined the pool, and the
+    // 'corkscrew' signature now uses the REAL corkscrew piece (was a wallride stand-in)
+    const signatures = ['gorge', 'corkscrew', 'ice_slalom', 'mountain_pass', 'spaghetti', 'rally_stage'];
     let signatureType = signatures[rng.int(0, signatures.length - 1) % signatures.length];
 
     if (seedStr.startsWith('CAMP-')) {
@@ -494,7 +561,7 @@
         const tNum = parseInt(match[1], 10);
         if (tNum === 1) signatureType = 'gorge';
         else if (tNum === 2) signatureType = 'corkscrew';
-        else if (tNum === 3) signatureType = 'gorge';
+        else if (tNum === 3) signatureType = 'mountain_pass';
         else if (tNum === 4) signatureType = 'ice_slalom';
         else if (tNum === 5) signatureType = 'void_extreme';
       }
@@ -507,9 +574,10 @@
         const dHome = Math.hypot(st.pos[0], st.pos[2]);
         if (total + dHome + 320 >= targetLen) break;
       }
-      let name;
+      let name, fromQueue = false;
       if (forcedQueue.length > 0) {
         name = forcedQueue.shift();
+        fromQueue = true;
       } else {
         const progress = total / targetLen;
         if (progress >= 0.4 && !hasSignature) {
@@ -517,11 +585,17 @@
           if (signatureType === 'gorge') {
             forcedQueue = ['boost', 'kicker', 'jumpgap', 'straight'];
           } else if (signatureType === 'corkscrew') {
-            forcedQueue = ['boost', 'wallride', 'banked', 'straight'];
+            forcedQueue = ['boost', 'corkscrew', 'straight'];
           } else if (signatureType === 'ice_slalom') {
             forcedQueue = ['glass', 'chicane', 'weave', 'straight'];
           } else if (signatureType === 'void_extreme') {
             forcedQueue = ['boost', 'wallride', 'boost', 'kicker', 'jumpgap', 'straight'];
+          } else if (signatureType === 'mountain_pass') {
+            forcedQueue = ['ridge', 'corkscrew', 'bowl', 'straight'];
+          } else if (signatureType === 'spaghetti') {
+            forcedQueue = ['overunder', 'banked', 'overunder', 'straight'];
+          } else if (signatureType === 'rally_stage') {
+            forcedQueue = ['dirtcut', 'crest', 'dirtcut', 'straight'];
           }
           name = forcedQueue.shift();
         } else {
@@ -553,10 +627,16 @@
         }
       }
 
-      if (lastName === 'glass' || lastName === 'kicker' || lastName === 'jumpgap' || lastName === 'bigjump') name = 'straight';
-      if (name === lastName && (name === 'hairpin' || name === 'glass' || name === 'kicker' || name === 'boost' || name === 'jumpgap' || name === 'bigjump' || name === 'tighten')) name = 'straight';
-      if ((name === 'glass' || name === 'boost' || name === 'wallride' || name === 'jumpgap' || name === 'bigjump') && total - lastSpecial < 180) name = 'sweeper';
-      if ((lastName === 'crest' || lastName === 'dip') && (name === 'hairpin' || name === 'tighten')) name = 'sweeper';
+      // sequencing rewrites apply to WEIGHTED draws only — signature queue pieces are the
+      // designed sequence and bypass them (the spacing rule was silently rewriting every
+      // queued corkscrew/bowl/jumpgap to a sweeper because the previous queue piece had just
+      // set lastSpecial). Collision downgrade still guards queue pieces.
+      if (!fromQueue) {
+        if (lastName === 'glass' || lastName === 'kicker' || lastName === 'jumpgap' || lastName === 'bigjump' || lastName === 'corkscrew' || lastName === 'overunder') name = 'straight';
+        if (name === lastName && (name === 'hairpin' || name === 'glass' || name === 'kicker' || name === 'boost' || name === 'jumpgap' || name === 'bigjump' || name === 'tighten' || name === 'corkscrew' || name === 'overunder' || name === 'bowl' || name === 'dirtcut')) name = 'straight';
+        if ((name === 'glass' || name === 'boost' || name === 'wallride' || name === 'jumpgap' || name === 'bigjump' || name === 'corkscrew' || name === 'overunder' || name === 'bowl') && total - lastSpecial < 180) name = 'sweeper';
+        if ((lastName === 'crest' || lastName === 'dip') && (name === 'hairpin' || name === 'tighten')) name = 'sweeper';
+      }
 
       // anticipation: braking straight before sharp stuff arriving fast
       const vc = CORNER_V[name];
@@ -570,8 +650,14 @@
       }
 
       const p = decorate(builders[name](), name);
-      if (name === 'glass' || name === 'boost' || name === 'wallride' || name === 'kicker' || name === 'jumpgap' || name === 'bigjump') lastSpecial = total;
+      if (name === 'glass' || name === 'boost' || name === 'wallride' || name === 'kicker' || name === 'jumpgap' || name === 'bigjump' || name === 'corkscrew' || name === 'overunder' || name === 'bowl') lastSpecial = total;
       const placed = appendPiece(p, name, true);
+      // signature integrity: a queue piece that collision-downgraded gets ONE retry from the
+      // new position (compact loops often reject the first corkscrew/overunder placement)
+      if (fromQueue && placed !== name && !sigRetried[name]) {
+        sigRetried[name] = 1;
+        forcedQueue.unshift(name);
+      }
       lastName = placed;
 
       const vcP = CORNER_V[placed];
@@ -825,11 +911,11 @@
         return true;
       };
       for (const span of pieceSpans) {
-        if (span.name !== 'straight' && span.name !== 'sweeper') continue;
+        if (span.name !== 'straight' && span.name !== 'sweeper' && span.name !== 'boost') continue;
         let i = span.start + 2;
         const end = span.end - 2;
         while (i < end) {
-          const gapN = rngA.int(6, 12);   // 12-24 m between apron spans
+          const gapN = rngA.int(5, 9);    // 10-18 m between apron spans
           const apN = rngA.int(10, 18);   // 20-36 m apron span
           const sidePick = rngA.sign();   // used when the span has no curvature (straights)
           const a0 = i + gapN, a1 = Math.min(a0 + apN, end);
@@ -841,7 +927,7 @@
           let ok = true;
           for (let k = a0; k < a1; k++) {
             const s = samples[k];
-            if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || s.p[1] - minTrackY > 8.0) { ok = false; break; }
+            if (s.gap || s.surf !== 0 || Math.abs(s.bank) > 0.04 || s.p[1] - minTrackY > 12.0) { ok = false; break; }
           }
           // no aprons where ANOTHER stretch of track runs close by (closure beside the opening
           // straight, near-parallel passes): the flush shelf would sit in the other road's space
@@ -890,14 +976,25 @@
         const sA = samples[e0], sB = samples[e1];
         if (sA.gap || sB.gap) { cutStats.gapNear++; continue; }
         if (Math.abs(sA.bank) > 0.10 || Math.abs(sB.bank) > 0.10) { cutStats.bank++; continue; }
+        // mouths must sit on near-level deck: a pitching neighbour's deck footprint (correctly)
+        // caps the terrain under it, which would leave the mouth shelf ~1-2 m below flush
+        let pitchOk = true;
+        for (const m of [e0, e1]) {
+          for (let j = Math.max(0, m - 5); j <= Math.min(n - 1, m + 5) && pitchOk; j++) {
+            if (Math.abs(samples[j].pitch) > 0.05) pitchOk = false;
+          }
+        }
+        if (!pitchOk) { cutStats.bank++; continue; }
         let spanOk = true;
         for (let j = e0; j <= e1; j++) { if (samples[j].gap || samples[j].surf !== 0) { spanOk = false; break; } }
         if (!spanOk) { cutStats.gapNear++; continue; }
         const side = c.insideSign;
         const a = V.addS(V.clone(sA.p), sA.r, side * (sA.w / 2 + 2.0));
         const b = V.addS(V.clone(sB.p), sB.r, side * (sB.w / 2 + 2.0));
-        a[1] = sA.p[1] - Math.abs(sA.r[1]) * (sA.w / 2) - 0.15;
-        b[1] = sB.p[1] - Math.abs(sB.r[1]) * (sB.w / 2) - 0.15;
+        // mouth height = the edge on the CHORD side (mildly banked mouths put the cut on the
+        // high edge — minRoadY would carve the shelf ~1.5 m under it)
+        a[1] = sA.p[1] + side * sA.r[1] * (sA.w / 2) - 0.15;
+        b[1] = sB.p[1] + side * sB.r[1] * (sB.w / 2) - 0.15;
         const chord = Math.hypot(b[0] - a[0], b[2] - a[2]);
         const arc = (e1 - e0) * DS;
         // a cut pays off via distance AND entry speed (the corner brakes to ~26-30 m/s, the
@@ -927,6 +1024,10 @@
           const dx = sp[0] - (a[0] + abx * t), dz = sp[2] - (a[2] + abz * t);
           const near2 = samples[j].gap ? 26 * 26 : 15 * 15; // gap chasms reach further
           if (dx * dx + dz * dz < near2 && Math.abs(sp[1] - DD.lerp(a[1], b[1], t)) < 14) { clear = false; break; }
+          // mouths must OWN their ground at ANY elevation: a crossing deck (legal over the
+          // mid-corridor at dY>=14) plants a deckCapY footprint that would sink the shelf
+          const ax0 = sp[0] - a[0], az0 = sp[2] - a[2], bx0 = sp[0] - b[0], bz0 = sp[2] - b[2];
+          if (ax0 * ax0 + az0 * az0 < 16 * 16 || bx0 * bx0 + bz0 * bz0 < 16 * 16) { clear = false; break; }
         }
         if (!clear) { cutStats.clear++; continue; }
         cutStats.cands++;

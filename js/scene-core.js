@@ -386,6 +386,12 @@
       theme.glassColor, 0.28, THREE.AdditiveBlending);
     if (glass) root.add(glass);
 
+    // dirtcut overlay (3.1) — matte earth wash so the rally sector reads before you're on it
+    const dirtStrip = DD._sceneShared.buildStrip(track, theme,
+      (s) => s.surf === DD.SURF.DIRT ? [V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, -s.w / 2), V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, s.w / 2)] : null,
+      V.lerp(theme.groundColor, [0.42, 0.30, 0.18], 0.55), 0.85, THREE.NormalBlending);
+    if (dirtStrip) root.add(dirtStrip);
+
     // guardrails: solid wall + bright top rail. Shortcut mouths OPEN the inside rail
     // (s.wallOpen — mirrors the physics clamp skip, so what you see is what collides).
     const railWall = (side) => DD._sceneShared.buildStrip(track, theme,
