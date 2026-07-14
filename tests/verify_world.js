@@ -299,5 +299,52 @@ console.log('[4] buildValidTrack fallback audit (bot runs — slower)');
   check('0 fallbacks across ' + runs + ' seed×tier builds', fallbacks === 0, fallbacks + ' fallbacks');
 }
 
+/* 6 — playground basin pockets (masterplan 5.2): every pocket clear of every leg, floor near
+   road level, and the dish interior actually SMOOTH on the built grid (closed-loop, same rule
+   as the apron audit — construction guarantee, not a hope) */
+console.log('[6] playground basins (5.2)');
+{
+  let pockets = 0, tracksWith = 0, total = 0;
+  for (const seed of SEEDS) {
+    for (let tier = 1; tier <= 5; tier++) {
+      const track = DD.generateTrack(seed, tier, 0);
+      total++;
+      const pgs = track.playgrounds || [];
+      if (pgs.length) tracksWith++;
+      for (const pg of pgs) {
+        pockets++;
+        // (a) clearance: center at least r + w/2 + 4 from every sample (constraint was +6)
+        let minClear = Infinity;
+        for (let j = 0; j < track.samples.length; j += 2) {
+          const s = track.samples[j];
+          const dx = pg.x - s.p[0], dz = pg.z - s.p[2];
+          minClear = Math.min(minClear, Math.sqrt(dx * dx + dz * dz) - s.w / 2);
+        }
+        check(seed + ' T' + tier + ' pocket clear of all legs', minClear >= pg.r + 4,
+          'minClear=' + minClear.toFixed(1) + ' need>=' + (pg.r + 4).toFixed(1));
+        // (b) floor near road level at the anchor (drive off, drive back)
+        const ay = track.samples[pg.anchorIdx].p[1];
+        check(seed + ' T' + tier + ' pocket floor near road', Math.abs(pg.y - ay) <= 9.5,
+          'dy=' + (pg.y - ay).toFixed(1));
+        // (c) interior smoothness on the BUILT grid: probe a 5×5 lattice inside r*0.7 —
+        // neighbouring probes (grid-cell scale apart) must not step more than 2.4 m
+        const P = 5, span = pg.r * 0.7;
+        let maxStep = 0;
+        const hs = [];
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          hs.push(DD.terrainAt(track.terrain, pg.x + (a / (P - 1) - 0.5) * 2 * span, pg.z + (b / (P - 1) - 0.5) * 2 * span));
+        }
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          if (a + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[(a + 1) * P + b]));
+          if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
+        }
+        check(seed + ' T' + tier + ' pocket interior smooth', maxStep <= 2.4, 'maxStep=' + maxStep.toFixed(2) + 'm');
+      }
+    }
+  }
+  console.log('  (' + pockets + ' pockets across ' + tracksWith + '/' + total + ' builds)');
+  check('basins exist somewhere in the matrix', pockets > 0, pockets + ' pockets');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

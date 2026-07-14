@@ -5,6 +5,19 @@ z-fighting, ghosts, interactivity. Claude specs + phases; individual items becom
 entries when picked up. Physics items (`DD.PHYS`, physics.js) stay Claude-owned per the
 hard invariants._
 
+## Platform status (2026-07-13)
+
+**Distribution = Capacitor APK first** (Tibba decision). The PWA install path is deprecated
+(`manifest.json`/`sw.js` stay for browser-dev convenience only; no further PWA-specific work).
+The APK is cloud-built by `.github/workflows/android.yml` at the **repo root** on every push to
+master — note: the `apk-build/.github/workflows/` copy is inert (GitHub reads `.github/` at the
+default-branch root only). `node dd.js sync` regenerates the gitignored `apk-build/www/` before build.
+
+**Fullscreen APK: RESOLVED + device-confirmed** (2026-07-13, `7ae8f21` and predecessors) — the
+purple ActionBar band root cause was the `values-v28` overlay redefining `AppTheme.NoActionBar`
+without an explicit `parent=` (overlays replace, not merge). Do not re-open; the overlay rule is
+documented in `res/values/styles.xml` and INBOX.
+
 ## Diagnosis (what the code says today)
 
 | Complaint | Root cause found |
@@ -124,13 +137,17 @@ laptime value. Get bored, hop off, play, hop back._
   speed, straights still road-won (drivability [10] holds the cap). Tune further on feel.
 - Looks: noise/rut decal overlay on dirt spans, scattered stones at edges, wheel dust plumes,
   persistent tire marks, louder gravel audio layer.
-**5.1 A way back, everywhere** _(trackgen/terrain — Claude)_ — soft re-enterable shoulder on ALL
-  non-hostile spans (ledge −0.85 blends to ~−0.15 where terrain isn't cliff/void); aprons remain
-  the painted "official" invitations. Rejoin-exploit stance: accept freedom v1, watch, guard
-  later only if abused (Tibba call).
-**5.2 Driveable basins** _(terrain — Claude)_ — heightfield relaxation pockets near the road
-  (`::playground` rng stream) so off-track driving is smooth enough to be fun. Closed-loop
-  audited against the built grid (10–13 m/cell rule).
+**5.1 A way back, everywhere** _(trackgen/terrain — Claude)_ ✅ **DONE** (earlier session) — soft
+re-enterable shoulder on ALL non-hostile spans (ledge −0.85 blends to ~−0.15 where terrain isn't
+cliff/void); aprons remain the painted "official" invitations. Coverage flipped from rare windows
+(10-18 m gaps) to near-continuous (4-8 m gaps, 36-68 m spans). Rejoin-exploit stance: accept
+freedom v1, watch, guard later only if abused (Tibba call).
+**5.2 Driveable basins** _(terrain — Claude)_ ✅ **DONE** (session 32, `f22495b`) — heightfield
+relaxation pockets near the road (`::playground` rng stream): 1-2 smooth driveable terrain
+pockets per track anchored off apron spans. Floor anchors to road level (shallow dish, ~1.3 m
+below road at center, flush at edges), not the pre-conform landform. Closed-loop audited against
+the built grid (terrain-never-above-deck + apron re-entry invariants hold). Stores
+`track.playgrounds` for 5.3 furniture.
 **5.3 Playground furniture v1: heightfield stamps** _(trackgen/terrain — Claude; dressing
   delegable)_ — kickers, tabletops, rollers, banked bowls stamped INTO the heightfield inside
   basins. Free collision via existing ground query. Jump lines loosely parallel the track.
@@ -190,10 +207,14 @@ Candidate directions (Tibba picks before any brief):
 
 ## Suggested order of attack
 
-1. **1.1 + 1.2** (wall + collision) — biggest daily-feel win, pure physics.
-2. **1.5** (powerslide rework) — same file, same session as 1; land the acceptance tests with it.
-3. **1.4** (ghost motion/look) — visible quality jump, isolated.
-4. **1.3** (z-fight ladder + seam) — mechanical, delegable alongside 3.
-4. **2.1 + 2.4** (aprons + kerb feel) — makes the world forgiving.
-5. **2.2 / 2.3** (shortcuts, forks) — route choice arrives.
-6. **3.x** then **4.x** as content waves.
+_Phases 1–3 are DONE. 5.0/5.1/5.2 are DONE. This list is the current frontier (as of 2026-07-13)._
+
+1. **5.3** (heightfield playground stamps) — the skate-park payoff: kickers, tabletops, rollers,
+   banked bowls stamped INTO the now-driveable playground basins. Free collision via existing
+   ground query. **This is the next flagship slice.**
+2. **5.4 + 5.5** (wallrides v2 + discovery cues).
+3. **4.4** (speed traps) — small, delegable, fun layer.
+4. **4.5** (true branches) — big, Claude-owned core; design note first.
+5. **6.x** (car looks) — pick a direction with Tibba, then brief.
+
+_Delegable queue that can interleave: A20 (APK icon), A21 (dirt looks), SQ4 (boost-tile look)._

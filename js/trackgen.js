@@ -331,23 +331,6 @@
         // terracing applies to the composed landform (terraced mesas, not just basin steps)
         if (theme.terraced) h = Math.round(h / 9) * 9 + (h - Math.round(h / 9) * 9) * 0.25;
 
-        // playground basins (5.2): blend the composed landform toward a smooth shallow dish —
-        // the off-track playground floor. Runs BEFORE the embankment conform and the safety
-        // clamps, so the road corridor always wins where they overlap.
-        if (playgrounds && playgrounds.length) {
-          for (const pg of playgrounds) {
-            const dxp = x - pg.x, dzp = z - pg.z;
-            const dp = Math.sqrt(dxp * dxp + dzp * dzp);
-            const R1 = pg.r * 1.45; // blend skirt
-            if (dp < R1) {
-              const t = DD.smoothstep(DD.clamp((R1 - dp) / (R1 - pg.r * 0.55), 0, 1));
-              const nd = dp / pg.r;
-              const dish = pg.y - 1.2 * Math.max(0, 1 - nd * nd);
-              h = DD.lerp(h, dish, t);
-            }
-          }
-        }
-
         // embankment conforming: raise terrain up to just under the road where it passes close
         // (only ever RAISES toward the road underside). On apron spans the conform target blends
         // from -0.85 (permanent ledge) to -0.10 (flush) on the apron side — drive off, drive back on.
@@ -381,6 +364,29 @@
               const t = (dist - roadEdgeN - flushExt) / 32.0;
               const smoothT = t * t * (3 - 2 * t);
               h = DD.lerp(clampTargetH, h, smoothT);
+            }
+          }
+        }
+
+        // playground basins (5.2): blend toward a smooth shallow dish — the off-track playground
+        // floor. Runs AFTER the embankment conform (whose 32 m falloff otherwise plows a raised
+        // ramp straight through the dish — the closed-loop audit caught exactly that) but BEFORE
+        // the safety clamp, so road/gap clearance still always wins. The road-distance gate keeps
+        // the conform's apron shelf and embankment intact near the deck; the dish owns the rest.
+        if (playgrounds && playgrounds.length) {
+          for (const pg of playgrounds) {
+            const dxp = x - pg.x, dzp = z - pg.z;
+            const dp = Math.sqrt(dxp * dxp + dzp * dzp);
+            const R1 = pg.r * 1.5; // blend skirt
+            if (dp < R1) {
+              // full dish inside 0.85r, skirt 0.85r→1.5r; the floor must be full-strength well
+              // past the audit's 0.7r probe ring or grid-scale noise leaks into the interior
+              let t = DD.smoothstep(DD.clamp((R1 - dp) / (R1 - pg.r * 0.85), 0, 1));
+              // fade the dish out within ~14 m of the deck edge (apron flush shelf = 12 m)
+              t *= DD.smoothstep(DD.clamp((dist - (roadEdgeN + 14.0)) / 8.0, 0, 1));
+              const nd = dp / pg.r;
+              const dish = pg.y - 1.2 * Math.max(0, 1 - nd * nd);
+              h = DD.lerp(h, dish, t);
             }
           }
         }
@@ -1146,7 +1152,9 @@
         if (gapNear) continue;
         const side = Math.sign(s.apron);
         const r = rngP.range(16, 26);
-        const off = rngP.range(34, 52);
+        // 48-62 m out: the 0.7r audit-probe ring must clear the conform's road-distance gate
+        // (roadEdge + 14 + 8 m fade) or the dish never reaches full strength where it's measured
+        const off = rngP.range(48, 62);
         const px = s.p[0] + s.r[0] * side * off;
         const pz = s.p[2] + s.r[2] * side * off;
         // Playground floor anchors to the ROAD (a shallow drivable dish just below the apron
@@ -1159,7 +1167,7 @@
         const nyCtr = natH(px, pz, s.p[1]);
         if (Math.abs(nyEdge - nyCtr) > 18) continue;
         if (!clearOfAll(px, pz, r + s.w / 2 + 6)) continue; // pocket clear of every leg
-        if (!clearOfCuts(px, pz, r + 16)) continue;         // and of shortcut corridors
+        if (!clearOfCuts(px, pz, r + 24)) continue;         // shortcut carve feather reaches 22 m
         if (playgrounds.some(pg => { const dx = pg.x - px, dz = pg.z - pz; return dx * dx + dz * dz < 120 * 120; })) continue;
         playgrounds.push({ x: px, z: pz, r, y: s.p[1] - 1.5, anchorIdx: i });
       }
@@ -1181,6 +1189,28 @@
     };
     track._cutStats = cutStats; // shortcut-candidate funnel (debug/telemetry, deterministic)
     track.terrain = buildTerrainData(samples, seedStr, theme, shortcuts, playgrounds);
+
+    // playground audit — CLOSED LOOP (same philosophy as the apron audit below): the dish
+    // competes with conform/carve/clamp on a 10-13 m grid, so re-MEASURE every pocket's floor
+    // on the built heights and demote any that isn't actually smooth. "listed pocket ⇒ playable
+    // floor" is a construction guarantee, not a hope. Demoted pockets keep their (partially)
+    // relaxed terrain — harmless dent — but get no furniture/cues later.
+    if (playgrounds.length) {
+      for (let pi = playgrounds.length - 1; pi >= 0; pi--) {
+        const pg = playgrounds[pi];
+        const P = 5, span = pg.r * 0.7;
+        const hs = [];
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          hs.push(DD.terrainAt(track.terrain, pg.x + (a / (P - 1) - 0.5) * 2 * span, pg.z + (b / (P - 1) - 0.5) * 2 * span));
+        }
+        let maxStep = 0;
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          if (a + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[(a + 1) * P + b]));
+          if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
+        }
+        if (maxStep > 2.4) playgrounds.splice(pi, 1);
+      }
+    }
 
     // apron audit — CLOSED LOOP: the conform/clamp interplay on a 10-13 m grid can still miss
     // flush in odd noise/undulation spots. Re-measure every apron span against the ACTUAL grid

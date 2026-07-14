@@ -1,10 +1,35 @@
 # DRIFTDREAM — Status & Known Issues
 
-_Last verified against code: 2026-06-24._
+_Last verified against code: 2026-07-13._
 
 Read [`README.md`](README.md) first (run/build/controls), then [`ARCHITECTURE.md`](ARCHITECTURE.md)
 (how each system works, with `file:line` references). This file is the **current state + the
 backlog** — the things a new contributor (human or AI) most needs to know before changing anything.
+
+---
+
+## Current frontier (2026-07-13)
+
+**The APK is the chosen distribution** (PWA deprecated; manifest/sw stay for browser dev only).
+It's cloud-built by `.github/workflows/android.yml` at the **repo root** (the `apk-build/.github`
+copy is inert — GitHub reads `.github/` at the default-branch root only); `node dd.js sync`
+regenerates the gitignored `apk-build/www/` before build.
+
+**Fullscreen APK: WORKING** (landed 2026-07-13 after several rounds — the Activity runs under the
+launch theme forever because Capacitor never calls `installSplashScreen()`, so all fullscreen flags
++ ActionBar suppression had to live on `AppTheme.NoActionBarLaunch` itself). Immersive sticky mode,
+`shortEdges` cutout, `setDecorFitsSystemWindows(false)`, native + Web wake-lock, `sensorLandscape`.
+
+**Sharpness setting: LANDED** (`0d61473`) — a new quality/sharpness lever in settings: `soft`
+(old 1.5/1.25 caps), `sharp` (2.0/1.5, new default), `native` (full panel ratio — crispest, costliest).
+Live-re-applies renderer + composer + FXAA on change. Back-fills the key for older saves.
+
+**Next frontier = Phase 5 (offtrack playground)** — 5.0 (dirt physics), 5.1 (universal re-entry)
+and 5.2 (driveable basins) DONE. 5.2 final shape: pockets 48-62 m off apron spans, floor anchored
+to road level (shallow dish), conform-gated blend, plus a CLOSED-LOOP audit (apron-audit
+philosophy) that re-measures every pocket on the built grid and demotes rough floors — "listed
+pocket ⇒ playable" is a construction guarantee (14 audited pockets across the verify_world
+matrix). 5.3 furniture stamps → 5.4 wallrides → 5.5 discovery cues queued. See MASTERPLAN.
 
 ---
 
@@ -89,8 +114,13 @@ These are real today (the code, not the marketing). Roughly high→low impact.
     integration gaps already fixed.)_
 17. **`js/scene.js` is ~2000 lines** doing everything — the maintainability bottleneck. Candidate
     to split (render-core / car / decor / fx / camera).
-18. **`apk-build/www/` is a synced duplicate** of the root game. Edits to `js/` don't reach the APK
-    until `apk-build/sync.bat` runs.
+18. **[RESOLVED 2026-07-13]** ~~`apk-build/www/` is a synced duplicate of the root game. Edits to
+    `js/` don't reach the APK until `apk-build/sync.bat` runs.~~ The CI workflow now runs
+    `node dd.js sync` before building, so every push rebuilds from the canonical root source.
+    `www/` stays gitignored by design (generated mirror); run `node dd.js sync` locally if you
+    need to build on your own machine.
+19. **[OPEN] The Android APK does not run true fullscreen** — a purple ActionBar band sits at the
+    top on API 28+ phones. Diagnosed + briefed as A22 (`BRIEFS.md`); native-theme fix pending.
 
 ---
 
