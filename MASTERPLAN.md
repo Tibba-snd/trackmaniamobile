@@ -148,9 +148,12 @@ pockets per track anchored off apron spans. Floor anchors to road level (shallow
 below road at center, flush at edges), not the pre-conform landform. Closed-loop audited against
 the built grid (terrain-never-above-deck + apron re-entry invariants hold). Stores
 `track.playgrounds` for 5.3 furniture.
-**5.3 Playground furniture v1: heightfield stamps** _(trackgen/terrain — Claude; dressing
-  delegable)_ — kickers, tabletops, rollers, banked bowls stamped INTO the heightfield inside
-  basins. Free collision via existing ground query. Jump lines loosely parallel the track.
+**5.3 Playground furniture v1: heightfield stamps** ✅ **DONE (session 33)** — kickers,
+  tabletops, rollers, banked bowls stamped as additive height deltas into audited basins; free
+  collision via the existing ground query; jump lines follow the anchor's track tangent (±20°).
+  DOUBLE closed-loop audited (trackgen demotes + verify_world [7] re-checks): a listed
+  `pg.furniture` is a real driveable bump. Grid reality: 10-13 m cells favor kickers/bowls;
+  sub-cell tabletops/rollers mostly self-demote — amplitude/size tuning is a later pass.
 **5.4 Wallrides v2** _(physics-adjacent — Claude)_ — standalone vertical quarter-pipe panels
   reusing the track-wall collision path. No overhangs/loops off-track (engine limit, v1).
 **5.5 Discovery cues** _(scene-decor — delegable)_ — faint paint arrows/glow marks at basin

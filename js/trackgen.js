@@ -426,6 +426,65 @@
     return { minX, minZ, stepX, stepZ, res: RES, heights, minH: hMin, maxH: hMax };
   }
 
+  /* --- playground furniture stamps (masterplan 5.3) ---
+     kickers/tabletops/rollers/bowls, stamped as height DELTAS directly into the already-baked
+     dish floor (track.terrain.heights) — additive, so nothing outside the footprint is touched
+     and every existing clamp/conform/clearance invariant upstream is untouched. Ground query
+     (DD.terrainAt / the mesh vertices themselves) is the only collision — no new physics. */
+  function furnitureDelta(f, dx, dz) {
+    if (f.type === 'bowl') {
+      const r = Math.hypot(dx, dz), R = f.r;
+      if (r >= R * 1.15) return 0;
+      if (r <= R * 0.8) { const t = r / (R * 0.8); return -f.depth * (1 - t * t); }
+      const t = DD.clamp((r - R * 0.8) / (R * 0.35), 0, 1);
+      return f.rim * Math.sin(Math.PI * t);
+    }
+    const u = dx * f.dir[0] + dz * f.dir[1];
+    const v = -dx * f.dir[1] + dz * f.dir[0];
+    if (Math.abs(u) > f.halfLen || Math.abs(v) > f.halfWidth) return 0;
+    const vFalloff = DD.smoothstep(DD.clamp((f.halfWidth - Math.abs(v)) / (f.halfWidth * 0.35), 0, 1));
+    const tu = (u + f.halfLen) / (2 * f.halfLen);
+    let shape = 0;
+    if (f.type === 'kicker') {
+      // long smooth rise to a 60%-along lip, short steep drop — the aggressive kicker profile
+      shape = tu < 0.6 ? DD.smoothstep(DD.clamp(tu / 0.6, 0, 1)) : 1 - DD.smoothstep(DD.clamp((tu - 0.6) / 0.4, 0, 1));
+      shape *= f.amp;
+    } else if (f.type === 'tabletop') {
+      // rise / flat plateau / descent — motocross tabletop
+      if (tu < 0.3) shape = f.amp * DD.smoothstep(DD.clamp(tu / 0.3, 0, 1));
+      else if (tu < 0.7) shape = f.amp;
+      else shape = f.amp * (1 - DD.smoothstep(DD.clamp((tu - 0.7) / 0.3, 0, 1)));
+    } else if (f.type === 'roller') {
+      // a short whoop train, tapered to 0 at both ends so it seats into the dish floor
+      const env = DD.smoothstep(DD.clamp((f.halfLen - Math.abs(u)) / (f.halfLen * 0.25), 0, 1));
+      shape = f.amp * env * (0.5 * (1 - Math.cos(2 * Math.PI * f.n * tu)));
+    }
+    return shape * vFalloff;
+  }
+
+  function stampFurniture(T, pg) {
+    const f = pg.furniture;
+    const pad = f.type === 'bowl' ? f.r * 1.2 : Math.max(f.halfLen, f.halfWidth) * 1.2;
+    const i0 = Math.max(0, Math.floor((pg.x - pad - T.minX) / T.stepX));
+    const i1 = Math.min(T.res - 1, Math.ceil((pg.x + pad - T.minX) / T.stepX));
+    const j0 = Math.max(0, Math.floor((pg.z - pad - T.minZ) / T.stepZ));
+    const j1 = Math.min(T.res - 1, Math.ceil((pg.z + pad - T.minZ) / T.stepZ));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const x = T.minX + i * T.stepX, z = T.minZ + j * T.stepZ;
+        const delta = furnitureDelta(f, x - pg.x, z - pg.z);
+        if (delta !== 0) {
+          const v = T.heights[j * T.res + i] + delta;
+          T.heights[j * T.res + i] = v;
+          // keep the cached range honest: physics out-of-world uses minH, terrain-mesh
+          // coloring normalizes on the range (a bowl dips below the pre-stamp minimum)
+          if (v < T.minH) T.minH = v;
+          if (v > T.maxH) T.maxH = v;
+        }
+      }
+    }
+  }
+
   DD.terrainAt = function (T, x, z) {
     const fx = DD.clamp((x - T.minX) / T.stepX, 0, T.res - 1.001);
     const fz = DD.clamp((z - T.minZ) / T.stepZ, 0, T.res - 1.001);
@@ -1209,6 +1268,72 @@
           if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
         }
         if (maxStep > 2.4) playgrounds.splice(pi, 1);
+      }
+    }
+
+    /* --- playground furniture v1 (masterplan 5.3): kickers, tabletops, rollers, banked bowls
+       stamped INTO the heightfield of every pocket that survived the audit above. Own derived
+       rng stream (main sequence untouched); direction loosely follows the anchor sample's own
+       track-forward tangent (jitter ±20°) so jump lines read as "parallel to the track", not
+       arbitrary. Stamped as additive deltas (see stampFurniture) then re-measured on the BUILT
+       grid — same closed-loop guarantee as every other terrain feature here: a listed furniture
+       piece is a real, driveable bump, not a hope that the coarse grid caught it. */
+    if (playgrounds.length) {
+      const rngF = DD.makeRng(seedStr + '::furniture');
+      const TYPES = ['kicker', 'tabletop', 'roller', 'bowl'];
+      for (const pg of playgrounds) {
+        const type = rngF.pick(TYPES);
+        const anchor = samples[pg.anchorIdx];
+        const jitter = rngF.range(-0.35, 0.35); // ~±20 deg off the track tangent
+        const cf = Math.cos(jitter), sf = Math.sin(jitter);
+        const fx = anchor.f[0], fz = anchor.f[2];
+        const dl = Math.hypot(fx, fz) || 1;
+        const dir = [(fx * cf - fz * sf) / dl, (fx * sf + fz * cf) / dl];
+        const halfLen = pg.r * rngF.range(0.42, 0.55);
+        const halfWidth = pg.r * rngF.range(0.30, 0.40);
+        let furniture;
+        if (type === 'kicker') furniture = { type, dir, halfLen, halfWidth, amp: rngF.range(1.6, 2.4) };
+        else if (type === 'tabletop') furniture = { type, dir, halfLen, halfWidth, amp: rngF.range(1.4, 2.0) };
+        else if (type === 'roller') furniture = { type, dir, halfLen, halfWidth: halfWidth * 0.8, amp: rngF.range(0.5, 0.9), n: rngF.int(3, 4) };
+        else furniture = { type, r: Math.min(halfLen, halfWidth), depth: rngF.range(1.6, 2.4), rim: rngF.range(0.6, 1.0) };
+        pg.furniture = furniture;
+        stampFurniture(track.terrain, pg);
+      }
+      // closed-loop furniture audit: re-measure each stamp on the built grid. Demote (drop the
+      // furniture, keep the — otherwise harmless — terrain dent) if the coarse grid missed the
+      // feature (amplitude undershoot) or produced an unreasonably sharp step (bad grid luck).
+      for (const pg of playgrounds) {
+        const f = pg.furniture;
+        if (!f) continue;
+        let peakWorld, expectedAmp, refWorld;
+        if (f.type === 'bowl') {
+          // bowl: amplitude = bottom (center) vs undisturbed floor BESIDE the rim ring
+          peakWorld = [pg.x, pg.z]; expectedAmp = f.depth;
+          refWorld = [pg.x + f.r * 1.4, pg.z];
+        } else {
+          const tuPeak = f.type === 'roller' ? 0.5 : 0.6;
+          const uPeak = tuPeak * 2 * f.halfLen - f.halfLen;
+          peakWorld = [pg.x + f.dir[0] * uPeak, pg.z + f.dir[1] * uPeak];
+          expectedAmp = f.amp;
+          // floor reference PERPENDICULAR to the stamp, past the width falloff — the pocket
+          // center itself sits ON the stamp (a tabletop's plateau measures ~0 against itself,
+          // which is exactly the bug that demoted every stamp on the first pass)
+          refWorld = [pg.x - f.dir[1] * f.halfWidth * 1.6, pg.z + f.dir[0] * f.halfWidth * 1.6];
+        }
+        const floorY = DD.terrainAt(track.terrain, refWorld[0], refWorld[1]);
+        const peakY = DD.terrainAt(track.terrain, peakWorld[0], peakWorld[1]);
+        const gotAmp = Math.abs(peakY - floorY);
+        const P = 5, span = Math.max(f.halfLen || f.r, f.halfWidth || f.r) * 0.9;
+        let maxStep = 0;
+        const hs = [];
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          hs.push(DD.terrainAt(track.terrain, pg.x + (a / (P - 1) - 0.5) * 2 * span, pg.z + (b / (P - 1) - 0.5) * 2 * span));
+        }
+        for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+          if (a + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[(a + 1) * P + b]));
+          if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
+        }
+        if (gotAmp < expectedAmp * 0.4 || maxStep > 5.0) pg.furniture = null;
       }
     }
 

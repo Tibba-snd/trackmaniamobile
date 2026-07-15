@@ -376,6 +376,101 @@ circuits; every new randomness = derived rng stream.
 eyeball a `dirtcut` signature seed AND a dirt-shortcut seed at speed; `?v=` bumps for every
 touched js file; walkthrough with screenshots in INBOX.
 
+## A22 — Boost-tile look rework (SQ4)  🔴 OPEN (queue after A21)
+
+_Boost pads (T2) are visible but static — Tibba wants them to feel like energy: scrolling pulse,
+approach glow, a hit that pops. **Scene/fx + tiny game.js wiring — zero physics, zero trackgen.**_
+
+**Verified context (Claude, 2026-07-14):** pads are built in `buildBoostPads`
+(`js/scene-decor.js`, exported via `DD._sceneShared`); the hit signal already exists —
+`car.boostGlow` is consumed for the body-shell pulse in `js/game.js` (~line 1160). Speed-lines FX
+live in `js/scene-fx.js`.
+
+**Scope:**
+1. **Scrolling chevron pulse** — animate the pad chevrons (UV scroll or time-uniform pulse fed
+   from the existing shared breath/LFO update path in scene-decor). Fast forward scroll =
+   "energy flowing" toward travel direction. Emissive/additive only.
+2. **Approach glow** — pad emissive intensity + halo scale up as the player car nears
+   (distance-based, in the existing per-frame decor update; smoothstep over ~120→20 m). No new
+   lights — `addLightSource` pool only if one isn't already registered.
+3. **Hit flash** — on `car.boostGlow` rising edge: (a) brief color-shifted burst of the existing
+   speed-lines FX (scene-fx param hook, deterministic — no `Math.random`); (b) a slim screen-edge
+   accent flash via a CSS class toggle on a static overlay div (NO backdrop-filter, NO
+   pseudo-element transitions — WebView rules).
+4. Files: `js/scene-decor.js`, `js/scene-fx.js`, `js/game.js` (few lines at the boostGlow
+   consumer), `index.html` (overlay div + CSS + `?v=` bumps for every touched js file).
+
+**Hard rules:** light-pool rule; fill-rate budget (screen flash = thin edge strip, never
+full-screen); all animation deterministic; nothing in physics/trackgen.
+
+**DoD:** suites green after FINAL edit; launch, drive over a pad at speed; screenshots of
+approach glow + hit moment; draw calls within ±2 (`DD.debugGL()`); `?v=` bumps; walkthrough in
+INBOX.
+
+## A23 — Speed traps (MASTERPLAN 4.4, approved)  🔴 OPEN (queue after A22)
+
+_TM-style radar gate: cross it, see your speed pop, chase a per-track top-speed record.
+**game.js + scene-decor + index.html only — placement derives from existing track data, zero
+trackgen edits.**_
+
+**Verified context (Claude, 2026-07-14):** `track.corners[]` carries `entry`/`apex` indices;
+save records are additive-friendly (`rec.attempts`/`rec.lastPlayed` pattern in `js/game.js`
+~line 587); finish card populated ~line 646; gate visuals reuse the gantry pattern in
+`buildGates` (`js/scene-decor.js`).
+
+**Scope:**
+1. **Placement (deterministic derivation, NO rng):** helper in `js/game.js` at track load — the
+   sample at the midpoint of the longest corner-free span (gaps between consecutive
+   `track.corners` apexes; wrap modulo N when `track.closed`). Exclude gap/apron/dirt spans and
+   anything within ~60 samples of start, finish, or a checkpoint. Store `G.trapIdx` (one per
+   track, v1).
+2. **Radar gate visual** (`js/scene-decor.js`): slim overhead gantry at `trapIdx` — reuse the
+   gate post/crossbar pattern, "RADAR" board styled like the chevron boards, accent2.
+   Instanced/merged, decal-ladder heights, light-pool rule.
+3. **Detection + popup** (`js/game.js`): when run progress crosses `trapIdx`, capture km/h. HUD
+   popup reusing the checkpoint-flash pattern (small DOM node, class-toggle animation only) + a
+   brief emissive pulse on the gate (mirror the `justCkpt` pulse). Ghosts do NOT trigger it.
+4. **Finish card + persistence:** `#finTopSpeed` row (run's trap speed + per-track best);
+   persist additive `rec.topSpeed` next to the `rec.attempts` writes — NO `SAVE_VER` bump. New
+   record gets a "radar best!" accent.
+5. Files: `js/game.js`, `js/scene-decor.js`, `index.html` (DOM + CSS + `?v=` bumps).
+
+**Hard rules:** placement draws NOTHING from any rng (pure function of track data);
+closed-circuit wrap; no new lights; per-frame cost ≈ one index compare.
+
+**DoD:** suites green after FINAL edit; launch, cross the trap → screenshot popup + gate;
+finish → screenshot of the card row; verify on one closed circuit AND one sprint; `?v=` bumps;
+walkthrough in INBOX listing every gameplay-adjacent line (the progress-crossing hook
+especially).
+
+## A24 — Playground discovery cues (MASTERPLAN 5.5)  🔴 OPEN (queue after A23 — gate lifted, 5.3 landed)
+
+_Faint invitations to hop off-track: paint arrows + glow marks at basin entrances. No HUD, no
+scoring — sandbox by design. **scene-decor only.**_
+
+**Data shape (verified post-5.3):** `track.playgrounds` = array of
+`{ x, z, r, y, anchorIdx, furniture }`. `furniture` is `null` (bare floor) or
+`{ type: 'kicker'|'tabletop'|'roller', dir:[x,z], halfLen, halfWidth, amp }` /
+`{ type: 'bowl', r, depth, rim }`. Every listed pocket AND every non-null furniture piece is
+closed-loop audited — trust the data, no re-probing needed.
+
+**Scope:**
+1. Per playground: 2-3 faint painted arrows on the deck across the nearest apron span
+   (`anchorIdx` neighborhood, outside edge, pointing off-road toward the basin center) —
+   `DD.DECAL` ladder height, polygonOffset per A15 rules, LOW opacity (invitation, not signage).
+2. A soft glow marker at the basin entrance (emissive ground disc or low post-pair, accent2,
+   additive, `addLightSource` only if the pool has headroom) — visible from the road at speed.
+3. If `pg.furniture` is non-null, sprinkle 2-3 tiny glow dots along the stamp (use `dir` ×
+   `halfLen` for placement; bowl = ring at `r*0.975`) so the playground reads at a glance.
+4. All randomness (jitter/spacing) = derived stream `seed + '::cues'`. Instanced/merged.
+   NOTHING on the driving line; respect apron/shortcut/gap exclusion zones (`isSpawningSafe` +
+   `clearOfTrack` helpers already exist in scene-decor).
+5. Files: `js/scene-decor.js`, `index.html` (`?v=` bump only).
+
+**DoD:** suites green; launch a seed with furnished playgrounds (`DREAM-12345` T1,
+`APRON-42` T2/T5, `CAMP-T1-01` T3); screenshot from the road showing the cue reads at speed +
+one inside the basin; draw calls within ±3; `?v=` bumps; walkthrough in INBOX.
+
 ---
 
 # TRACK REWORK — width, modules, furniture, set-pieces (Tibba-directed, 2026-07-05)

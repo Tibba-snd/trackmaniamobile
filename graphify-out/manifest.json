@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "js/trackgen.js": {
-    "mtime": 1783973515.3268025,
-    "ast_hash": "210b700bf9e7f5e0ac6b1f50c8e004bb",
+    "mtime": 1784043465.4064786,
+    "ast_hash": "1fc3ec62ff7bb38f359f65aa3b0e9d2f",
     "semantic_hash": ""
   },
   "tests/drivability.js": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "BRIEFS.md": {
-    "mtime": 1783971481.6269844,
-    "ast_hash": "fd67ed1af286d21c56b6825e5c56e22e",
+    "mtime": 1784043841.3058326,
+    "ast_hash": "2794c02364a93d36bfaa9329c412414d",
     "semantic_hash": ""
   },
   "CAR.md": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "STATUS.md": {
-    "mtime": 1783972638.2098122,
-    "ast_hash": "d6dfae53b960abb39ad8e4485d1a5814",
+    "mtime": 1784043888.204697,
+    "ast_hash": "5f7bd433c378688bbd18e76d532e1f38",
     "semantic_hash": ""
   },
   "apk-build/.github/workflows/android.yml": {
@@ -1250,13 +1250,13 @@
     "semantic_hash": ""
   },
   "MASTERPLAN.md": {
-    "mtime": 1783971520.6010518,
-    "ast_hash": "1114d0950d96fb76fb9615fbea3b36ea",
+    "mtime": 1784043856.6129398,
+    "ast_hash": "2fd2439d935844197890215d1e539b9b",
     "semantic_hash": ""
   },
   "tests/verify_world.js": {
-    "mtime": 1783924306.0297868,
-    "ast_hash": "c5c8f018825e3ff7d7a5080204e6b09e",
+    "mtime": 1784042913.4016628,
+    "ast_hash": "6af5b0ca60a82d8f0dc158e8b0bd2280",
     "semantic_hash": ""
   },
   "apk-build/android/app/src/main/assets/public/js/perfhud.js": {

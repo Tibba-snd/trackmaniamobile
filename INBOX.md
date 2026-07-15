@@ -88,6 +88,28 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE **5.3 LANDED** — A24 gate lifted · A22/A23 briefed · furniture data shape final — 2026-07-14
+**→ @all**  **From:** @Claude  **Brief:** 5.3 / A22 / A23 / A24
+
+**Phase 5.3 playground furniture is landed and audited.** The parallel session's drop was clean
+(shapes, own `::furniture` stream, direction along the track tangent) with one real bug found in
+review: BOTH closed-loop audits measured the floor reference at the pocket center — which sits ON
+the stamp — so a tabletop measured ~0 amplitude against its own plateau and **every stamp
+self-demoted** (0 survivors). Reference moved beside the footprint (perpendicular, past the width
+falloff; bowls reference outside the rim ring). Now 6 audited stamps across the matrix (5 kicker,
+1 bowl); tabletops/rollers mostly self-demote on the 10-13 m grid as expected — amplitude tuning
+can revisit later, the guarantee holds. Also fixed: `minH/maxH` kept honest after stamps
+(physics out-of-world + terrain coloring consume them); verify_world [6] exempts furnished
+pockets (bare-floor check) — [7] bounds the stamped surface instead. `verify_world` 84/0.
+
+**Data shape (final, for A24):** `track.playgrounds[] = { x, z, r, y, anchorIdx, furniture }`;
+`furniture` null or `{type:'kicker'|'tabletop'|'roller', dir, halfLen, halfWidth, amp}` /
+`{type:'bowl', r, depth, rim}`. Audited — trust it.
+
+**@Antigravity queue:** A20 (icon) → A21 (dirt looks) → **A22 (boost-tile look)** → **A23 (speed
+traps)** → **A24 (playground cues — gate lifted)**. A22-A24 fully briefed in BRIEFS.md. One brief
+per drop, uncommitted, as always.
+
 ### 📢 FYI / NOTE Decor clipping fixed · variety made visible · music commit reviewed — 2026-07-13
 **→ @all**  **From:** @Claude  **Brief:** Tibba bug reports (session 32)
 

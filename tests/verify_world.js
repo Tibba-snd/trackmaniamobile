@@ -327,8 +327,63 @@ console.log('[6] playground basins (5.2)');
         check(seed + ' T' + tier + ' pocket floor near road', Math.abs(pg.y - ay) <= 9.5,
           'dy=' + (pg.y - ay).toFixed(1));
         // (c) interior smoothness on the BUILT grid: probe a 5×5 lattice inside r*0.7 —
-        // neighbouring probes (grid-cell scale apart) must not step more than 2.4 m
-        const P = 5, span = pg.r * 0.7;
+        // neighbouring probes (grid-cell scale apart) must not step more than 2.4 m.
+        // FURNISHED pockets are exempt: stamps are deliberate bumps on the audited bare floor
+        // (trackgen audits the floor pre-stamp; section [7] bounds the stamped surface at 5.0).
+        if (!pg.furniture) {
+          const P = 5, span = pg.r * 0.7;
+          let maxStep = 0;
+          const hs = [];
+          for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+            hs.push(DD.terrainAt(track.terrain, pg.x + (a / (P - 1) - 0.5) * 2 * span, pg.z + (b / (P - 1) - 0.5) * 2 * span));
+          }
+          for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
+            if (a + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[(a + 1) * P + b]));
+            if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
+          }
+          check(seed + ' T' + tier + ' pocket interior smooth', maxStep <= 2.4, 'maxStep=' + maxStep.toFixed(2) + 'm');
+        }
+      }
+    }
+  }
+  console.log('  (' + pockets + ' pockets across ' + tracksWith + '/' + total + ' builds)');
+  check('basins exist somewhere in the matrix', pockets > 0, pockets + ' pockets');
+}
+
+/* 7 — playground furniture stamps (masterplan 5.3): every surviving stamp actually shows up on
+   the built grid at (most of) its intended amplitude, and stays inside a driveable step bound —
+   the same closed-loop guarantee trackgen's own furniture audit already enforces; this re-checks
+   it independently against the shipped track object. */
+console.log('[7] playground furniture stamps (5.3)');
+{
+  let stamps = 0, byType = {};
+  for (const seed of SEEDS) {
+    for (let tier = 1; tier <= 5; tier++) {
+      const track = DD.generateTrack(seed, tier, 0);
+      for (const pg of (track.playgrounds || [])) {
+        const f = pg.furniture;
+        if (!f) continue;
+        stamps++;
+        byType[f.type] = (byType[f.type] || 0) + 1;
+        let peakWorld, expectedAmp, refWorld;
+        if (f.type === 'bowl') {
+          peakWorld = [pg.x, pg.z]; expectedAmp = f.depth;
+          refWorld = [pg.x + f.r * 1.4, pg.z];
+        } else {
+          const tuPeak = f.type === 'roller' ? 0.5 : 0.6;
+          const uPeak = tuPeak * 2 * f.halfLen - f.halfLen;
+          peakWorld = [pg.x + f.dir[0] * uPeak, pg.z + f.dir[1] * uPeak];
+          expectedAmp = f.amp;
+          // reference beside the stamp, not on it (mirror of trackgen's own audit)
+          refWorld = [pg.x - f.dir[1] * f.halfWidth * 1.6, pg.z + f.dir[0] * f.halfWidth * 1.6];
+        }
+        const floorY = DD.terrainAt(track.terrain, refWorld[0], refWorld[1]);
+        const peakY = DD.terrainAt(track.terrain, peakWorld[0], peakWorld[1]);
+        const gotAmp = Math.abs(peakY - floorY);
+        check(seed + ' T' + tier + ' ' + f.type + ' amplitude present', gotAmp >= expectedAmp * 0.4,
+          'got=' + gotAmp.toFixed(2) + ' want>=' + (expectedAmp * 0.4).toFixed(2));
+
+        const P = 5, span = Math.max(f.halfLen || f.r, f.halfWidth || f.r) * 0.9;
         let maxStep = 0;
         const hs = [];
         for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) {
@@ -338,12 +393,12 @@ console.log('[6] playground basins (5.2)');
           if (a + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[(a + 1) * P + b]));
           if (b + 1 < P) maxStep = Math.max(maxStep, Math.abs(hs[a * P + b] - hs[a * P + b + 1]));
         }
-        check(seed + ' T' + tier + ' pocket interior smooth', maxStep <= 2.4, 'maxStep=' + maxStep.toFixed(2) + 'm');
+        check(seed + ' T' + tier + ' ' + f.type + ' driveable step', maxStep <= 5.0, 'maxStep=' + maxStep.toFixed(2) + 'm');
       }
     }
   }
-  console.log('  (' + pockets + ' pockets across ' + tracksWith + '/' + total + ' builds)');
-  check('basins exist somewhere in the matrix', pockets > 0, pockets + ' pockets');
+  console.log('  (' + stamps + ' stamps: ' + JSON.stringify(byType) + ')');
+  check('furniture exists somewhere in the matrix', stamps > 0, stamps + ' stamps');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
