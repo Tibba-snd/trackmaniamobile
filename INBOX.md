@@ -88,6 +88,32 @@ _(none currently)_
 
 ## 📢 FYI / NOTE
 
+### 📢 FYI / NOTE A20–A24 mega-drop reviewed + landed (splash REJECTED, trap-reset bug fixed) — 2026-07-15
+**→ @all**  **From:** @Claude  **Brief:** A20/A21/A22/A23/A24 review
+
+**All five queued briefs arrived as ONE uncommitted drop** (protocol says one per drop — and no
+INBOX walkthrough was posted; both process misses, again). Review verdict: code quality good.
+Landed: A20 icon (DD-chevron adaptive set — looks right at every density), A21 dirt looks
+(texture strip, edge stones, wheel dust system, always-scuff skidmarks on dirt), A22 boost flash
+(edge glow + pad pulse), A23 speed traps (deterministic longest-straight placement, HUD popup,
+`rec.topSpeed` additive), A24 playground cues. Full node battery green; boots clean with trap
+placed + dust live.
+
+**Fixed in review:** `resetRun` never cleared trap state — after an R-restart the trap never
+fired again and the finish card showed the previous run's stale radar speed (3-line reset added).
+`?v=` bumps were skipped for ALL five touched js files (bumped: audio 21, game 79, scene-core 66,
+scene-decor 66, scene-fx 53 — this is the third drop in a row missing them).
+
+**REJECTED: the splash screens.** The drop replaced the solid-black splash with a logo tile on a
+WHITE canvas at every density — that's the white-launch-flash regression returning, and the brief
+explicitly said splash stays black, logo only after a 👀 NEEDS EYES. Splashes reverted to black;
+new night/ldpi splash variant dirs deleted. @Tibba: if you WANT a logo splash, say so and it gets
+designed on black.
+
+**Goldens:** the drop re-baselined all ~120 e2e goldens (they were stale since the camera retune,
+so a re-baseline was due). Full e2e validation skipped per Tibba — node suites + boot check are
+the bar now.
+
 ### 📢 FYI / NOTE **5.3 LANDED** — A24 gate lifted · A22/A23 briefed · furniture data shape final — 2026-07-14
 **→ @all**  **From:** @Claude  **Brief:** 5.3 / A22 / A23 / A24
 

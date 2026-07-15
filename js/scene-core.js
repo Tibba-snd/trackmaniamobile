@@ -392,10 +392,15 @@
     if (glass) root.add(glass);
 
     // dirtcut overlay (3.1) — matte earth wash so the rally sector reads before you're on it
+    const dirtTex = DD._sceneShared.getDirtTexture ? DD._sceneShared.getDirtTexture() : null;
     const dirtStrip = DD._sceneShared.buildStrip(track, theme,
       (s) => s.surf === DD.SURF.DIRT ? [V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, -s.w / 2), V.addS(V.addS(s.p, s.u, DD.DECAL.glass), s.r, s.w / 2)] : null,
-      V.lerp(theme.groundColor, [0.42, 0.30, 0.18], 0.55), 0.85, THREE.NormalBlending);
+      [1, 1, 1], 0.85, THREE.NormalBlending, dirtTex);
     if (dirtStrip) root.add(dirtStrip);
+
+    // dirt edge scatter (small stones)
+    const dirtScatter = DD._sceneShared.buildDirtScatter ? DD._sceneShared.buildDirtScatter(track, theme) : null;
+    if (dirtScatter) root.add(dirtScatter);
 
     // guardrails: solid wall + bright top rail. Shortcut mouths OPEN the inside rail
     // (s.wallOpen — mirrors the physics clamp skip, so what you see is what collides).
@@ -424,6 +429,16 @@
 
     // T3 + T4: gantry-style start/finish + numbered checkpoint gates
     root.add(DD._sceneShared.buildGates(track, theme, quality));
+    // Speed trap gantry (A23)
+    if (DD._sceneShared.buildSpeedTrapGantry) {
+      const radarGantry = DD._sceneShared.buildSpeedTrapGantry(track, theme);
+      if (radarGantry) root.add(radarGantry);
+    }
+    // Playground cues (A24)
+    if (DD._sceneShared.buildPlaygroundCues) {
+      const cues = DD._sceneShared.buildPlaygroundCues(track, theme);
+      if (cues) root.add(cues);
+    }
     // T5: tunnels (overheaded tubes on straight segments)
     root.add(DD._sceneShared.buildTunnels(track, theme, quality));
     // T6: landing target pads for big jumps

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#07040e" />
+      <stop offset="100%" stop-color="#140b2e" />
+    </radialGradient>
+    
+    <!-- Horizon Gradient -->
+    <linearGradient id="horizonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff7bd5" stop-opacity="0" />
+      <stop offset="50%" stop-color="#ff7bd5" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#ff7bd5" stop-opacity="0" />
+    </linearGradient>
+    
+    <!-- Glyphs Gradient -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9d7bff" />
+      <stop offset="100%" stop-color="#ff7bd5" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Group -->
+  <g id="background">
+    <rect width="1024" height="1024" fill="url(#bgGrad)" />
+  </g>
+
+  <!-- Foreground Group -->
+  <g id="foreground">
+    <!-- Horizon Line -->
+    <line x1="112" y1="562" x2="912" y2="562" stroke="url(#horizonGrad)" stroke-width="4" />
+    
+    <!-- Monogram Group (Leaning Forward) -->
+    <g transform="translate(512, 512) skewX(-15) scale(1.35)">
+      <!-- Left D Glyph -->
+      <!-- Main body -->
+      <path d="M -110,-140 L -110,140 L -60,140 L 10,0 L -60,-140 Z" 
+            fill="none" stroke="url(#mainGrad)" stroke-width="36" stroke-linejoin="round" stroke-linecap="round" />
+      <!-- Edge Light (Leading/Right edges) -->
+      <path d="M -60,140 L 10,0 L -60,-140" 
+            fill="none" stroke="#ffb37b" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" />
+
+      <!-- Right D Glyph -->
+      <!-- Main body -->
+      <path d="M 50,-140 L 50,140 L 100,140 L 170,0 L 100,-140 Z" 
+            fill="none" stroke="url(#mainGrad)" stroke-width="36" stroke-linejoin="round" stroke-linecap="round" />
+      <!-- Edge Light (Leading/Right edges) -->
+      <path d="M 100,140 L 170,0 L 100,-140" 
+            fill="none" stroke="#ffb37b" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" />
+    </g>
+  </g>
+</svg>

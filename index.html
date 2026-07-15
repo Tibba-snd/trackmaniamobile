@@ -44,6 +44,27 @@
     animation:grain 0.6s steps(2) infinite; }
   @keyframes grain { 0%{transform:translate(0,0)} 50%{transform:translate(-6%,4%)} 100%{transform:translate(4%,-3%)} }
 
+  /* Boost Hit screen edge glow flash */
+  #boostFlash {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    box-sizing: border-box;
+    border: 0px solid rgba(255, 123, 213, 0);
+    mix-blend-mode: screen;
+  }
+  #boostFlash.active {
+    animation: boost-flash-anim 0.45s cubic-bezier(0.1, 0.85, 0.2, 1) forwards;
+  }
+  @keyframes boost-flash-anim {
+    0% {
+      border: 36px solid var(--accent2, #ff7bd5);
+      opacity: 0.95;
+    }
+    100% {
+      border: 4px solid var(--accent2, #ff7bd5);
+      opacity: 0;
+    }
+  }
+
   /* Screens & Menus */
   .screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10;
     background:radial-gradient(120% 120% at 50% 110%, rgba(var(--accent-rgb), 0.15) 0%, rgba(5, 3, 10, 0.95) 55%, #05030a 100%);
@@ -361,6 +382,73 @@
     font-weight: 600;
     color: rgba(255, 255, 255, 0.62);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Speed Trap HUD Card */
+  #hudSpeedTrap {
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.7);
+    background: rgba(10, 7, 24, 0.9);
+    border: 2px solid var(--accent2, #ff7bd5);
+    border-radius: 8px;
+    padding: 12px 24px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 0 32px rgba(255, 123, 213, 0.45);
+    opacity: 0;
+    display: none;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s linear;
+  }
+  #hudSpeedTrap.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.0);
+  }
+  .hud-speedtrap-label {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--accent2, #ff7bd5);
+    margin-bottom: 2px;
+  }
+  .hud-speedtrap-value {
+    font-family: 'Azeret Mono', monospace;
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+  }
+  .hud-speedtrap-value small {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: 2px;
+  }
+
+  /* Finish top speed row */
+  #finTopSpeed {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #a59fc4;
+    margin: 8px 0;
+    text-transform: uppercase;
+  }
+  #finTopSpeed .fin-speed-val {
+    color: #ffffff;
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 800;
+  }
+  #finTopSpeed .radar-best-lbl {
+    color: var(--accent2, #ff7bd5);
+    font-weight: 800;
+    animation: flash-pulse 0.8s infinite alternate;
+  }
+  @keyframes flash-pulse {
+    0% { opacity: 0.6; }
+    100% { opacity: 1.0; }
   }
   #hudGhostTag {
     font-family: 'Chakra Petch', sans-serif;
@@ -1372,6 +1460,7 @@
 <canvas id="gl"></canvas>
 <div id="vignette"></div>
 <div id="grain"></div>
+<div id="boostFlash"></div>
 <div id="steerIndicatorL"></div>
 <div id="steerIndicatorR"></div>
 <div id="tapHint" class="tap-hint-overlay" style="display: none;">◀ tap left · right tap ▶ · hold to steer</div>
@@ -1607,6 +1696,12 @@
   <div id="countdown"><div id="countNum" class="pulse-tick">3</div></div>
 </div>
 
+<!-- Speed Trap HUD card -->
+<div id="hudSpeedTrap">
+  <div class="hud-speedtrap-label">SPEED TRAP</div>
+  <div class="hud-speedtrap-value"><span id="hudSpeedTrapVal">0</span> <small>KM/H</small></div>
+</div>
+
 <!-- in-game buttons -->
 <div id="gameButtons">
   <button class="gbtn" id="btnRestart" title="restart">
@@ -1637,6 +1732,7 @@
     <div id="finDelta"></div>
     <div id="finMedal"></div>
     <div id="finPB"></div>
+    <div id="finTopSpeed" style="display: none;"></div>
     <div id="finSeed"></div>
     <div id="finLaps"></div>
     <div class="finRow">
@@ -1671,14 +1767,14 @@
 <script src="js/theme.js?v=24"></script>
 <script src="js/trackgen.js?v=30"></script>
 <script src="js/physics.js?v=34"></script>
-<script src="js/audio.js?v=20"></script>
+<script src="js/audio.js?v=21"></script>
 <script src="js/input.js?v=17"></script>
 <script src="js/carspec.js?v=5"></script>
-<script src="js/scene-core.js?v=65"></script>
-<script src="js/scene-decor.js?v=65"></script>
+<script src="js/scene-core.js?v=66"></script>
+<script src="js/scene-decor.js?v=66"></script>
 <script src="js/scene-car.js?v=60"></script>
-<script src="js/scene-fx.js?v=52"></script>
-<script src="js/game.js?v=78"></script>
+<script src="js/scene-fx.js?v=53"></script>
+<script src="js/game.js?v=79"></script>
 <script src="js/physdev.js?v=4"></script>
 <script src="js/perfhud.js?v=2"></script>
 </body>

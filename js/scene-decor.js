@@ -566,7 +566,7 @@
     return mesh;
   }
 
-  function buildStrip(track, theme, offsetFn, color, opacity, blending) {
+  function buildStrip(track, theme, offsetFn, color, opacity, blending, texture) {
     // generic thin strip builder along track; offsetFn(s) -> [centerOffsetVec, halfWidthVec] or null to skip
     const ss = track.samples;
     const pts = [];
@@ -575,12 +575,14 @@
       pts.push(o); // may be null
     }
     const pos = [];
+    const uvs = [];
     const idx = [];
     let vi = 0, runStart = -1;
     for (let i = 0; i < ss.length; i++) {
       if (pts[i]) {
         const [a, b] = pts[i];
         pos.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+        uvs.push(0, i * 0.2, 1, i * 0.2);
         if (runStart >= 0) {
           const q = vi - 2;
           idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2);
@@ -597,6 +599,7 @@
     if (!pos.length) return null;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geo.setIndex(idx);
     const isNormal = !blending || blending === THREE.NormalBlending;
     const mat = new THREE.MeshBasicMaterial({
@@ -605,7 +608,8 @@
       depthWrite: isNormal,
       polygonOffset: isNormal,
       polygonOffsetFactor: isNormal ? -1 : 0,
-      polygonOffsetUnits: isNormal ? -1 : 0
+      polygonOffsetUnits: isNormal ? -1 : 0,
+      map: texture || null
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
@@ -2933,6 +2937,22 @@
     const baseInst = new THREE.InstancedMesh(baseGeo, baseMat, runs.length);
     const chevronInst = new THREE.InstancedMesh(chevronGeo, chevronMat, totalChevrons);
 
+    const haloGeo = new THREE.PlaneGeometry(1, 1);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      map: getDotTexture ? getDotTexture() : null,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+    const haloInst = new THREE.InstancedMesh(haloGeo, haloMat, runs.length);
+    group.add(haloInst);
+    track.boostHaloInst = haloInst;
+
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
 
@@ -2956,7 +2976,14 @@
       baseInst.setMatrixAt(idx, m4);
 
       if (idx < 8) {
-        addLightSource(track, [sMid.p[0], sMid.p[1] + 1.2, sMid.p[2]], boostCol, 1.3, 16.0);
+        const light = {
+          pos: [sMid.p[0], sMid.p[1] + 1.2, sMid.p[2]],
+          color: boostCol,
+          intensity: 0.0,
+          distance: 16.0
+        };
+        (track._lightSources || (track._lightSources = [])).push(light);
+        padData[idx].lightSource = light;
       }
     });
 
@@ -3235,22 +3262,72 @@
     return group;
   }
 
-  function updateBoostPads(track, dt) {
+  function updateBoostPads(track, dt, car) {
     if (!track || !track.boostPadsData || !track.boostChevronInst) return;
     const ss = track.samples;
     const chevronInst = track.boostChevronInst;
 
+    track.boostPadTime = (track.boostPadTime || 0) + dt;
+    if (track.boostChevronMat) {
+      track.boostChevronMat.opacity = 0.55 + 0.4 * Math.sin(track.boostPadTime * 6.0);
+    }
+
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const qPlane = new THREE.Quaternion(), localRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
-    track.boostPadsData.forEach(pad => {
-      const len = pad.run.end - pad.run.start;
+    const boostCol = new THREE.Color().copy(chevronInst.material.color);
+    const cTemp = new THREE.Color();
+
+    track.boostPadsData.forEach((pad, idx) => {
+      const run = pad.run;
+      const midIdx = Math.floor((run.start + run.end) / 2);
+      const sMid = ss[midIdx];
+      const startP = ss[run.start].p;
+      const endP = ss[run.end].p;
+      const dist = V.dist(startP, endP);
+
+      let smoothGlow = 0;
+      if (car) {
+        const dx = car.pos[0] - sMid.p[0];
+        const dz = car.pos[2] - sMid.p[2];
+        const d = Math.hypot(dx, dz);
+        const normD = DD.clamp((d - 20) / (120 - 20), 0, 1);
+        const approachGlow = 1.0 - normD;
+        smoothGlow = approachGlow * approachGlow * (3.0 - 2.0 * approachGlow);
+      }
+
+      if (pad.lightSource) {
+        pad.lightSource.intensity = smoothGlow * 1.4;
+      }
+
+      if (track.boostHaloInst) {
+        pos.set(sMid.p[0], sMid.p[1] + (DD.DECAL.boost + 0.04), sMid.p[2]);
+
+        const yaw = Math.atan2(sMid.f[0], sMid.f[2]);
+        const pitch = Math.asin(sMid.f[1]);
+        const roll = Math.atan2(sMid.r[1], sMid.r[0]);
+        q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+
+        qPlane.copy(q).multiply(localRot);
+
+        const scaleFactor = 1.0 + smoothGlow * 0.45;
+        scl.set(sMid.w * 1.4 * scaleFactor, (dist + 3.0) * scaleFactor, 1.0);
+
+        m4.compose(pos, qPlane, scl);
+        track.boostHaloInst.setMatrixAt(idx, m4);
+
+        cTemp.copy(boostCol).multiplyScalar(smoothGlow * 0.85);
+        track.boostHaloInst.setColorAt(idx, cTemp);
+      }
+
+      const len = run.end - run.start;
       pad.chevrons.forEach(chev => {
         chev.progress = (chev.progress + dt * 1.6) % 1.0;
 
-        const localVal = pad.run.start + chev.progress * len;
+        const localVal = run.start + chev.progress * len;
         const idxA = Math.floor(localVal);
-        const idxB = Math.min(pad.run.end, idxA + 1);
+        const idxB = Math.min(run.end, idxA + 1);
         const fraction = localVal - idxA;
 
         const sA = ss[idxA], sB = ss[idxB];
@@ -3273,7 +3350,6 @@
         const pitch = Math.asin(fy);
         const roll = Math.atan2(ry, rx);
         q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
-        const localRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
         q.multiply(localRot);
 
         const width = (sA.w + (sB.w - sA.w) * fraction) * 0.45;
@@ -3284,6 +3360,10 @@
       });
     });
 
+    if (track.boostHaloInst) {
+      track.boostHaloInst.instanceMatrix.needsUpdate = true;
+      if (track.boostHaloInst.instanceColor) track.boostHaloInst.instanceColor.needsUpdate = true;
+    }
     chevronInst.instanceMatrix.needsUpdate = true;
   }
 
@@ -3417,5 +3497,445 @@
   DD._sceneShared.buildTunnels = buildTunnels;
   DD._sceneShared.buildLandingPads = buildLandingPads;
   DD._sceneShared.updateLandingPads = updateLandingPads;
+
+  let _dirtTex = null;
+  function getDirtTexture() {
+    if (_dirtTex) return _dirtTex;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill background with earth wash
+    ctx.fillStyle = '#6b4c35';
+    ctx.fillRect(0, 0, 512, 512);
+    
+    // Deterministic LCG
+    let rngSeed = 42;
+    function rand() {
+      rngSeed = (rngSeed * 1664525 + 1013904223) % 4294967296;
+      return rngSeed / 4294967296;
+    }
+    
+    // Draw noise / mottling
+    for (let i = 0; i < 5000; i++) {
+      const x = rand() * 512;
+      const y = rand() * 512;
+      const size = rand() * 2 + 1;
+      const c = rand() > 0.5 ? 'rgba(60,40,25,0.45)' : 'rgba(140,105,75,0.3)';
+      ctx.fillStyle = c;
+      ctx.fillRect(x, y, size, size);
+    }
+    
+    // Draw tire-groove streaks
+    ctx.strokeStyle = 'rgba(50,30,15,0.4)';
+    ctx.lineWidth = 4;
+    if (ctx.beginPath) {
+      for (let i = 0; i < 24; i++) {
+        const x = rand() * 512;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 512);
+        ctx.stroke();
+      }
+    }
+    
+    // Draw lighter tire-groove streaks
+    ctx.strokeStyle = 'rgba(125,95,65,0.22)';
+    ctx.lineWidth = 3;
+    if (ctx.beginPath) {
+      for (let i = 0; i < 18; i++) {
+        const x = rand() * 512;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 512);
+        ctx.stroke();
+      }
+    }
+    
+    _dirtTex = new THREE.CanvasTexture(canvas);
+    _dirtTex.wrapS = THREE.RepeatWrapping;
+    _dirtTex.wrapT = THREE.RepeatWrapping;
+    _dirtTex.repeat.set(4, 32);
+    return _dirtTex;
+  }
+
+  function buildDirtScatter(track, theme) {
+    const ss = track.samples;
+    const N = ss.length;
+    const rng = DD.makeRng(track.seed + '::dirtlook');
+    
+    const dirtIndices = [];
+    for (let i = 0; i < N; i++) {
+      if (ss[i].surf === DD.SURF.DIRT) {
+        dirtIndices.push(i);
+      }
+    }
+    if (!dirtIndices.length) return null;
+    
+    let count = 0;
+    dirtIndices.forEach(idx => {
+      if (rng.chance(0.7)) {
+        count++;
+      }
+    });
+    if (count === 0) return null;
+    
+    const geo = new THREE.OctahedronGeometry(0.18, 0);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x5a483c,
+      roughness: 0.92,
+      metalness: 0.08
+    });
+    const inst = new THREE.InstancedMesh(geo, mat, count);
+    inst.castShadow = true;
+    inst.receiveShadow = true;
+    inst.frustumCulled = false;
+    
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    
+    let ii = 0;
+    dirtIndices.forEach(idx => {
+      if (!rng.chance(0.7)) return;
+      const s = ss[idx];
+      
+      const side = rng.sign();
+      const factor = 0.88 + rng.range(0.0, 0.1);
+      const edgeDist = side * (s.w / 2) * factor;
+      
+      const px = s.p[0] + s.r[0] * edgeDist;
+      const pz = s.p[2] + s.r[2] * edgeDist;
+      const py = DD.terrainAt(track.terrain, px, pz) + 0.04;
+      
+      pos.set(px, py, pz);
+      
+      const sVal = rng.range(0.6, 1.4);
+      scl.set(sVal, sVal, sVal);
+      
+      e.set(rng.range(0, 6.28), rng.range(0, 6.28), rng.range(0, 6.28));
+      q.setFromEuler(e);
+      
+      m4.compose(pos, q, scl);
+      inst.setMatrixAt(ii++, m4);
+    });
+    
+    inst.instanceMatrix.needsUpdate = true;
+    return inst;
+  }
+
+  function buildSpeedTrapGantry(track, theme) {
+    if (!track || track.speedTrapIdx === undefined || track.speedTrapIdx === -1) return null;
+    const ss = track.samples;
+    const s = ss[track.speedTrapIdx];
+    if (!s) return null;
+    
+    const group = new THREE.Group();
+    const halfW = s.w * 0.5 + 0.7;
+    const postH = 4.2;
+    
+    const right = new THREE.Vector3(s.r[0], s.r[1], s.r[2]);
+    const up = new THREE.Vector3(s.u[0], s.u[1], s.u[2]);
+    const fwd = new THREE.Vector3(s.f[0], s.f[1], s.f[2]);
+    
+    const yaw = Math.atan2(s.f[0], s.f[2]);
+    const pitch = Math.asin(s.f[1]);
+    const roll = Math.atan2(s.r[1], s.r[0]);
+    const e = new THREE.Euler().set(pitch, yaw, roll, 'YXZ');
+    const quat = new THREE.Quaternion().setFromEuler(e);
+    
+    const structMat = new THREE.MeshBasicMaterial({ color: 0x0c0a15, transparent: true, opacity: 0.95 });
+    
+    // Left column
+    const lp = new THREE.Mesh(new THREE.BoxGeometry(0.18, postH, 0.18), structMat);
+    lp.position.set(
+      s.p[0] - right.x * halfW + up.x * postH * 0.5,
+      s.p[1] - right.y * halfW + up.y * postH * 0.5,
+      s.p[2] - right.z * halfW + up.z * postH * 0.5
+    );
+    lp.quaternion.copy(quat);
+    group.add(lp);
+    
+    // Right column
+    const rp = new THREE.Mesh(new THREE.BoxGeometry(0.18, postH, 0.18), structMat);
+    rp.position.set(
+      s.p[0] + right.x * halfW + up.x * postH * 0.5,
+      s.p[1] + right.y * halfW + up.y * postH * 0.5,
+      s.p[2] + right.z * halfW + up.z * postH * 0.5
+    );
+    rp.quaternion.copy(quat);
+    group.add(rp);
+    
+    // Crossbar
+    const cb = new THREE.Mesh(new THREE.BoxGeometry(s.w * 1.02 + 1.4, 0.2, 0.2), structMat);
+    cb.position.set(
+      s.p[0] + up.x * postH,
+      s.p[1] + up.y * postH,
+      s.p[2] + up.z * postH
+    );
+    cb.quaternion.copy(quat);
+    group.add(cb);
+    
+    // Radar Text Canvas Board
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#090712'; ctx.fillRect(0, 0, 256, 128);
+    ctx.strokeStyle = 'rgba(255,179,123,0.85)'; ctx.lineWidth = 8; ctx.strokeRect(8, 8, 240, 112);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 50px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('RADAR', 128, 64);
+    
+    const radarTex = new THREE.CanvasTexture(canvas);
+    const boardMat = new THREE.MeshStandardMaterial({
+      map: radarTex,
+      emissive: col(theme.accent2 || theme.accent),
+      emissiveMap: radarTex,
+      emissiveIntensity: 1.0,
+      roughness: 0.5
+    });
+    track.speedTrapMat = boardMat;
+    
+    const boardGeo = new THREE.BoxGeometry(4.0, 1.4, 0.15);
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.set(
+      s.p[0] + up.x * (postH - 0.7),
+      s.p[1] + up.y * (postH - 0.7),
+      s.p[2] + up.z * (postH - 0.7)
+    );
+    board.quaternion.copy(quat);
+    group.add(board);
+    
+    // Add flashing neon trim
+    const trimGeo = new THREE.BoxGeometry(4.2, 0.05, 0.22);
+    const trimMat = new THREE.MeshBasicMaterial({
+      color: col(theme.accent2 || theme.accent),
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const trimT = new THREE.Mesh(trimGeo, trimMat);
+    trimT.position.set(
+      s.p[0] + up.x * (postH - 0.7 + 0.725),
+      s.p[1] + up.y * (postH - 0.7 + 0.725),
+      s.p[2] + up.z * (postH - 0.7 + 0.725)
+    );
+    trimT.quaternion.copy(quat);
+    group.add(trimT);
+    
+    const trimB = new THREE.Mesh(trimGeo, trimMat);
+    trimB.position.set(
+      s.p[0] + up.x * (postH - 0.7 - 0.725),
+      s.p[1] + up.y * (postH - 0.7 - 0.725),
+      s.p[2] + up.z * (postH - 0.7 - 0.725)
+    );
+    trimB.quaternion.copy(quat);
+    group.add(trimB);
+    
+    return group;
+  }
+
+  DD._sceneShared.getDirtTexture = getDirtTexture;
+  DD._sceneShared.buildDirtScatter = buildDirtScatter;
+  DD._sceneShared.buildSpeedTrapGantry = buildSpeedTrapGantry;
+
+  let _arrowTex = null;
+  function getArrowTexture() {
+    if (_arrowTex) return _arrowTex;
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 14;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (ctx.beginPath) {
+      ctx.beginPath();
+      ctx.moveTo(24, 76); ctx.lineTo(64, 36); ctx.lineTo(104, 76);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(24, 102); ctx.lineTo(64, 62); ctx.lineTo(104, 102);
+      ctx.stroke();
+    }
+    _arrowTex = new THREE.CanvasTexture(canvas);
+    return _arrowTex;
+  }
+
+  function buildPlaygroundCues(track, theme) {
+    const pgs = track.playgrounds;
+    if (!pgs || !pgs.length) return null;
+    const group = new THREE.Group();
+    const ss = track.samples;
+    const N = ss.length;
+    const T = track.terrain;
+    if (!T) return null;
+    
+    const arrowTex = getArrowTexture();
+    const arrowMat = new THREE.MeshBasicMaterial({
+      color: col(theme.accent),
+      transparent: true,
+      opacity: 0.25,
+      map: arrowTex,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+    
+    const arrowGeo = new THREE.PlaneGeometry(2.2, 2.2);
+    let totalArrows = pgs.length * 3;
+    const arrowInst = new THREE.InstancedMesh(arrowGeo, arrowMat, totalArrows);
+    group.add(arrowInst);
+    
+    const glowGeo = new THREE.PlaneGeometry(3.0, 3.0);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: col(theme.accent2 || theme.accent),
+      transparent: true,
+      opacity: 0.65,
+      map: getDotTexture ? getDotTexture() : null,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.5,
+      polygonOffsetUnits: -1.5
+    });
+    const glowInst = new THREE.InstancedMesh(glowGeo, glowMat, pgs.length);
+    group.add(glowInst);
+    
+    const furnDots = [];
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const qPlane = new THREE.Quaternion();
+    const localRot = new THREE.Quaternion();
+    if (localRot.setFromAxisAngle) {
+      localRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    }
+    
+    let arrowVi = 0;
+    let glowVi = 0;
+    
+    pgs.forEach(pg => {
+      const anchorIdx = pg.anchorIdx;
+      if (anchorIdx === undefined || anchorIdx === -1) return;
+      const s = ss[anchorIdx];
+      if (!s) return;
+      
+      const side = Math.sign(s.apron) || 1;
+      const k = Math.abs(s.apron) || 1;
+      
+      const arrowIndices = [anchorIdx - 3, anchorIdx, anchorIdx + 3];
+      arrowIndices.forEach(idx => {
+        const wIdx = getWrappedIdx(idx, N, track.closed);
+        if (wIdx === -1) return;
+        const sArrow = ss[wIdx];
+        const distOnApron = side * (sArrow.w * 0.5 + 0.3 + 1.6 * k);
+        const px = sArrow.p[0] + sArrow.r[0] * distOnApron;
+        const pz = sArrow.p[2] + sArrow.r[2] * distOnApron;
+        const py = DD.terrainAt(T, px, pz) + 0.05;
+        
+        pos.set(px, py, pz);
+        scl.set(1.0, 1.0, 1.0);
+        
+        const dirX = pg.x - px, dirZ = pg.z - pz;
+        const distToCenter = Math.hypot(dirX, dirZ) || 1;
+        const dir = [dirX / distToCenter, 0, dirZ / distToCenter];
+        
+        const ux = sArrow.u[0], uy = sArrow.u[1], uz = sArrow.u[2];
+        const fx = dir[0], fy = 0, fz = dir[2];
+        const rx = uy * fz - uz * fy;
+        const ry = uz * fx - ux * fz;
+        const rz = ux * fy - uy * fx;
+        const rLen = Math.hypot(rx, ry, rz) || 1;
+        const rVec = new THREE.Vector3(rx / rLen, ry / rLen, rz / rLen);
+        const cx = ry * uz - rz * uy;
+        const cy = rz * ux - rx * uz;
+        const cz = rx * uy - ry * ux;
+        const cLen = Math.hypot(cx, cy, cz) || 1;
+        const uVec = new THREE.Vector3(ux, uy, uz);
+        const fVecCorrected = new THREE.Vector3(-cx / cLen, -cy / cLen, -cz / cLen);
+        m4.makeBasis(rVec, uVec, fVecCorrected);
+        if (m4.setPosition) m4.setPosition(pos);
+        
+        arrowInst.setMatrixAt(arrowVi++, m4);
+      });
+      
+      const entDist = side * (s.w * 0.5 + 0.5 + 3.4 * k);
+      const entX = s.p[0] + s.r[0] * entDist;
+      const entZ = s.p[2] + s.r[2] * entDist;
+      const entY = DD.terrainAt(T, entX, entZ);
+      
+      pos.set(entX, entY + 0.08, entZ);
+      scl.set(1.0, 1.0, 1.0);
+      
+      const yaw = Math.atan2(s.f[0], s.f[2]);
+      const pitch = Math.asin(s.f[1]);
+      const roll = Math.atan2(s.r[1], s.r[0]);
+      q.setFromEuler(e.set(pitch, yaw, roll, 'YXZ'));
+      qPlane.copy(q);
+      if (qPlane.multiply) qPlane.multiply(localRot);
+      
+      m4.compose(pos, qPlane, scl);
+      glowInst.setMatrixAt(glowVi++, m4);
+      
+      if (glowVi <= 8) {
+        addLightSource(track, [entX, entY + 1.0, entZ], col(theme.accent2 || theme.accent), 1.2, 10.0);
+      }
+      
+      const f = pg.furniture;
+      if (f) {
+        if (f.type === 'bowl') {
+          const count = 3;
+          for (let i = 0; i < count; i++) {
+            const angle = i * (Math.PI * 2 / count);
+            const dotX = pg.x + Math.cos(angle) * (f.r * 0.975);
+            const dotZ = pg.z + Math.sin(angle) * (f.r * 0.975);
+            const dotY = DD.terrainAt(T, dotX, dotZ) + 0.22;
+            furnDots.push([dotX, dotY, dotZ]);
+          }
+        } else {
+          const count = 3;
+          for (let i = 0; i < count; i++) {
+            const t = (i / (count - 1) - 0.5) * 1.6;
+            const dotX = pg.x + f.dir[0] * (t * f.halfLen);
+            const dotZ = pg.z + f.dir[1] * (t * f.halfLen);
+            const dotY = DD.terrainAt(T, dotX, dotZ) + 0.22;
+            furnDots.push([dotX, dotY, dotZ]);
+          }
+        }
+      }
+    });
+    
+    arrowInst.count = arrowVi;
+    arrowInst.instanceMatrix.needsUpdate = true;
+    
+    glowInst.count = glowVi;
+    glowInst.instanceMatrix.needsUpdate = true;
+    
+    if (furnDots.length > 0) {
+      const dotGeo = new THREE.SphereGeometry(0.14, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({
+        color: col(theme.accent2 || theme.accent),
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const dotInst = new THREE.InstancedMesh(dotGeo, dotMat, furnDots.length);
+      group.add(dotInst);
+      furnDots.forEach((pt, idx) => {
+        pos.set(pt[0], pt[1], pt[2]);
+        scl.set(1.0, 1.0, 1.0);
+        if (q.set) q.set(0, 0, 0, 1);
+        m4.compose(pos, q, scl);
+        dotInst.setMatrixAt(idx, m4);
+      });
+      dotInst.instanceMatrix.needsUpdate = true;
+    }
+    
+    return group;
+  }
+
+  DD._sceneShared.buildPlaygroundCues = buildPlaygroundCues;
 
 })(typeof window !== 'undefined' ? window : globalThis);

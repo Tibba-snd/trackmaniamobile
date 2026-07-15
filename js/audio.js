@@ -63,7 +63,7 @@
 
     // ---- dirt rumble ----
     const rm = ctx.createBufferSource(); rm.buffer = noiseBuf; rm.loop = true;
-    const rmFilt = ctx.createBiquadFilter(); rmFilt.type = 'lowpass'; rmFilt.frequency.value = 160; rmFilt.Q.value = 0.5;
+    const rmFilt = A.nodes.rumbleFilt = ctx.createBiquadFilter(); rmFilt.type = 'lowpass'; rmFilt.frequency.value = 160; rmFilt.Q.value = 0.5;
     const rmGain = A.nodes.rumbleGain = ctx.createGain(); rmGain.gain.value = 0;
     rm.connect(rmFilt).connect(rmGain).connect(master);
     rm.start();
@@ -162,9 +162,13 @@
     n.screechGain.gain.setTargetAtTime(sc * 0.22 * A.volumes.sfx, ctx.currentTime, 0.04);
     n.screechFilt.frequency.setTargetAtTime(1100 + slide * 600 + speed * 3, ctx.currentTime, 0.06);
     // rumble serves dirt AND the corner kerb band (kerb slightly quieter, same noise loop)
-    const rumble = onDirt ? DD.clamp(speed / 35, 0, 1) * 0.3
-      : DD.clamp(kerb || 0, 0, 1) * DD.clamp(speed / 35, 0, 1) * 0.3;
+    const rumble = onDirt ? DD.clamp(speed / 30, 0, 1) * 0.55
+      : DD.clamp(kerb || 0, 0, 1) * DD.clamp(speed / 35, 0, 1) * 0.22;
     n.rumbleGain.gain.setTargetAtTime(rumble * A.volumes.sfx, ctx.currentTime, 0.07);
+    if (n.rumbleFilt) {
+      const cut = onDirt ? (120 + speed * 1.5) : 160;
+      n.rumbleFilt.frequency.setTargetAtTime(cut, ctx.currentTime, 0.05);
+    }
 
     // ---- wall scrape: grinding bandpass noise while hitWall & speed > 5 ----
     const active = !!hitWall && speed > 5;

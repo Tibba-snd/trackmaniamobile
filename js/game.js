@@ -282,6 +282,11 @@
         DD.trackCache[cacheKey] = track;
       }
       G.track = track;
+      G.trapIdx = findSpeedTrapIndex(track);
+      G.runTrapSpeed = 0;
+      G.trapCrossed = false;
+      G.prevCarIdx = 0;
+      G.speedTrapFlash = 0;
       applyCssTheme(track.theme);
       // Show the track's full identity — biome/weather alone made distinct layouts read as "the
       // same track" (archetype and circuit-vs-sprint are the real variety, make them VISIBLE).
@@ -308,6 +313,11 @@
       if (G.smoke) DD.disposeGroup(G.scene, G.smoke);
       G.smoke = DD.buildSmoke(track.theme);
       G.scene.add(G.smoke);
+      if (G.dust) DD.disposeGroup(G.scene, G.dust);
+      if (DD.buildDust) {
+        G.dust = DD.buildDust(track.theme);
+        G.scene.add(G.dust);
+      }
       if (G.sparks) DD.disposeGroup(G.scene, G.sparks);
       if (DD.buildSparks) {
         G.sparks = DD.buildSparks(track.theme);
@@ -541,6 +551,12 @@
     G.tickCount = 0;
     G.ghostPlayhead = 0;
     G.ghostIdx = 0; // ghost's own ribbon cursor (track-pose lookup)
+    // speed trap is per-RUN: without this, a restart kept trapCrossed=true (trap never fired
+    // again) and the finish card showed the previous run's stale radar speed
+    G.trapCrossed = false;
+    G.runTrapSpeed = 0;
+    G.prevCarIdx = 0;
+    G.speedTrapFlash = 0;
     G.prevPos = [G.car.pos[0], G.car.pos[1], G.car.pos[2]];
     G.prevYaw = G.car.yaw;
     G.camState = DD.makeCamState();
@@ -645,6 +661,30 @@
     $('finMedal').className = 'md ' + medal;
     $('finPB').textContent = isPB ? (rec.attempts === 1 ? 'first run!' : 'new personal best!') : ('PB ' + DD.formatTime(rec.pb));
     dialInText($('finSeed'), track.seed + '  ·  TIER ' + track.tier);
+
+    // Top Speed Trap persistence and display
+    const finTopSpeed = $('finTopSpeed');
+    if (finTopSpeed) {
+      if (track && G.trapIdx !== undefined && G.trapIdx !== -1) {
+        const runTrapSpeed = G.runTrapSpeed || 0;
+        const oldBest = rec.topSpeed || 0;
+        const isNewRecord = runTrapSpeed > oldBest;
+        if (isNewRecord) {
+          rec.topSpeed = runTrapSpeed;
+          G.save.tracks[key] = rec;
+          DD.persistSave(G.save);
+        }
+        const bestSpeed = rec.topSpeed || runTrapSpeed;
+        let label = 'BEST ' + bestSpeed + ' KM/H';
+        if (isNewRecord && oldBest > 0) {
+          label += ' <span class="radar-best-lbl">(RADAR BEST!)</span>';
+        }
+        finTopSpeed.innerHTML = 'RADAR SPEED: <span class="fin-speed-val">' + runTrapSpeed + ' KM/H</span>  ·  ' + label;
+        finTopSpeed.style.display = 'block';
+      } else {
+        finTopSpeed.style.display = 'none';
+      }
+    }
 
     const finLaps = $('finLaps');
     if (finLaps) {
@@ -1100,7 +1140,7 @@
     }
     DD.updateTrail(G.trail, G.car, G.track, speedNorm);
     if (DD._sceneShared.updateBoostPads) {
-      DD._sceneShared.updateBoostPads(G.track, dtReal);
+      DD._sceneShared.updateBoostPads(G.track, dtReal, G.car);
     }
     if (DD._sceneShared.updateGates) {
       DD._sceneShared.updateGates(G.track, dtReal, G.state, G.countdownT, G.car ? G.car.nextCkpt : 0);
@@ -1108,7 +1148,7 @@
     if (DD._sceneShared.updateLandingPads) {
       DD._sceneShared.updateLandingPads(G.track, t);
     }
-    DD.updateSpeedLines(G.speedLines, G.camera, speedNorm);
+    DD.updateSpeedLines(G.speedLines, G.camera, speedNorm, G.car, G.track.theme);
     DD.updateFireflies(G.track.fireflies, t * 0.001);
     if (G.weather && DD.updateWeather) {
       DD.updateWeather(G.weather, G.camera, dtReal, t * 0.001);
@@ -1119,8 +1159,39 @@
     if (G.track.planetMesh) G.track.planetMesh.rotation.y = -t * 0.00003;
     if (G.track.starsMesh) G.track.starsMesh.rotation.y = t * 0.000007;
     const slideAmt = G.car.slipMax || 0;
-    DD.updateSkidmarks(G.skid, G.car, G.track, G.car.sliding && slideAmt > 0.1 && G.state === 'play');
-    DD.updateSmoke(G.smoke, G.car, G.track, dtReal, (G.car.sliding && slideAmt > 0.32) || (G.car.onDirt && speed > 14));
+    const isDirt = G.car.onDirt || G.car.surf === DD.SURF.DIRT;
+    const activeSkid = G.state === 'play' && (
+      isDirt ? (slideAmt > 0.05) : (G.car.sliding && slideAmt > 0.1)
+    );
+    DD.updateSkidmarks(G.skid, G.car, G.track, activeSkid);
+    DD.updateSmoke(G.smoke, G.car, G.track, dtReal, G.car.sliding && slideAmt > 0.32);
+    if (G.dust && DD.updateDust) {
+      DD.updateDust(G.dust, G.car, G.track, dtReal, isDirt && speed > 10);
+    }
+
+    // Speed trap crossing and emissive flash logic
+    if (G.trapIdx !== undefined && G.trapIdx !== -1 && G.state === 'play' && G.car) {
+      const prev = G.prevCarIdx;
+      const curr = G.car.idx;
+      if (prev !== undefined && prev !== curr) {
+        const crossed = (prev < G.trapIdx && curr >= G.trapIdx) || (prev > G.trapIdx && curr <= G.trapIdx && Math.abs(prev - curr) < 25);
+        if (crossed && !G.trapCrossed) {
+          G.trapCrossed = true;
+          const kmh = Math.round(V.len(G.car.vel) * 3.6);
+          G.runTrapSpeed = kmh;
+          G.speedTrapFlash = 1.0;
+          if (DD.sfxCheckpoint) DD.sfxCheckpoint();
+          triggerSpeedTrapPopup(kmh);
+        }
+      }
+      G.prevCarIdx = curr;
+    }
+    if (G.speedTrapFlash > 0) {
+      G.speedTrapFlash = Math.max(0, G.speedTrapFlash - dtReal * 2.5);
+      if (G.track && G.track.speedTrapMat) {
+        G.track.speedTrapMat.emissiveIntensity = 1.0 + G.speedTrapFlash * 3.5;
+      }
+    }
     
     // Check for clean drift release
     const isCurrentlyDrifting = G.car.sliding && G.car.slideState;
@@ -1157,6 +1228,18 @@
       G.carMesh.userData.iridescent.emissive.copy(scratchColor.setHSL(h, 0.7, 0.25));
       G.carMesh.userData.iridescent.emissiveIntensity = 0.5;
     }
+    // boost flash overlay trigger
+    const currentBoostGlow = G.car.boostGlow || 0;
+    if (currentBoostGlow > 0.8 && (G.prevBoostGlow || 0) < 0.2) {
+      const flashEl = $('boostFlash');
+      if (flashEl) {
+        flashEl.classList.remove('active');
+        void flashEl.offsetWidth;
+        flashEl.classList.add('active');
+      }
+    }
+    G.prevBoostGlow = currentBoostGlow;
+
     // car boost glow — pulse the body shell while on a boost pad (consumes car.boostGlow)
     const ud = G.carMesh.userData;
     if (ud.boostShell && ud.baseEmis && !ud.iridescent) {
@@ -2727,6 +2810,78 @@
     $('zoneR').style.display = isTap ? 'block' : 'none';
 
     document.body.classList.toggle('tap-mode', isTap);
+  }
+
+  function findSpeedTrapIndex(track) {
+    const idx = findLongestStraight(track, false);
+    if (idx !== -1) return idx;
+    return findLongestStraight(track, true);
+  }
+
+  function findLongestStraight(track, relaxed) {
+    let longestStart = -1;
+    let longestLen = 0;
+    let currentStart = -1;
+    let currentLen = 0;
+    const minLength = relaxed ? 10 : 18;
+    const cpDist = relaxed ? 10 : 20;
+    const cornerPadding = relaxed ? 0 : 8;
+    const edgePadding = relaxed ? 15 : 30;
+    for (let i = 0; i < track.samples.length; i++) {
+      let allowed = true;
+      const s = track.samples[i];
+      if (s.gap || s.cut) allowed = false;
+      if (s.surf === DD.SURF.DIRT) allowed = false;
+      if (!relaxed && s.apron) allowed = false;
+      if (i < edgePadding || i > track.samples.length - edgePadding) allowed = false;
+      if (allowed && track.checkpoints) {
+        for (const cp of track.checkpoints) {
+          if (Math.abs(i - cp) < cpDist) { allowed = false; break; }
+        }
+      }
+      if (allowed && track.corners) {
+        for (const c of track.corners) {
+          if (i >= c.entry - cornerPadding && i <= c.end + cornerPadding) { allowed = false; break; }
+        }
+      }
+      if (allowed) {
+        if (currentStart === -1) currentStart = i;
+        currentLen++;
+      } else {
+        if (currentLen > longestLen) {
+          longestLen = currentLen;
+          longestStart = currentStart;
+        }
+        currentStart = -1;
+        currentLen = 0;
+      }
+    }
+    if (currentLen > longestLen) {
+      longestLen = currentLen;
+      longestStart = currentStart;
+    }
+    if (longestLen < minLength) return -1;
+    return Math.floor(longestStart + longestLen / 2);
+  }
+
+  function triggerSpeedTrapPopup(kmh) {
+    const el = $('hudSpeedTrap');
+    if (!el) return;
+    const valEl = $('hudSpeedTrapVal');
+    if (valEl) valEl.textContent = kmh;
+    el.style.display = 'block';
+    el.classList.remove('active');
+    void el.offsetWidth;
+    el.classList.add('active');
+    if (G.speedTrapTimeout) clearTimeout(G.speedTrapTimeout);
+    G.speedTrapTimeout = setTimeout(() => {
+      el.classList.remove('active');
+      setTimeout(() => {
+        if (!el.classList.contains('active')) {
+          el.style.display = 'none';
+        }
+      }, 300);
+    }, 2000);
   }
 
   window.addEventListener('DOMContentLoaded', DD.boot);

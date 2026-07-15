@@ -27,7 +27,7 @@
   };
   DD.updateSkidmarks = function (skid, car, track, active) {
     const ud = skid.userData;
-    if (!active || !car.grounded || car.onDirt) { ud.prevL = ud.prevR = null; return; }
+    if (!active || !car.grounded) { ud.prevL = ud.prevR = null; return; }
     const s = track.samples[Math.min(car.idx, track.samples.length - 1)];
     const fwd = [Math.sin(car.yaw), 0, Math.cos(car.yaw)];
     const fp = V.norm(V.addS(fwd, s.u, -V.dot(fwd, s.u)));
@@ -72,7 +72,7 @@
   DD.updateSmoke = function (pts, car, track, dt, emitting) {
     const ud = pts.userData;
     const arr = pts.geometry.attributes.position.array;
-    if (emitting && car.grounded) {
+    if (emitting && car.grounded && !car.onDirt && car.surf !== DD.SURF.DIRT) {
       const s = track.samples[Math.min(car.idx, track.samples.length - 1)];
       const fwd = [Math.sin(car.yaw), 0, Math.cos(car.yaw)];
       const right = V.norm(V.cross(s.u, fwd));
@@ -380,7 +380,7 @@
     pts.userData = { seeded: false };
     return pts;
   };
-  DD.updateSpeedLines = function (pts, camera, speedNorm) {
+  DD.updateSpeedLines = function (pts, camera, speedNorm, car, theme) {
     const arr = pts.geometry.attributes.position.array;
     const n = arr.length / 3;
     const cp = camera.position;
@@ -392,6 +392,7 @@
       }
       pts.userData.seeded = true;
     }
+    const isBoosting = !!(car && car.boostGlow > 0.05);
     for (let i = 0; i < n; i++) {
       const dx = arr[i * 3] - cp.x, dy = arr[i * 3 + 1] - cp.y, dz = arr[i * 3 + 2] - cp.z;
       if (dx * dx + dy * dy + dz * dz > 3600) {
@@ -403,11 +404,83 @@
       }
     }
     pts.geometry.attributes.position.needsUpdate = true;
-    pts.material.opacity = Math.max(0, speedNorm - 0.3) * 1.1;
+    if (isBoosting && theme) {
+      pts.material.color.copy(col(theme.boostColor || [0, 1, 0.5]));
+      pts.material.size = 0.95;
+      pts.material.opacity = 0.85;
+    } else if (theme) {
+      pts.material.color.copy(col(theme.accent));
+      pts.material.size = 0.3;
+      pts.material.opacity = Math.max(0, speedNorm - 0.3) * 1.1;
+    }
   };
 
 
   // Register on DD._sceneShared
   DD._sceneShared.buildFireflies = buildFireflies;
+
+  DD.buildDust = function (theme) {
+    const N = 120;
+    const pos = new Float32Array(N * 3);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const dustCol = new THREE.Color(0x8c664d).lerp(col(theme.groundColor || [0.4, 0.3, 0.2]), 0.4);
+    const m = new THREE.PointsMaterial({
+      color: dustCol,
+      size: 0.95,
+      map: getDotTexture(),
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.NormalBlending,
+      depthWrite: false
+    });
+    const pts = new THREE.Points(g, m);
+    pts.frustumCulled = false;
+    pts.userData = { N, head: 0, life: new Float32Array(N), vel: new Float32Array(N * 3) };
+    for (let i = 0; i < N; i++) pos[i * 3 + 1] = -9999;
+    return pts;
+  };
+
+  let dustSeed = 9999;
+  function dustRand() {
+    const x = Math.sin(dustSeed++) * 10000;
+    return x - Math.floor(x);
+  }
+
+  DD.updateDust = function (pts, car, track, dt, emitting) {
+    const ud = pts.userData;
+    const arr = pts.geometry.attributes.position.array;
+    const speed = V.len(car.vel);
+    if (emitting && car.grounded && speed > 5) {
+      const s = track.samples[Math.min(car.idx, track.samples.length - 1)];
+      const fwd = [Math.sin(car.yaw), 0, Math.cos(car.yaw)];
+      const right = V.norm(V.cross(s.u, fwd));
+      const count = speed > 35 ? 3 : (speed > 15 ? 2 : 1);
+      for (let e = 0; e < count; e++) {
+        const i = ud.head; ud.head = (ud.head + 1) % ud.N;
+        const side = (ud.head % 2 === 0) ? -0.95 : 0.95;
+        const p = V.addS(V.addS(V.addS(V.clone(car.pos), fwd, -1.4), right, side), s.u, 0.15);
+        arr[i * 3] = p[0]; arr[i * 3 + 1] = p[1]; arr[i * 3 + 2] = p[2];
+        ud.life[i] = 0.22 + dustRand() * 0.28;
+        const scatter = 3.0;
+        ud.vel[i * 3] = (dustRand() - 0.5) * scatter - fwd[0] * (speed * 0.25);
+        ud.vel[i * 3 + 1] = 1.0 + dustRand() * 2.5 + speed * 0.05;
+        ud.vel[i * 3 + 2] = (dustRand() - 0.5) * scatter - fwd[2] * (speed * 0.25);
+      }
+    }
+    for (let i = 0; i < ud.N; i++) {
+      if (ud.life[i] > 0) {
+        ud.life[i] -= dt;
+        arr[i * 3] += ud.vel[i * 3] * dt;
+        arr[i * 3 + 1] += ud.vel[i * 3 + 1] * dt;
+        arr[i * 3 + 2] += ud.vel[i * 3 + 2] * dt;
+        if (ud.life[i] <= 0) arr[i * 3 + 1] = -9999;
+      }
+    }
+    pts.geometry.attributes.position.needsUpdate = true;
+  };
+
+  DD._sceneShared.buildDust = DD.buildDust;
+  DD._sceneShared.updateDust = DD.updateDust;
 
 })(typeof window !== 'undefined' ? window : globalThis);
